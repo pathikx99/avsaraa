@@ -168,46 +168,42 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* SHOP Column */}
+          {/* NAVIGATION Column */}
           <div>
             <h3 style={{ fontSize: "12px", letterSpacing: "0.15em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
-              SHOP
+              PAGES
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px", color: "#4A3525" }}>
-              <li><Link href="/#sarees">Sarees</Link></li>
-              <li><Link href="/#dresses">Dresses</Link></li>
-              <li><Link href="/#new-arrivals">New Arrivals</Link></li>
-              <li><Link href="/#occasion-wear">Occasion Wear</Link></li>
-            </ul>
-          </div>
-
-          {/* HELP Column */}
-          <div>
-            <h3 style={{ fontSize: "12px", letterSpacing: "0.15em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
-              HELP
-            </h3>
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px", color: "#4A3525" }}>
+              <li><Link href="/">Home</Link></li>
               <li><Link href="/account">My Account</Link></li>
-              <li><Link href="/account">Orders</Link></li>
-              <li><Link href="/#shipping">Shipping Policy</Link></li>
-              <li><Link href="/#returns">Returns & Exchanges</Link></li>
-              <li><Link href="/#size-guide">Size Guide</Link></li>
-              <li><Link href="/#faqs">FAQs</Link></li>
+              <li><Link href="/login">Sign In</Link></li>
+              <li><Link href="/register">Join Avsaraa</Link></li>
             </ul>
           </div>
 
-          {/* ABOUT Column */}
+          {/* ATELIER Column */}
           <div>
             <h3 style={{ fontSize: "12px", letterSpacing: "0.15em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
-              ABOUT
+              ATELIER
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px", color: "#4A3525" }}>
               <li><Link href="/#about-us">About Us</Link></li>
+              <li><Link href="/#about-us">Our Heritage</Link></li>
+              <li><Link href="/#about-us">Artisanal Weaves</Link></li>
+              <li><Link href="/account">Custom Tailoring</Link></li>
+            </ul>
+          </div>
+
+          {/* CONCIERGE Column */}
+          <div>
+            <h3 style={{ fontSize: "12px", letterSpacing: "0.15em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+              CONCIERGE
+            </h3>
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px", color: "#4A3525" }}>
               <li><Link href="/#contact-us">Contact Us</Link></li>
-              <li><Link href="/#our-story">Our Story</Link></li>
-              <li><Link href="/#care">Care Instructions</Link></li>
-              <li><Link href="/#privacy">Privacy Policy</Link></li>
-              <li><Link href="/#terms">Terms & Conditions</Link></li>
+              <li><Link href="/#contact-us">WhatsApp Stylist</Link></li>
+              <li><Link href="/#contact-us">Atelier Visit</Link></li>
+              <li><Link href="mailto:concierge@avsaraa.in">concierge@avsaraa.in</Link></li>
             </ul>
           </div>
         </div>

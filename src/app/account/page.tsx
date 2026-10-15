@@ -7,7 +7,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
 export default function AccountPage() {
-  const [activeTab, setActiveTab] = useState<"orders" | "wishlist" | "addresses" | "measurements" | "concierge">("orders");
+  const [activeTab, setActiveTab] = useState<"profile" | "addresses" | "measurements" | "concierge">("profile");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -178,45 +178,47 @@ export default function AccountPage() {
                   +91 98765 43210 • ananya.sharma@example.com
                 </p>
                 <p style={{ fontSize: "12px", color: "#AC9885" }}>
-                  Member since October 2026
+                  Avsaraa Patron since October 2026
                 </p>
               </div>
 
-              {/* Log Out Button */}
-              <Link
-                href="/login"
-                style={{
-                  padding: "8px 16px",
-                  border: "1px solid #CFBEAD",
-                  borderRadius: "20px",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  color: "#543E2E",
-                  backgroundColor: "#FFFFFF",
-                  transition: "all 0.2s ease",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-              >
-                <span>Sign Out</span>
-                <span style={{ fontSize: "14px" }}>→</span>
-              </Link>
+              {/* Action Buttons */}
+              <div style={{ display: "flex", gap: "8px" }}>
+                <Link
+                  href="/login"
+                  style={{
+                    padding: "8px 16px",
+                    border: "1px solid #CFBEAD",
+                    borderRadius: "20px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#543E2E",
+                    backgroundColor: "#FFFFFF",
+                    transition: "all 0.2s ease",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <span>Sign Out</span>
+                  <span style={{ fontSize: "14px" }}>→</span>
+                </Link>
+              </div>
             </div>
 
-            {/* Quick Metrics */}
+            {/* Account Quick Metrics */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
                 gap: "12px",
                 marginTop: "24px",
               }}
             >
               {[
-                { label: "Active Orders", value: "0" },
-                { label: "Saved Looks", value: "3" },
-                { label: "Reward Points", value: "450" },
+                { label: "Account Status", value: "Verified Active" },
+                { label: "Saved Addresses", value: "1 Primary" },
+                { label: "Tailoring Profile", value: "Saved" },
                 { label: "Styling Session", value: "1 Booked" },
               ].map((stat, i) => (
                 <div
@@ -234,7 +236,7 @@ export default function AccountPage() {
                   <span
                     style={{
                       fontFamily: "var(--font-serif), Georgia, serif",
-                      fontSize: "19px",
+                      fontSize: "17px",
                       fontWeight: 600,
                       color: "#261B13",
                     }}
@@ -270,9 +272,8 @@ export default function AccountPage() {
             }}
           >
             {[
-              { id: "orders", label: "My Orders" },
-              { id: "wishlist", label: "Curated Wishlist (3)" },
-              { id: "addresses", label: "Addresses" },
+              { id: "profile", label: "Profile Details" },
+              { id: "addresses", label: "Saved Addresses" },
               { id: "measurements", label: "Custom Sizing" },
               { id: "concierge", label: "Stylist Concierge" },
             ].map((tab) => {
@@ -300,190 +301,61 @@ export default function AccountPage() {
 
         {/* Tab Content Panels */}
         <div style={{ maxWidth: "880px", margin: "28px auto 0 auto", padding: "0 20px" }}>
-          {/* 1. ORDERS TAB */}
-          {activeTab === "orders" && (
-            <div className="fade-in-up">
-              {/* Empty state or active order preview */}
+          {/* 1. PROFILE DETAILS TAB */}
+          {activeTab === "profile" && (
+            <div className="fade-in-up" style={{ maxWidth: "640px", margin: "0 auto" }}>
               <div
                 style={{
                   backgroundColor: "#FFFFFF",
                   border: "1px solid #E8DED3",
                   borderRadius: "18px",
-                  padding: "48px 24px",
-                  textAlign: "center",
-                  maxWidth: "520px",
-                  margin: "0 auto",
+                  padding: "28px 24px",
                   boxShadow: "0 6px 24px -6px rgba(38,27,19,0.04)",
                 }}
               >
-                <div
-                  style={{
-                    width: "64px",
-                    height: "64px",
-                    borderRadius: "50%",
-                    backgroundColor: "#FAF7F2",
-                    border: "1px solid #E6DACF",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 18px auto",
-                    color: "#866951",
-                  }}
-                >
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-                    <line x1="3" y1="6" x2="21" y2="6" />
-                    <path d="M16 10a4 4 0 0 1-8 0" />
-                  </svg>
+                <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "22px", color: "#261B13", marginBottom: "16px" }}>
+                  Personal Information
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                  <div>
+                    <span style={{ fontSize: "11px", color: "#8E7D70", display: "block" }}>Full Name</span>
+                    <span style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13" }}>Ananya Sharma</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: "11px", color: "#8E7D70", display: "block" }}>Mobile Number</span>
+                    <span style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13" }}>+91 98765 43210</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: "11px", color: "#8E7D70", display: "block" }}>Email Address</span>
+                    <span style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13" }}>ananya.sharma@example.com</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: "11px", color: "#8E7D70", display: "block" }}>Membership Tier</span>
+                    <span style={{ fontSize: "14.5px", fontWeight: 600, color: "#866951" }}>✦ Privilege Member</span>
+                  </div>
                 </div>
 
-                <h3
-                  style={{
-                    fontFamily: "var(--font-serif), Georgia, serif",
-                    fontSize: "24px",
-                    fontWeight: 600,
-                    color: "#261B13",
-                    marginBottom: "8px",
-                  }}
-                >
-                  No Active Orders
-                </h3>
-                <p
-                  style={{
-                    fontSize: "14px",
-                    color: "#6E5B4E",
-                    lineHeight: 1.6,
-                    marginBottom: "24px",
-                  }}
-                >
-                  Your curated wardrobe journey awaits. Explore our handcrafted sarees, occasion wear, and bespoke coordinates.
-                </p>
-
-                <Link
-                  href="/"
-                  className="avsaraa-btn-primary"
-                  style={{
-                    display: "inline-flex",
-                    width: "auto",
-                    padding: "0 32px",
-                    height: "46px",
-                    fontSize: "13.5px",
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Explore Collections →
-                </Link>
-              </div>
-            </div>
-          )}
-
-          {/* 2. WISHLIST TAB */}
-          {activeTab === "wishlist" && (
-            <div className="fade-in-up">
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-                  gap: "20px",
-                }}
-              >
-                {[
-                  {
-                    title: "Sage Serenity",
-                    desc: "TOP + BOTTOM + DUPATTA",
-                    price: "₹5,899",
-                    tag: "Festive Ready",
-                  },
-                  {
-                    title: "Dusty Rose Elegance",
-                    desc: "TOP + BOTTOM + DUPATTA",
-                    price: "₹5,499",
-                    tag: "Bestseller",
-                  },
-                  {
-                    title: "Ivory Dreams Handloom",
-                    desc: "CHANDERI SILK SAREE",
-                    price: "₹6,299",
-                    tag: "Artisanal",
-                  },
-                ].map((item, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      borderRadius: "16px",
-                      border: "1px solid #E8DED3",
-                      overflow: "hidden",
-                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
-                    }}
+                <div style={{ borderTop: "1px solid #EFE6DC", paddingTop: "16px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                  <Link
+                    href="/#about-us"
+                    className="avsaraa-btn-outline"
+                    style={{ flex: 1, height: "42px", fontSize: "13px" }}
                   >
-                    <div style={{ position: "relative", height: "260px", width: "100%", backgroundColor: "#EDE5DB" }}>
-                      <Image
-                        src="/images/saree_model_hero.jpg"
-                        alt={item.title}
-                        fill
-                        sizes="280px"
-                        style={{ objectFit: "cover", objectPosition: "center 20%" }}
-                      />
-                      <span
-                        style={{
-                          position: "absolute",
-                          top: "12px",
-                          left: "12px",
-                          backgroundColor: "rgba(38, 27, 19, 0.85)",
-                          color: "#FFFFFF",
-                          fontSize: "10px",
-                          fontWeight: 600,
-                          padding: "4px 8px",
-                          borderRadius: "6px",
-                          letterSpacing: "0.06em",
-                        }}
-                      >
-                        {item.tag}
-                      </span>
-                    </div>
-
-                    <div style={{ padding: "16px" }}>
-                      <h4
-                        style={{
-                          fontFamily: "var(--font-serif), Georgia, serif",
-                          fontSize: "18px",
-                          color: "#261B13",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        {item.title}
-                      </h4>
-                      <p style={{ fontSize: "11px", color: "#8E7D70", letterSpacing: "0.08em", marginBottom: "8px" }}>
-                        {item.desc}
-                      </p>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "12px" }}>
-                        <span style={{ fontSize: "15px", fontWeight: 600, color: "#261B13" }}>
-                          {item.price}
-                        </span>
-                        <button
-                          onClick={() => showToast(`Added "${item.title}" to bag`)}
-                          style={{
-                            padding: "6px 14px",
-                            backgroundColor: "#261B13",
-                            color: "#FFFFFF",
-                            borderRadius: "8px",
-                            fontSize: "12px",
-                            fontWeight: 500,
-                          }}
-                        >
-                          Add to Bag
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    Read About Us
+                  </Link>
+                  <Link
+                    href="/#contact-us"
+                    className="avsaraa-btn-primary"
+                    style={{ flex: 1, height: "42px", fontSize: "13px" }}
+                  >
+                    Contact Concierge
+                  </Link>
+                </div>
               </div>
             </div>
           )}
 
-          {/* 3. ADDRESSES TAB */}
+          {/* 2. ADDRESSES TAB */}
           {activeTab === "addresses" && (
             <div className="fade-in-up" style={{ maxWidth: "600px", margin: "0 auto" }}>
               <div
@@ -519,12 +391,12 @@ export default function AccountPage() {
                 className="avsaraa-btn-outline"
                 style={{ width: "100%", height: "48px", fontSize: "13.5px" }}
               >
-                + Add New Shipping Address
+                + Add New Address
               </button>
             </div>
           )}
 
-          {/* 4. MEASUREMENTS TAB */}
+          {/* 3. MEASUREMENTS TAB */}
           {activeTab === "measurements" && (
             <div className="fade-in-up" style={{ maxWidth: "600px", margin: "0 auto" }}>
               <div
@@ -581,7 +453,7 @@ export default function AccountPage() {
             </div>
           )}
 
-          {/* 5. CONCIERGE TAB */}
+          {/* 4. CONCIERGE TAB */}
           {activeTab === "concierge" && (
             <div className="fade-in-up" style={{ maxWidth: "600px", margin: "0 auto" }}>
               <div

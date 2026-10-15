@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Header from "@/components/Header";
@@ -9,8 +9,6 @@ import AboutSection from "@/components/AboutSection";
 import ContactSection from "@/components/ContactSection";
 
 export default function HomePage() {
-  const [activeCategory, setActiveCategory] = useState("All Looks");
-
   return (
     <div
       style={{
@@ -23,7 +21,7 @@ export default function HomePage() {
       {/* 1. Official Header & Announcement Bar */}
       <Header />
 
-      {/* 2. Hero Section (matching Docs/WhatsApp Image 2026-10-13 at 11.56.08 AM.jpeg) */}
+      {/* 2. Hero Section */}
       <section
         style={{
           position: "relative",
@@ -36,7 +34,7 @@ export default function HomePage() {
           style={{
             maxWidth: "1280px",
             margin: "0 auto",
-            padding: "32px 20px 48px 20px",
+            padding: "36px 20px 52px 20px",
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
             alignItems: "center",
@@ -70,7 +68,7 @@ export default function HomePage() {
                 marginBottom: "14px",
               }}
             >
-              AVSARAA STYLE
+              AVSARAA
             </h1>
 
             <p
@@ -89,18 +87,18 @@ export default function HomePage() {
 
             <p
               style={{
-                fontSize: "14px",
+                fontSize: "14.5px",
                 lineHeight: 1.6,
                 color: "#6E5B4E",
                 marginBottom: "28px",
                 maxWidth: "460px",
               }}
             >
-              Curated combinations of tops, bottoms and dupattas to create complete looks for every occasion.
+              Born from a reverent celebration of Indian heritage handlooms. Explore bespoke styling, custom tailored silhouettes, and effortless grace.
             </p>
 
-            {/* Core Action Buttons: Login, Register, My Account */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginBottom: "20px" }}>
+            {/* Core Action Buttons */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
               <Link
                 href="/login"
                 className="avsaraa-btn-primary"
@@ -156,6 +154,17 @@ export default function HomePage() {
                 <span>My Account</span>
               </Link>
             </div>
+
+            {/* Quick Links to About & Contact */}
+            <div style={{ display: "flex", gap: "16px", fontSize: "13px" }}>
+              <Link href="#about-us" style={{ color: "#866951", textDecoration: "underline", textUnderlineOffset: "3px", fontWeight: 500 }}>
+                Our Heritage & Story ↓
+              </Link>
+              <span style={{ color: "#CFBEAD" }}>•</span>
+              <Link href="#contact-us" style={{ color: "#866951", textDecoration: "underline", textUnderlineOffset: "3px", fontWeight: 500 }}>
+                Atelier Concierge & Contact ↓
+              </Link>
+            </div>
           </div>
 
           {/* Right Hero Image */}
@@ -201,7 +210,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. Three Pillars (Expertly Curated, Complete Looks, For Every Occasion) */}
+      {/* 3. Three Pillars */}
       <section
         style={{
           backgroundColor: "#F7F2EE",
@@ -224,7 +233,7 @@ export default function HomePage() {
             <h3 style={{ fontSize: "13px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>
               Curated by Avsaraa
             </h3>
-            <p style={{ fontSize: "11.5px", color: "#6E5B4E" }}>Hand-selected styles</p>
+            <p style={{ fontSize: "11.5px", color: "#6E5B4E" }}>Hand-selected silhouettes</p>
           </div>
           <div>
             <span style={{ fontSize: "24px", display: "block", marginBottom: "6px" }}>👗</span>
@@ -243,283 +252,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. Filter Pills & Curated Looks Grid (matching Docs/WhatsApp Image 2026-10-13 at 11.56.08 AM.jpeg) */}
-      <section style={{ padding: "40px 20px 50px 20px", maxWidth: "1100px", margin: "0 auto", width: "100%" }}>
-        <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <span
-            style={{
-              fontSize: "10.5px",
-              fontWeight: 600,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: "#866951",
-              display: "block",
-              marginBottom: "6px",
-            }}
-          >
-            EXPLORE OUR CURATED LOOKS
-          </span>
-          <h2
-            style={{
-              fontFamily: "var(--font-serif), Georgia, serif",
-              fontSize: "30px",
-              fontWeight: 500,
-              color: "#261B13",
-            }}
-          >
-            Ethnic Elegance for Every Moment
-          </h2>
-          <div style={{ width: "36px", height: "1px", backgroundColor: "#C4AB94", margin: "10px auto 0 auto" }} />
-        </div>
-
-        {/* Filter Pills */}
-        <div
-          className="no-scrollbar"
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: "8px",
-            overflowX: "auto",
-            paddingBottom: "16px",
-            marginBottom: "24px",
-          }}
-        >
-          {["All Looks", "Everyday", "Festive", "Wedding", "Party"].map((tab) => {
-            const isActive = activeCategory === tab;
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveCategory(tab)}
-                style={{
-                  padding: "8px 18px",
-                  borderRadius: "20px",
-                  fontSize: "12.5px",
-                  fontWeight: 600,
-                  border: isActive ? "1px solid #261B13" : "1px solid #CFBEAD",
-                  backgroundColor: isActive ? "#261B13" : "#FFFFFF",
-                  color: isActive ? "#FAF7F2" : "#543E2E",
-                  transition: "all 0.2s ease",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {tab}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Product Grid (2 columns on mobile, matching reference) */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-            gap: "20px",
-          }}
-        >
-          {[
-            {
-              title: "Sage Serenity",
-              desc: "TOP + BOTTOM + DUPATTA",
-              price: "₹5,899",
-            },
-            {
-              title: "Dusty Rose Elegance",
-              desc: "TOP + BOTTOM + DUPATTA",
-              price: "₹5,499",
-            },
-            {
-              title: "Festive Grace",
-              desc: "TOP + BOTTOM + DUPATTA",
-              price: "₹6,299",
-            },
-            {
-              title: "Ivory Dreams",
-              desc: "TOP + BOTTOM + DUPATTA",
-              price: "₹5,299",
-            },
-          ].map((look, i) => (
-            <div
-              key={i}
-              style={{
-                backgroundColor: "#FFFFFF",
-                borderRadius: "16px",
-                border: "1px solid #E8DED3",
-                overflow: "hidden",
-                transition: "transform 0.2s ease",
-              }}
-            >
-              <div style={{ position: "relative", height: "280px", width: "100%", backgroundColor: "#EDE5DB" }}>
-                <Image
-                  src="/images/saree_model_hero.jpg"
-                  alt={look.title}
-                  fill
-                  sizes="(min-width: 600px) 280px, 50vw"
-                  style={{ objectFit: "cover", objectPosition: i % 2 === 0 ? "center 15%" : "center 30%" }}
-                />
-                <button
-                  aria-label="Save to Wishlist"
-                  style={{
-                    position: "absolute",
-                    top: "12px",
-                    right: "12px",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    backgroundColor: "rgba(255,255,255,0.85)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#261B13",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                  </svg>
-                </button>
-              </div>
-
-              <div style={{ padding: "16px" }}>
-                <h4
-                  style={{
-                    fontFamily: "var(--font-serif), Georgia, serif",
-                    fontSize: "18px",
-                    color: "#261B13",
-                    marginBottom: "4px",
-                  }}
-                >
-                  {look.title}
-                </h4>
-                <p style={{ fontSize: "10.5px", color: "#8E7D70", letterSpacing: "0.08em", marginBottom: "8px" }}>
-                  {look.desc}
-                </p>
-                <div style={{ fontSize: "16px", fontWeight: 600, color: "#261B13", marginBottom: "14px" }}>
-                  {look.price}
-                </div>
-
-                <Link
-                  href="/account"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                    width: "100%",
-                    height: "40px",
-                    backgroundColor: "#866951",
-                    color: "#FFFFFF",
-                    borderRadius: "8px",
-                    fontSize: "11.5px",
-                    fontWeight: 600,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  <span>VIEW LOOK</span>
-                  <span>→</span>
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 5. Create Your Own Look Promo (matching reference) */}
-      <section
-        style={{
-          padding: "30px 20px",
-          maxWidth: "1100px",
-          margin: "0 auto 40px auto",
-          width: "100%",
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "#FAF7F2",
-            border: "1px solid #E6DACF",
-            borderRadius: "20px",
-            padding: "32px 24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "24px",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          <div style={{ maxWidth: "480px", position: "relative", zIndex: 1 }}>
-            <span
-              style={{
-                fontSize: "10.5px",
-                fontWeight: 600,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: "#866951",
-                display: "block",
-                marginBottom: "6px",
-              }}
-            >
-              COMING SOON
-            </span>
-            <h3
-              style={{
-                fontFamily: "var(--font-serif), Georgia, serif",
-                fontSize: "26px",
-                color: "#261B13",
-                marginBottom: "8px",
-              }}
-            >
-              CREATE YOUR OWN LOOK
-            </h3>
-            <p style={{ fontSize: "13.5px", color: "#6E5B4E", lineHeight: 1.6, marginBottom: "20px" }}>
-              Choose your favourite tops, bottoms and dupattas to craft a look that&apos;s uniquely yours.
-            </p>
-            <Link
-              href="/register"
-              className="avsaraa-btn-primary"
-              style={{
-                display: "inline-flex",
-                width: "auto",
-                padding: "0 26px",
-                height: "44px",
-                fontSize: "12px",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              Get Notified →
-            </Link>
-          </div>
-
-          <div
-            style={{
-              position: "relative",
-              width: "200px",
-              height: "160px",
-              borderRadius: "14px",
-              overflow: "hidden",
-            }}
-          >
-            <Image
-              src="/images/saree_model_hero.jpg"
-              alt="Avsaraa Atelier"
-              fill
-              sizes="200px"
-              style={{ objectFit: "cover", objectPosition: "center 20%" }}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* 6. About Us Section */}
+      {/* 4. About Us Section */}
       <AboutSection />
 
-      {/* 7. Contact Section */}
+      {/* 5. Contact Section */}
       <ContactSection />
 
-      {/* 8. Official Footer */}
+      {/* 6. Official Footer */}
       <Footer />
     </div>
   );
