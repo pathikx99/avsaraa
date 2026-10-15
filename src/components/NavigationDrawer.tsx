@@ -77,13 +77,15 @@ export default function NavigationDrawer({ isOpen, onClose }: NavigationDrawerPr
           </button>
         </div>
 
-        {/* Primary Categories */}
+        {/* Primary Navigation */}
         <nav style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
           {[
-            { label: "SAREES", href: "/#sarees" },
-            { label: "DRESSES", href: "/#dresses" },
-            { label: "NEW ARRIVALS", href: "/#new-arrivals" },
-            { label: "OCCASION WEAR", href: "/#occasion-wear" },
+            { label: "HOME", href: "/", icon: "✦" },
+            { label: "MY ACCOUNT", href: "/account", icon: "👤" },
+            { label: "LOGIN", href: "/login", icon: "→" },
+            { label: "REGISTER", href: "/register", icon: "✨" },
+            { label: "ABOUT US", href: "/#about-us", icon: "📜" },
+            { label: "CONTACT US", href: "/#contact-us", icon: "✉️" },
           ].map((item) => (
             <Link
               key={item.label}
@@ -95,102 +97,94 @@ export default function NavigationDrawer({ isOpen, onClose }: NavigationDrawerPr
                 justifyContent: "space-between",
                 padding: "14px 0",
                 borderBottom: "1px solid #EFE6DC",
-                fontSize: "14px",
+                fontSize: "13px",
                 fontWeight: 600,
-                letterSpacing: "0.1em",
+                letterSpacing: "0.12em",
                 color: "#261B13",
                 textTransform: "uppercase",
+                transition: "all 0.2s ease",
               }}
             >
-              <span>{item.label}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ color: "#AC9885", fontSize: "14px" }}>{item.icon}</span>
+                <span>{item.label}</span>
+              </div>
               <span style={{ color: "#AC9885", fontSize: "16px" }}>›</span>
             </Link>
           ))}
         </nav>
 
-        {/* User Account / Bag links */}
-        <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "4px" }}>
-          <Link
-            href="/login"
-            onClick={onClose}
+        {/* Quick Access Section */}
+        <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "12px 0",
-              fontSize: "14px",
-              color: "#4A3525",
-              fontWeight: 500,
+              padding: "16px",
+              backgroundColor: "#F2EBE3",
+              borderRadius: "14px",
+              border: "1px solid #E6DACF",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              <span>My Account</span>
+            <span
+              style={{
+                fontSize: "10.5px",
+                fontWeight: 600,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: "#866951",
+                display: "block",
+                marginBottom: "4px",
+              }}
+            >
+              AVSARAA ATELIER
+            </span>
+            <p
+              style={{
+                fontFamily: "var(--font-serif), Georgia, serif",
+                fontSize: "16px",
+                color: "#261B13",
+                fontStyle: "italic",
+                marginBottom: "10px",
+              }}
+            >
+              Welcome to effortless grace.
+            </p>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <Link
+                href="/login"
+                onClick={onClose}
+                style={{
+                  flex: 1,
+                  padding: "9px 0",
+                  backgroundColor: "#261B13",
+                  color: "#FAF7F2",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  textAlign: "center",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                onClick={onClose}
+                style={{
+                  flex: 1,
+                  padding: "9px 0",
+                  backgroundColor: "#FFFFFF",
+                  color: "#261B13",
+                  border: "1px solid #CFBEAD",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  textAlign: "center",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Join Free
+              </Link>
             </div>
-            <span style={{ color: "#AC9885", fontSize: "16px" }}>›</span>
-          </Link>
-
-          <Link
-            href="/login"
-            onClick={onClose}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "12px 0",
-              fontSize: "14px",
-              color: "#4A3525",
-              fontWeight: 500,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              </svg>
-              <span>Wishlist</span>
-            </div>
-            <span style={{ color: "#AC9885", fontSize: "16px" }}>›</span>
-          </Link>
-
-          <Link
-            href="/login"
-            onClick={onClose}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "12px 0",
-              fontSize: "14px",
-              color: "#4A3525",
-              fontWeight: 500,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <path d="M16 10a4 4 0 0 1-8 0" />
-              </svg>
-              <span>My Bag (0)</span>
-            </div>
-            <span style={{ color: "#AC9885", fontSize: "16px" }}>›</span>
-          </Link>
-        </div>
-
-        {/* Secondary Links: About Us, Contact */}
-        <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #EFE6DC" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <Link href="/login" onClick={onClose} style={{ fontSize: "13.5px", color: "#6E5B4E", display: "flex", justifyContent: "space-between" }}>
-              <span>About Us</span>
-              <span style={{ color: "#AC9885" }}>›</span>
-            </Link>
-            <Link href="/login" onClick={onClose} style={{ fontSize: "13.5px", color: "#6E5B4E", display: "flex", justifyContent: "space-between" }}>
-              <span>Contact Us</span>
-              <span style={{ color: "#AC9885" }}>›</span>
-            </Link>
           </div>
         </div>
 
@@ -226,7 +220,8 @@ export default function NavigationDrawer({ isOpen, onClose }: NavigationDrawerPr
               src="/images/botanical_flowers.jpg"
               alt=""
               fill
-              style={{ objectFit: "contain" }}
+              sizes="120px"
+              style={{ objectFit: "contain", mixBlendMode: "multiply" }}
             />
           </div>
         </div>

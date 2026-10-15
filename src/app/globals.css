@@ -50,11 +50,6 @@ h1, h2, h3, h4, .font-serif {
   letter-spacing: -0.01em;
 }
 
-a {
-  text-decoration: none;
-  color: inherit;
-}
-
 button {
   font-family: inherit;
   cursor: pointer;
@@ -76,20 +71,10 @@ input {
   border: none;
 }
 
-/* ── Animations ── */
+/* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInScale {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes slideInLeft {
@@ -97,35 +82,9 @@ input {
   to { transform: translateX(0); }
 }
 
-@keyframes slideInRight {
-  from { transform: translateX(40px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 171, 148, 0); }
-  50% { box-shadow: 0 0 0 8px rgba(196, 171, 148, 0.15); }
-}
-
-@keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
 }
 
 .animate-spin {
@@ -136,25 +95,7 @@ input {
   animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.fade-in-up {
-  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Staggered children animation */
-.stagger-children > * {
-  opacity: 0;
-  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
-.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
-.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
-.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
-.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
-.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
-.stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
-.stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
-
-/* ── Form Styles ── */
+/* Form Styles */
 .avsaraa-input-group {
   position: relative;
   display: flex;
@@ -233,7 +174,7 @@ input {
   box-shadow: 0 4px 12px rgba(38, 27, 19, 0.05);
 }
 
-/* ── Custom Checkbox ── */
+/* Custom Checkbox */
 .avsaraa-checkbox {
   appearance: none;
   -webkit-appearance: none;
@@ -275,48 +216,12 @@ input {
   transform: scale(1) rotate(-45deg);
 }
 
-/* ── Shimmer Text Effect ── */
-.shimmer-text {
-  background: linear-gradient(
-    90deg,
-    var(--color-rich-brown) 0%,
-    var(--color-champagne) 40%,
-    var(--color-rich-brown) 60%,
-    var(--color-champagne) 100%
-  );
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: shimmer 4s ease-in-out infinite;
+a {
+  text-decoration: none;
+  color: inherit;
 }
 
-/* ── Decorative Ornament Separator ── */
-.ornament-divider {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 4px 0;
-}
-
-.ornament-divider::before,
-.ornament-divider::after {
-  content: "";
-  height: 1px;
-  width: 40px;
-  background: linear-gradient(
-    to var(--direction, right),
-    transparent,
-    var(--color-champagne)
-  );
-}
-
-.ornament-divider::after {
-  --direction: left;
-}
-
-/* ── Account Page Styles ── */
+/* ── Luxury Card & Interactive Styles ── */
 .account-card {
   background: #FFFFFF;
   border: 1px solid var(--color-border-subtle);
@@ -328,71 +233,40 @@ input {
   overflow: hidden;
 }
 
-.account-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--color-champagne), var(--color-rich-brown), var(--color-champagne));
-  background-size: 200% auto;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
 .account-card:hover {
   border-color: var(--color-taupe-beige);
-  box-shadow: 0 8px 30px -8px rgba(38, 27, 19, 0.1);
+  box-shadow: 0 10px 30px -10px rgba(38, 27, 19, 0.1);
   transform: translateY(-2px);
 }
 
-.account-card:hover::before {
-  opacity: 1;
-  animation: shimmer 2s ease-in-out infinite;
-}
-
-/* ── Luxury Gradient Background ── */
-.luxury-gradient-bg {
-  background: linear-gradient(135deg, #FAF7F2 0%, #F2EBE3 30%, #EDE4DA 60%, #FAF7F2 100%);
-  background-size: 400% 400%;
-  animation: gradientShift 12s ease infinite;
-}
-
-/* ── Scroll Animations (with JS observer) ── */
-.reveal {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.reveal.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* ── Glassmorphism Card ── */
 .glass-card {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(232, 222, 211, 0.6);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(232, 222, 211, 0.7);
   border-radius: var(--radius-lg);
 }
 
-/* ── Account Avatar ── */
-.account-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-champagne), var(--color-rich-brown));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #FFFFFF;
-  font-family: var(--font-serif);
-  font-size: 28px;
-  font-weight: 600;
-  box-shadow: 0 4px 16px rgba(134, 105, 81, 0.3);
-  animation: pulseGlow 3s ease-in-out infinite;
+/* ── Shimmer & Keyframes ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 171, 148, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(196, 171, 148, 0.2); }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom scrollbar for horizontal tabs */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

@@ -50,6 +50,9 @@ export default function RegisterForm({
     setTimeout(() => {
       setIsLoading(false);
       showToast(`Welcome to the Avsaraa family, ${fullName.split(" ")[0]}!`);
+      setTimeout(() => {
+        window.location.href = "/account";
+      }, 500);
     }, 800);
   };
 
@@ -120,6 +123,7 @@ export default function RegisterForm({
           style={{
             objectFit: "contain",
             transform: "rotate(12deg)",
+            mixBlendMode: "multiply",
           }}
           priority
         />
@@ -134,7 +138,7 @@ export default function RegisterForm({
         }}
       >
         <button
-          onClick={onBack || (() => window.history.back())}
+          onClick={onBack || (() => { if (typeof window !== "undefined" && window.history.length > 1) { window.history.back(); } else { window.location.href = "/"; } })}
           aria-label="Back"
           style={{
             width: "36px",

@@ -91,11 +91,23 @@ export default function Header() {
           </button>
 
           {/* Wishlist Icon */}
-          <button aria-label="Wishlist" style={{ color: "#261B13", display: "flex", alignItems: "center" }}>
+          <Link href="/account" aria-label="Wishlist" style={{ color: "#261B13", display: "flex", alignItems: "center" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
-          </button>
+          </Link>
+
+          {/* Account Icon */}
+          <Link
+            href="/account"
+            aria-label="My Account"
+            style={{ color: "#261B13", display: "flex", alignItems: "center" }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </Link>
 
           {/* Bag Icon with Counter */}
           <Link

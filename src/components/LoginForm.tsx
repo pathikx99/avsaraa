@@ -60,6 +60,9 @@ export default function LoginForm({
     setTimeout(() => {
       setIsLoading(false);
       showToast("Welcome back to Avsaraa!");
+      setTimeout(() => {
+        window.location.href = "/account";
+      }, 500);
     }, 700);
   };
 
@@ -72,7 +75,10 @@ export default function LoginForm({
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      showToast("Welcome back!");
+      showToast("Welcome back to Avsaraa!");
+      setTimeout(() => {
+        window.location.href = "/account";
+      }, 500);
     }, 700);
   };
 
@@ -138,7 +144,7 @@ export default function LoginForm({
         }}
       >
         <button
-          onClick={onBack || (() => window.history.back())}
+          onClick={onBack || (() => { if (typeof window !== "undefined" && window.history.length > 1) { window.history.back(); } else { window.location.href = "/"; } })}
           aria-label="Back"
           style={{
             width: "36px",
@@ -279,7 +285,7 @@ export default function LoginForm({
             alt=""
             fill
             sizes="150px"
-            style={{ objectFit: "contain", transform: "rotate(-25deg)" }}
+            style={{ objectFit: "contain", transform: "rotate(-25deg)", mixBlendMode: "multiply" }}
           />
         </div>
 

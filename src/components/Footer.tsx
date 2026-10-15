@@ -47,7 +47,8 @@ export default function Footer() {
             src="/images/botanical_flowers.jpg"
             alt=""
             fill
-            style={{ objectFit: "contain" }}
+            sizes="300px"
+            style={{ objectFit: "contain", mixBlendMode: "multiply" }}
           />
         </div>
 
@@ -186,8 +187,8 @@ export default function Footer() {
               HELP
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px", color: "#4A3525" }}>
-              <li><Link href="/login">My Account</Link></li>
-              <li><Link href="/login">Orders</Link></li>
+              <li><Link href="/account">My Account</Link></li>
+              <li><Link href="/account">Orders</Link></li>
               <li><Link href="/#shipping">Shipping Policy</Link></li>
               <li><Link href="/#returns">Returns & Exchanges</Link></li>
               <li><Link href="/#size-guide">Size Guide</Link></li>
