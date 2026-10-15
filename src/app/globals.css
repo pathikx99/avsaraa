@@ -1,0 +1,398 @@
+:root {
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+
+  /* Official Avsaraa Premium Website Color Palette */
+  --color-ivory: #F7F2EE;          /* Main website background; clean and luxurious */
+  --color-warm-beige: #E6DACF;     /* Hero sections, banners and soft backgrounds */
+  --color-taupe-beige: #CFBEAD;    /* Product cards, secondary sections and borders */
+  --color-champagne: #C4AB94;      /* Premium accents, decorative details and subtle highlights */
+  --color-soft-mocha: #AC9885;     /* Secondary text, subtle accents and elegant details */
+  --color-rich-brown: #866951;     /* Leather-inspired accents, icons and highlights */
+  --color-espresso: #261B13;       /* Headings, navigation, text and primary buttons */
+  --color-soft-greige: #EEEAE6;    /* Alternative background for product grids and mobile screens */
+
+  /* UI Aliases */
+  --color-bg-page: var(--color-ivory);
+  --color-card-bg: #FFFFFF;
+  --color-border-subtle: #E8DED3;
+  --color-border-focus: var(--color-champagne);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 32px;
+
+  --shadow-subtle: 0 4px 20px rgba(38, 27, 19, 0.05);
+  --shadow-card: 0 12px 35px -8px rgba(38, 27, 19, 0.08);
+  --shadow-button: 0 6px 18px -4px rgba(38, 27, 19, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  min-height: 100%;
+  background-color: var(--color-bg-page);
+  color: var(--color-espresso);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, .font-serif {
+  font-family: var(--font-serif);
+  color: var(--color-espresso);
+  letter-spacing: -0.01em;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--color-champagne);
+  outline-offset: 2px;
+}
+
+input {
+  font-family: inherit;
+  outline: none;
+  background: transparent;
+  border: none;
+}
+
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(40px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 171, 148, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(196, 171, 148, 0.15); }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Staggered children animation */
+.stagger-children > * {
+  opacity: 0;
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
+
+/* ── Form Styles ── */
+.avsaraa-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--color-border-subtle);
+  background: #FCFAF7;
+  border-radius: var(--radius-md);
+  padding: 0 16px;
+  height: 52px;
+  transition: all 0.25s ease;
+}
+
+.avsaraa-input-group:hover {
+  border-color: var(--color-taupe-beige);
+}
+
+.avsaraa-input-group:focus-within {
+  border-color: var(--color-champagne);
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(196, 171, 148, 0.2);
+}
+
+.avsaraa-btn-primary {
+  width: 100%;
+  height: 52px;
+  background-color: var(--color-espresso);
+  color: #FFFFFF;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: var(--shadow-button);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.avsaraa-btn-primary:hover:not(:disabled) {
+  background-color: #382418;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -5px rgba(38, 27, 19, 0.4);
+}
+
+.avsaraa-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  background-color: #1A120C;
+}
+
+.avsaraa-btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.avsaraa-btn-outline {
+  width: 100%;
+  height: 52px;
+  background: transparent;
+  color: var(--color-espresso);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 14.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.avsaraa-btn-outline:hover {
+  background: #FFFFFF;
+  border-color: var(--color-taupe-beige);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(38, 27, 19, 0.05);
+}
+
+/* ── Custom Checkbox ── */
+.avsaraa-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 19px;
+  height: 19px;
+  border: 1.5px solid var(--color-border-subtle);
+  border-radius: 4px;
+  background: #FFFFFF;
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  margin-top: 2px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.avsaraa-checkbox:checked {
+  background-color: var(--color-espresso);
+  border-color: var(--color-espresso);
+}
+
+.avsaraa-checkbox:focus-visible {
+  outline: 2px solid var(--color-champagne);
+  outline-offset: 2px;
+}
+
+.avsaraa-checkbox::before {
+  content: "";
+  width: 10px;
+  height: 6px;
+  transform: scale(0) rotate(-45deg);
+  border-left: 2px solid white;
+  border-bottom: 2px solid white;
+  margin-bottom: 2px;
+  transition: 120ms transform ease-in-out;
+}
+
+.avsaraa-checkbox:checked::before {
+  transform: scale(1) rotate(-45deg);
+}
+
+/* ── Shimmer Text Effect ── */
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--color-rich-brown) 0%,
+    var(--color-champagne) 40%,
+    var(--color-rich-brown) 60%,
+    var(--color-champagne) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s ease-in-out infinite;
+}
+
+/* ── Decorative Ornament Separator ── */
+.ornament-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.ornament-divider::before,
+.ornament-divider::after {
+  content: "";
+  height: 1px;
+  width: 40px;
+  background: linear-gradient(
+    to var(--direction, right),
+    transparent,
+    var(--color-champagne)
+  );
+}
+
+.ornament-divider::after {
+  --direction: left;
+}
+
+/* ── Account Page Styles ── */
+.account-card {
+  background: #FFFFFF;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.account-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-champagne), var(--color-rich-brown), var(--color-champagne));
+  background-size: 200% auto;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.account-card:hover {
+  border-color: var(--color-taupe-beige);
+  box-shadow: 0 8px 30px -8px rgba(38, 27, 19, 0.1);
+  transform: translateY(-2px);
+}
+
+.account-card:hover::before {
+  opacity: 1;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* ── Luxury Gradient Background ── */
+.luxury-gradient-bg {
+  background: linear-gradient(135deg, #FAF7F2 0%, #F2EBE3 30%, #EDE4DA 60%, #FAF7F2 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 12s ease infinite;
+}
+
+/* ── Scroll Animations (with JS observer) ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Glassmorphism Card ── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(232, 222, 211, 0.6);
+  border-radius: var(--radius-lg);
+}
+
+/* ── Account Avatar ── */
+.account-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-champagne), var(--color-rich-brown));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(134, 105, 81, 0.3);
+  animation: pulseGlow 3s ease-in-out infinite;
+}
