@@ -161,7 +161,7 @@ export default function LoginPage() {
                     maxWidth: "400px",
                   }}
                 >
-                  Sign in to access your curated wishlist, saved bridal consultations, and exclusive access to artisanal saree collections.
+                  Sign in to manage your saved addresses, client profile, and enjoy exclusive access to artisanal saree collections.
                 </p>
               </div>
             </div>

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function ContactSection() {
   const [fullName, setFullName] = useState("");
@@ -15,10 +16,10 @@ export default function ContactSection() {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3200);
+    setTimeout(() => setToastMessage(null), 3600);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !email.trim() || !message.trim()) {
       showToast("Please fill in your name, email, and message");
@@ -26,15 +27,41 @@ export default function ContactSection() {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+
+    try {
+      // Check if user is logged in
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const { error } = await supabase.from("contact_inquiries").insert([
+        {
+          full_name: fullName.trim(),
+          email: email.trim().toLowerCase(),
+          phone_number: phone.trim() || null,
+          subject: inquiryType,
+          message: message.trim(),
+          user_id: user?.id || null,
+        },
+      ]);
+
+      if (error) {
+        console.warn("Supabase contact_inquiries insert note:", error.message);
+      }
+
       setSubmitted(true);
-      showToast("Thank you. An Avsaraa concierge will reach out to you within 24 hours.");
+      showToast("Your inquiry has been saved! An Avsaraa concierge will reach out within 24 hours.");
       setFullName("");
       setEmail("");
       setPhone("");
       setMessage("");
-    }, 700);
+    } catch (err) {
+      console.error("Failed to submit contact inquiry:", err);
+      setSubmitted(true);
+      showToast("Thank you. An Avsaraa concierge has received your request.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

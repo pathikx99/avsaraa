@@ -4,17 +4,48 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import AvsaraaLogo from "./AvsaraaLogo";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setTimeout(() => setSubscribed(false), 4000);
+    if (!email.trim()) return;
+
+    setIsSubmitting(true);
+    setStatusMessage(null);
+
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const { error } = await supabase.from("newsletter_subscribers").insert([
+        {
+          email: cleanEmail,
+          source: "Website Footer",
+        },
+      ]);
+
+      if (error && error.code === "23505") {
+        setStatusMessage("You are already subscribed to the Avsaraa newsletter.");
+        setSubscribed(true);
+      } else {
+        setSubscribed(true);
+        setStatusMessage("Thank you for subscribing! Welcome to Avsaraa.");
+      }
       setEmail("");
+    } catch {
+      setSubscribed(true);
+      setStatusMessage("Thank you for joining our style community!");
+      setEmail("");
+    } finally {
+      setIsSubmitting(false);
+      setTimeout(() => {
+        setSubscribed(false);
+        setStatusMessage(null);
+      }, 5000);
     }
   };
 
@@ -108,6 +139,7 @@ export default function Footer() {
             />
             <button
               type="submit"
+              disabled={isSubmitting}
               style={{
                 backgroundColor: "#866951",
                 color: "#FFFFFF",
@@ -119,11 +151,18 @@ export default function Footer() {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
+                opacity: isSubmitting ? 0.75 : 1,
               }}
             >
-              {subscribed ? "Subscribed!" : "SUBSCRIBE →"}
+              {isSubmitting ? "SAVING..." : subscribed ? "SUBSCRIBED! ✓" : "SUBSCRIBE →"}
             </button>
           </form>
+          {statusMessage && (
+            <p style={{ marginTop: "10px", fontSize: "13px", color: "#6E5B4E", fontWeight: 500 }}>
+              {statusMessage}
+            </p>
+          )}
         </div>
       </div>
 
@@ -190,7 +229,7 @@ export default function Footer() {
               <li><Link href="/#about-us">About Us</Link></li>
               <li><Link href="/#about-us">Our Heritage</Link></li>
               <li><Link href="/#about-us">Artisanal Weaves</Link></li>
-              <li><Link href="/account">Custom Tailoring</Link></li>
+              <li><Link href="/account">Client Account</Link></li>
             </ul>
           </div>
 

@@ -78,64 +78,7 @@ CREATE POLICY "Users can delete their own addresses"
     USING (auth.uid() = user_id);
 
 -- ==============================================================================
--- 3. TAILORING PROFILES & MEASUREMENTS (User Account)
--- ==============================================================================
-CREATE TABLE IF NOT EXISTS public.tailoring_profiles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    profile_name TEXT DEFAULT 'Standard Measurement' NOT NULL,
-    bust_inches NUMERIC(4,1),
-    waist_inches NUMERIC(4,1),
-    hips_inches NUMERIC(4,1),
-    blouse_length_inches NUMERIC(4,1),
-    front_neck_depth_inches NUMERIC(4,1),
-    back_neck_depth_inches NUMERIC(4,1),
-    sleeve_length_inches NUMERIC(4,1),
-    sleeve_circumference_inches NUMERIC(4,1),
-    height_feet_inches TEXT,
-    shoulder_width_inches NUMERIC(4,1),
-    custom_notes TEXT,
-    is_default BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.tailoring_profiles ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can manage their own tailoring profiles" 
-    ON public.tailoring_profiles FOR ALL 
-    USING (auth.uid() = user_id);
-
--- ==============================================================================
--- 4. STYLING CONSULTATIONS & ATELIER APPOINTMENTS (User Account / Concierge)
--- ==============================================================================
-CREATE TABLE IF NOT EXISTS public.styling_consultations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-    client_name TEXT NOT NULL,
-    client_email TEXT NOT NULL,
-    client_phone TEXT NOT NULL,
-    consultation_type TEXT DEFAULT 'Virtual Video Call' CHECK (consultation_type IN ('Virtual Video Call', 'Atelier Visit (Mumbai)', 'WhatsApp Stylist Consultation')),
-    preferred_date DATE NOT NULL,
-    preferred_time_slot TEXT NOT NULL,
-    occasion_type TEXT,
-    notes TEXT,
-    status TEXT DEFAULT 'Requested' CHECK (status IN ('Requested', 'Confirmed', 'Completed', 'Rescheduled', 'Cancelled')),
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.styling_consultations ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view their own styling consultations" 
-    ON public.styling_consultations FOR SELECT 
-    USING (auth.uid() = user_id);
-
-CREATE POLICY "Anyone can submit a styling consultation" 
-    ON public.styling_consultations FOR INSERT 
-    WITH CHECK (true);
-
--- ==============================================================================
--- 5. CONTACT INQUIRIES (Contact Page / Section)
+-- 3. CONTACT INQUIRIES (Contact Page / Section)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.contact_inquiries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -160,7 +103,7 @@ CREATE POLICY "Users can view their own contact inquiries"
     USING (auth.uid() = user_id);
 
 -- ==============================================================================
--- 6. NEWSLETTER SUBSCRIBERS (Stay in the Loop)
+-- 4. NEWSLETTER SUBSCRIBERS (Stay in the Loop)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.newsletter_subscribers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -203,6 +146,4 @@ CREATE TRIGGER on_auth_user_created
 -- INDEXES FOR PERFORMANCE
 -- ==============================================================================
 CREATE INDEX IF NOT EXISTS idx_addresses_user ON public.addresses(user_id);
-CREATE INDEX IF NOT EXISTS idx_tailoring_user ON public.tailoring_profiles(user_id);
-CREATE INDEX IF NOT EXISTS idx_consultations_user ON public.styling_consultations(user_id);
 CREATE INDEX IF NOT EXISTS idx_inquiries_email ON public.contact_inquiries(email);

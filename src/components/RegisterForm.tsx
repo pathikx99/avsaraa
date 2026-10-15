@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import AvsaraaLogo from "./AvsaraaLogo";
+import { supabase } from "@/lib/supabaseClient";
 import {
   BackArrowIcon,
   UserIcon,
@@ -27,11 +28,12 @@ export default function RegisterForm({
   const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
       showToast("Please enter your full name");
@@ -41,19 +43,68 @@ export default function RegisterForm({
       showToast("Please enter a valid mobile number");
       return;
     }
+    if (!email.trim()) {
+      showToast("Please enter your email address");
+      return;
+    }
+    if (!password || password.length < 6) {
+      showToast("Password must be at least 6 characters long");
+      return;
+    }
     if (!agreedToTerms) {
       showToast("Please agree to the Terms & Conditions and Privacy Policy");
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      showToast(`Welcome to the Avsaraa family, ${fullName.split(" ")[0]}!`);
+
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanName = fullName.trim();
+      const cleanPhone = phoneNumber.trim();
+
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: password,
+        options: {
+          data: {
+            full_name: cleanName,
+            phone_number: cleanPhone,
+          },
+        },
+      });
+
+      if (error) {
+        showToast(error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Upsert into public.profiles in database
+        try {
+          await supabase.from("profiles").upsert({
+            id: data.user.id,
+            full_name: cleanName,
+            email: cleanEmail,
+            phone_number: cleanPhone,
+            membership_tier: "Privilege",
+            updated_at: new Date().toISOString(),
+          });
+        } catch (profileErr) {
+          console.warn("Profile table upsert:", profileErr);
+        }
+      }
+
+      showToast(`Welcome to Avsaraa, ${cleanName.split(" ")[0]}!`);
       setTimeout(() => {
         window.location.href = "/account";
-      }, 500);
-    }, 800);
+      }, 600);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create account";
+      showToast(msg);
+      setIsLoading(false);
+    }
   };
 
   const handleSocialSignIn = (provider: "Google" | "Apple") => {
@@ -335,6 +386,52 @@ export default function RegisterForm({
                 color: "#261B13",
                 width: "100%",
               }}
+              required
+            />
+          </div>
+        </div>
+
+        {/* Field 4: Password */}
+        <div
+          className="avsaraa-input-group"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "6px 16px",
+            marginBottom: "16px",
+            height: "56px",
+          }}
+        >
+          <span style={{ color: "#786556", display: "flex", alignItems: "center" }}>
+            🔒
+          </span>
+          <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" }}>
+            <span
+              style={{
+                fontSize: "11px",
+                color: "#8C796B",
+                fontWeight: 500,
+                lineHeight: 1.1,
+                marginBottom: "2px",
+              }}
+            >
+              Password * (Min 6 Characters)
+            </span>
+            <input
+              type="password"
+              name="password"
+              autoComplete="new-password"
+              placeholder="Create a secure password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={6}
+              style={{
+                fontSize: "14px",
+                color: "#261B13",
+                width: "100%",
+              }}
+              required
             />
           </div>
         </div>

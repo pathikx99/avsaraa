@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import AvsaraaLogo from "./AvsaraaLogo";
+import { supabase } from "@/lib/supabaseClient";
 import { BackArrowIcon, PhoneIcon, MailIcon, ChevronDownIcon, FlourishDivider, SpinnerIcon } from "./Icons";
 
 interface LoginFormProps {
@@ -35,21 +36,31 @@ export default function LoginForm({
     { code: "+65", country: "Singapore", flag: "🇸🇬" },
   ];
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneNumber || phoneNumber.length < 8) {
       showToast("Please enter a valid mobile number");
       return;
     }
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: `${countryCode}${phoneNumber}`,
+      });
+      if (error) {
+        showToast(error.message);
+      } else {
+        setOtpSent(true);
+        showToast(`OTP sent to ${countryCode} ${phoneNumber}`);
+      }
+    } catch {
+      showToast("Could not send SMS. Please use Email Sign In.");
+    } finally {
       setIsLoading(false);
-      setOtpSent(true);
-      showToast(`OTP sent to ${countryCode} ${phoneNumber}`);
-    }, 600);
+    }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     const enteredOtp = otpCode.join("");
     if (enteredOtp.length < 4) {
@@ -57,29 +68,55 @@ export default function LoginForm({
       return;
     }
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        phone: `${countryCode}${phoneNumber}`,
+        token: enteredOtp,
+        type: "sms",
+      });
+      if (error) {
+        showToast(error.message);
+        setIsLoading(false);
+        return;
+      }
       showToast("Welcome back to Avsaraa!");
       setTimeout(() => {
         window.location.href = "/account";
       }, 500);
-    }, 700);
+    } catch {
+      showToast("Invalid verification code");
+      setIsLoading(false);
+    }
   };
 
-  const handleEmailLogin = (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       showToast("Please enter your email and password");
       return;
     }
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password: password,
+      });
+
+      if (error) {
+        showToast(error.message);
+        setIsLoading(false);
+        return;
+      }
+
       showToast("Welcome back to Avsaraa!");
       setTimeout(() => {
         window.location.href = "/account";
       }, 500);
-    }, 700);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to sign in";
+      showToast(msg);
+      setIsLoading(false);
+    }
   };
 
   const showToast = (msg: string) => {

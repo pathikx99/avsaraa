@@ -165,7 +165,7 @@ export default function RegisterPage() {
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ color: "#C4AB94" }}>✦</span>
-                    <span>Curated private bridal consultations</span>
+                    <span>Priority access to Avsaraa concierge assistance</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ color: "#C4AB94" }}>✦</span>
