@@ -265,7 +265,7 @@ export default function Footer() {
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
               <li><Link href="/about">Our Story</Link></li>
               <li><Link href="/about">Handmade Silks</Link></li>
-              <li><Link href="/contact">Mumbai Store</Link></li>
+              <li><Link href="/contact">Surat Studio & Online Store</Link></li>
             </ul>
           </div>
 
@@ -276,7 +276,7 @@ export default function Footer() {
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
               <li><Link href="/contact">Contact Us</Link></li>
-              <li><a href="https://wa.me/912226401234">WhatsApp Help</a></li>
+              <li><a href="https://wa.me/919825012345">WhatsApp Help</a></li>
               <li><a href="mailto:hello@avsaraa.in">hello@avsaraa.in</a></li>
             </ul>
           </div>

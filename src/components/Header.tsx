@@ -17,7 +17,7 @@ export default function Header() {
 
   const announcements = [
     "✦ Free Delivery Across India on Orders Above ₹2,999",
-    "✦ Pure Handmade Silks • Mumbai Studio",
+    "✦ Handcrafted in Surat • Nationwide Online Delivery",
     "✦ Chat with Us on WhatsApp for Sizing & Help",
   ];
 

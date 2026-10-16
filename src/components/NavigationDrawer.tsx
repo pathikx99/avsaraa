@@ -353,7 +353,7 @@ export default function NavigationDrawer({
         {/* WhatsApp Callout */}
         <div style={{ marginTop: "auto", paddingTop: "28px" }}>
           <a
-            href="https://wa.me/912226401234?text=Hello%20Avsaraa%2C%20I%20have%20a%20question%20about%20your%20sarees."
+            href="https://wa.me/919825012345?text=Hello%20Avsaraa%2C%20I%20have%20a%20question%20about%20ordering%20online."
             target="_blank"
             rel="noopener noreferrer"
             style={{
@@ -373,7 +373,7 @@ export default function NavigationDrawer({
             <span>Chat on WhatsApp</span>
           </a>
           <p style={{ marginTop: "12px", textAlign: "center", fontSize: "11px", color: "#8E7D70" }}>
-            Mumbai Studio • Mon-Sat 10:00 - 19:30
+            Surat Studio • Online Store • Mon-Sat 10:00 - 19:30
           </p>
         </div>
       </div>

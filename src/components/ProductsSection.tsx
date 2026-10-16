@@ -594,7 +594,7 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
                     </div>
 
                     <a
-                      href={`https://wa.me/912226401234?text=${encodeURIComponent(
+                      href={`https://wa.me/919825012345?text=${encodeURIComponent(
                         `Hello Avsaraa, I am inquiring about "${product.name}" (₹${product.price.toLocaleString("en-IN")}) from the ${product.category} collection.`
                       )}`}
                       target="_blank"
@@ -753,13 +753,13 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "12.5px", color: "#6E5B4E", marginBottom: "24px" }}>
                   <div>✦ <strong>Category:</strong> {selectedProduct.category}</div>
                   <div>✦ <strong>Authenticity:</strong> 100% Handcrafted Indian Silk</div>
-                  <div>✦ <strong>Finishing:</strong> Hand-checked at Mumbai Studio</div>
+                  <div>✦ <strong>Finishing & Delivery:</strong> Hand-checked at Surat Studio • Delivered Across India</div>
                 </div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <a
-                  href={`https://wa.me/912226401234?text=${encodeURIComponent(
+                  href={`https://wa.me/919825012345?text=${encodeURIComponent(
                     `Hello Avsaraa, I would like to inquire about and order "${selectedProduct.name}" (₹${selectedProduct.price.toLocaleString("en-IN")}).`
                   )}`}
                   target="_blank"

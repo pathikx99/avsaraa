@@ -190,7 +190,7 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
                   marginBottom: "8px",
                 }}
               >
-                OUR STORE
+                OUR STUDIO & ONLINE STORE
               </span>
               <h3
                 style={{
@@ -200,12 +200,13 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
                   marginBottom: "14px",
                 }}
               >
-                Mumbai Store & Studio
+                Surat Studio & Online Store
               </h3>
               <p style={{ fontSize: "14px", color: "#543E2E", lineHeight: 1.7, marginBottom: "28px" }}>
                 Avsaraa Studio<br />
-                Level 3, Linking Road, Bandra West<br />
-                Mumbai, Maharashtra - 400050, India
+                Ring Road Textile Hub, Surat<br />
+                Gujarat - 395002, India<br />
+                <span style={{ color: "#866951", fontSize: "12.5px", fontWeight: 600 }}>✦ Online Orders Delivered Across India</span>
               </p>
 
               {/* Contact Channels */}
@@ -229,10 +230,10 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
                   </div>
                   <div>
                     <span style={{ display: "block", fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      Phone
+                      Phone & Orders
                     </span>
-                    <a href="tel:+912226401234" style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
-                      +91 22 2640 1234
+                    <a href="tel:+919825012345" style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
+                      +91 98250 12345
                     </a>
                   </div>
                 </div>
@@ -283,10 +284,10 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
                   </div>
                   <div>
                     <span style={{ display: "block", fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      Opening Hours
+                      Online Support Hours
                     </span>
                     <span style={{ fontSize: "13.5px", color: "#261B13" }}>
-                      Monday – Saturday: 10:00 AM – 7:30 PM
+                      Monday – Saturday: 10:00 AM – 7:30 PM IST
                     </span>
                   </div>
                 </div>
@@ -295,7 +296,7 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
 
             {/* WhatsApp CTA */}
             <a
-              href="https://wa.me/912226401234?text=Hello%20Avsaraa%2C%20I%20have%20a%20question%20about%20your%20sarees."
+              href="https://wa.me/919825012345?text=Hello%20Avsaraa%2C%20I%20have%20a%20question%20about%20ordering%20online."
               target="_blank"
               rel="noopener noreferrer"
               style={{

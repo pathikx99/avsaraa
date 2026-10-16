@@ -780,7 +780,7 @@ export default function AccountPage() {
                 { label: "Status", value: "Active Member" },
                 { label: "Saved Addresses", value: `${addresses.length} Saved` },
                 { label: "Account Type", value: `✦ ${profile?.membership_tier || "Member"}` },
-                { label: "Store", value: "Mumbai Studio" },
+                { label: "Studio", value: "Surat (Online Store)" },
               ].map((stat, i) => (
                 <div
                   key={i}
@@ -1631,7 +1631,7 @@ export default function AccountPage() {
                     type="text"
                     value={newAddress.address_line2}
                     onChange={(e) => setNewAddress({ ...newAddress, address_line2: e.target.value })}
-                    placeholder="e.g. Linking Road, Bandra West"
+                    placeholder="e.g. Ring Road, Textile Hub"
                     style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>
@@ -1643,7 +1643,7 @@ export default function AccountPage() {
                     type="text"
                     value={newAddress.landmark}
                     onChange={(e) => setNewAddress({ ...newAddress, landmark: e.target.value })}
-                    placeholder="e.g. Near Grand Hotel"
+                    placeholder="e.g. Near Textile Market"
                     style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>
@@ -1659,7 +1659,7 @@ export default function AccountPage() {
                     value={newAddress.city}
                     onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
                     required
-                    placeholder="Mumbai"
+                    placeholder="Surat"
                     style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>

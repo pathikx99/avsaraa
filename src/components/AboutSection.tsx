@@ -71,7 +71,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
                 lineHeight: 1.8,
               }}
             >
-              Avsaraa is inspired by special moments and family celebrations. We bring you authentic Indian handloom sarees and sets that are comfortable, timeless, and made to last.
+              Avsaraa is based in Surat, the textile heart of India. We craft and curate authentic ethnic wear, festive ensembles, and handloom sarees, bringing timeless craftsmanship directly to your doorstep through our online store with delivery across India.
             </p>
           </div>
         )}
@@ -127,7 +127,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
                   fontWeight: 600,
                 }}
               >
-                ✦ Handcrafted in India
+                ✦ Surat, India • Online Store
               </div>
             </div>
           </div>
@@ -148,7 +148,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
               {
                 icon: <NeedleThreadIcon size={22} color="#866951" />,
                 title: "Finishing & Quality",
-                desc: "Every drape is checked and finished by hand at our Mumbai studio so it feels perfect when you wear it.",
+                desc: "Every drape is checked and finished by hand at our Surat studio, then securely shipped to your doorstep anywhere in India.",
               },
             ].map((pillar, i) => (
               <div

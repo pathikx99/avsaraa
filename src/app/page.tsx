@@ -95,7 +95,7 @@ export default function HomePage() {
           >
             <div style={{ marginBottom: "18px" }}>
               <span className="luxury-badge">
-                ✦ PURE HANDLOOM SILKS • MUMBAI STUDIO ✦
+                ✦ BASED IN SURAT • SHOP ONLINE ACROSS INDIA ✦
               </span>
             </div>
 

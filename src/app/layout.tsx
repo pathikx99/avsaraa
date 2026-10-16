@@ -18,8 +18,8 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "AVSARAA | Handcrafted Indian Sarees & Silks",
-  description: "Thoughtfully paired Indian sarees and handloom silks for your special moments.",
+  title: "AVSARAA | Handcrafted Sarees, Ethnic Wear & Clothes Online | Surat, India",
+  description: "Explore handcrafted sarees, ethnic dresses, and occasion wear from Surat's textile heart. Buy authentic Indian clothes online with nationwide delivery across India.",
   icons: {
     icon: "/favicon.ico",
   },
