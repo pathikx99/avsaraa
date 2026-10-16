@@ -1,16 +1,44 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import AvsaraaLogo from "./AvsaraaLogo";
 import { supabase } from "@/lib/supabaseClient";
+import type { User } from "@supabase/supabase-js";
+import {
+  DeliveryVanIcon,
+  ReturnBoxIcon,
+  ShieldCheckIcon,
+  DiamondCrownIcon,
+  InstagramIcon,
+  PinterestIcon,
+  FacebookIcon,
+  YoutubeIcon,
+} from "./Icons";
 
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +57,7 @@ export default function Footer() {
       ]);
 
       if (error && error.code === "23505") {
-        setStatusMessage("You are already subscribed to the Avsaraa newsletter.");
+        setStatusMessage("You are already subscribed!");
         setSubscribed(true);
       } else {
         setSubscribed(true);
@@ -38,7 +66,7 @@ export default function Footer() {
       setEmail("");
     } catch {
       setSubscribed(true);
-      setStatusMessage("Thank you for joining our style community!");
+      setStatusMessage("Thank you for subscribing!");
       setEmail("");
     } finally {
       setIsSubmitting(false);
@@ -51,12 +79,12 @@ export default function Footer() {
 
   return (
     <footer style={{ backgroundColor: "#F7F2EE", borderTop: "1px solid #E6DACF", marginTop: "auto" }}>
-      {/* 1. Newsletter Section (from Docs/WhatsApp Image 2026-10-13 at 11.40.33 AM.jpeg) */}
+      {/* 1. Newsletter Section */}
       <div
         style={{
           position: "relative",
           backgroundColor: "#F2EBE3",
-          padding: "50px 24px 60px 24px",
+          padding: "54px 24px 60px 24px",
           borderBottom: "1px solid #E6DACF",
           overflow: "hidden",
         }}
@@ -67,10 +95,10 @@ export default function Footer() {
             position: "absolute",
             right: "-40px",
             top: "-30px",
-            width: "300px",
-            height: "300px",
+            width: "280px",
+            height: "280px",
             pointerEvents: "none",
-            opacity: 0.8,
+            opacity: 0.7,
             zIndex: 0,
           }}
         >
@@ -78,45 +106,45 @@ export default function Footer() {
             src="/images/botanical_flowers.jpg"
             alt=""
             fill
-            sizes="300px"
+            sizes="280px"
             style={{ objectFit: "contain", mixBlendMode: "multiply" }}
           />
         </div>
 
-        <div style={{ maxWidth: "800px", margin: "0 auto", position: "relative", zIndex: 1 }}>
+        <div style={{ maxWidth: "760px", margin: "0 auto", position: "relative", zIndex: 1 }}>
           <span
             style={{
               fontSize: "11px",
               fontWeight: 600,
-              letterSpacing: "0.2em",
+              letterSpacing: "0.14em",
               textTransform: "uppercase",
               color: "#866951",
               display: "block",
               marginBottom: "8px",
             }}
           >
-            STAY IN THE LOOP
+            NEWSLETTER
           </span>
           <h2
             style={{
               fontFamily: "var(--font-serif), Georgia, serif",
-              fontSize: "36px",
+              fontSize: "clamp(28px, 4vw, 36px)",
               fontWeight: 500,
               color: "#261B13",
-              marginBottom: "10px",
+              marginBottom: "8px",
             }}
           >
-            Be the first to know
+            Stay in Touch
           </h2>
-          <p style={{ fontSize: "14.5px", color: "#6E5B4E", marginBottom: "24px", maxWidth: "480px" }}>
-            Get exclusive updates, new arrivals and special offers from Avsaraa.
+          <p style={{ fontSize: "14px", color: "#6E5B4E", marginBottom: "22px", maxWidth: "460px" }}>
+            Get updates on new saree collections, special offers, and styling tips from Avsaraa.
           </p>
 
           <form
             onSubmit={handleSubscribe}
             style={{
               display: "flex",
-              maxWidth: "520px",
+              maxWidth: "500px",
               background: "#FFFFFF",
               border: "1px solid #CFBEAD",
               borderRadius: "8px",
@@ -131,9 +159,11 @@ export default function Footer() {
               onChange={(e) => setEmail(e.target.value)}
               style={{
                 flex: 1,
-                padding: "14px 18px",
-                fontSize: "14px",
+                padding: "13px 18px",
+                fontSize: "13.5px",
                 color: "#261B13",
+                border: "none",
+                outline: "none",
               }}
               required
             />
@@ -143,16 +173,17 @@ export default function Footer() {
               style={{
                 backgroundColor: "#866951",
                 color: "#FFFFFF",
-                padding: "0 24px",
-                fontSize: "12px",
+                padding: "0 22px",
+                fontSize: "11.5px",
                 fontWeight: 600,
-                letterSpacing: "0.14em",
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
                 cursor: isSubmitting ? "not-allowed" : "pointer",
                 opacity: isSubmitting ? 0.75 : 1,
+                border: "none",
               }}
             >
               {isSubmitting ? "SAVING..." : subscribed ? "SUBSCRIBED! ✓" : "SUBSCRIBE →"}
@@ -167,126 +198,149 @@ export default function Footer() {
       </div>
 
       {/* 2. Main Footer Directory */}
-      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "60px 24px 40px 24px" }}>
+      <div style={{ maxWidth: "1140px", margin: "0 auto", padding: "56px 24px 36px 24px" }}>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "40px",
-            marginBottom: "50px",
+            gap: "36px",
+            marginBottom: "46px",
           }}
         >
           {/* Brand Column */}
           <div style={{ maxWidth: "300px" }}>
-            <AvsaraaLogo size="md" width={175} />
-            <p style={{ marginTop: "16px", fontSize: "13.5px", lineHeight: 1.6, color: "#6E5B4E" }}>
-              Thoughtfully designed ethnic and western wear for every moment that matters.
+            <AvsaraaLogo size="md" width={160} />
+            <p style={{ marginTop: "14px", fontSize: "13.5px", lineHeight: 1.6, color: "#6E5B4E" }}>
+              Thoughtfully designed ethnic and festive wear for every special moment.
             </p>
 
-            {/* Social Icons */}
-            <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-              {["Instagram", "Pinterest", "Facebook", "YouTube"].map((network) => (
+            {/* Social Icons with SVG */}
+            <div style={{ display: "flex", gap: "10px", marginTop: "18px" }}>
+              {[
+                { name: "Instagram", icon: <InstagramIcon size={16} color="#261B13" /> },
+                { name: "Pinterest", icon: <PinterestIcon size={16} color="#261B13" /> },
+                { name: "Facebook", icon: <FacebookIcon size={16} color="#261B13" /> },
+                { name: "YouTube", icon: <YoutubeIcon size={16} color="#261B13" /> },
+              ].map((item) => (
                 <div
-                  key={network}
+                  key={item.name}
+                  aria-label={item.name}
                   style={{
-                    width: "36px",
-                    height: "36px",
+                    width: "34px",
+                    height: "34px",
                     borderRadius: "50%",
                     border: "1px solid #CFBEAD",
+                    backgroundColor: "#FAF7F2",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "#261B13",
-                    fontSize: "13px",
                     cursor: "pointer",
+                    transition: "all 0.2s ease",
                   }}
                 >
-                  {network[0]}
+                  {item.icon}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* NAVIGATION Column */}
+          {/* PAGES Column */}
           <div>
-            <h3 style={{ fontSize: "12px", letterSpacing: "0.15em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
               PAGES
             </h3>
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px", color: "#4A3525" }}>
-              <li><Link href="/">Home</Link></li>
-              <li><Link href="/account">My Account</Link></li>
-              <li><Link href="/login">Sign In</Link></li>
-              <li><Link href="/register">Join Avsaraa</Link></li>
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
+              <li><Link href="/" className="luxury-nav-link">Home</Link></li>
+              <li><Link href="/#about" className="luxury-nav-link">About Us</Link></li>
+              <li><Link href="/#contact" className="luxury-nav-link">Contact Us</Link></li>
+              {user && <li><Link href="/account" className="luxury-nav-link">My Account</Link></li>}
             </ul>
           </div>
 
-          {/* ATELIER Column */}
+          {/* ABOUT Column */}
           <div>
-            <h3 style={{ fontSize: "12px", letterSpacing: "0.15em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
-              ATELIER
+            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+              ABOUT
             </h3>
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px", color: "#4A3525" }}>
-              <li><Link href="/#about-us">About Us</Link></li>
-              <li><Link href="/#about-us">Our Heritage</Link></li>
-              <li><Link href="/#about-us">Artisanal Weaves</Link></li>
-              <li><Link href="/account">Client Account</Link></li>
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
+              <li><Link href="/#about">Our Story</Link></li>
+              <li><Link href="/#about">Handmade Silks</Link></li>
+              <li><Link href="/#contact">Mumbai Store</Link></li>
             </ul>
           </div>
 
-          {/* CONCIERGE Column */}
+          {/* HELP Column */}
           <div>
-            <h3 style={{ fontSize: "12px", letterSpacing: "0.15em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
-              CONCIERGE
+            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+              HELP & SUPPORT
             </h3>
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "14px", color: "#4A3525" }}>
-              <li><Link href="/#contact-us">Contact Us</Link></li>
-              <li><Link href="/#contact-us">WhatsApp Stylist</Link></li>
-              <li><Link href="/#contact-us">Atelier Visit</Link></li>
-              <li><Link href="mailto:concierge@avsaraa.in">concierge@avsaraa.in</Link></li>
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
+              <li><Link href="/#contact">Contact Us</Link></li>
+              <li><a href="https://wa.me/912226401234">WhatsApp Help</a></li>
+              <li><a href="mailto:hello@avsaraa.in">hello@avsaraa.in</a></li>
             </ul>
           </div>
         </div>
 
-        {/* 3. Four Value Pillars from Docs/WhatsApp Image 2026-10-13 at 11.40.33 AM.jpeg */}
+        {/* 3. Four Value Pillars with Bespoke SVG Icons */}
         <div
           style={{
             borderTop: "1px solid #E6DACF",
             borderBottom: "1px solid #E6DACF",
-            padding: "36px 0",
+            padding: "32px 0",
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
             gap: "24px",
             textAlign: "center",
           }}
         >
           <div>
-            <span style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}>🚚</span>
-            <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#261B13", marginBottom: "4px", fontFamily: "var(--font-sans)" }}>Free Shipping</h4>
-            <p style={{ fontSize: "12.5px", color: "#6E5B4E" }}>On all orders above ₹2,999</p>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "10px" }}>
+              <div style={{ width: "42px", height: "42px", borderRadius: "50%", border: "1px solid #CFBEAD", backgroundColor: "#FAF7F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <DeliveryVanIcon size={20} color="#866951" />
+              </div>
+            </div>
+            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Free Shipping</h4>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>On all orders above ₹2,999</p>
           </div>
+
           <div>
-            <span style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}>📦</span>
-            <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#261B13", marginBottom: "4px", fontFamily: "var(--font-sans)" }}>Easy Returns</h4>
-            <p style={{ fontSize: "12.5px", color: "#6E5B4E" }}>Within 7 days</p>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "10px" }}>
+              <div style={{ width: "42px", height: "42px", borderRadius: "50%", border: "1px solid #CFBEAD", backgroundColor: "#FAF7F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <ReturnBoxIcon size={20} color="#866951" />
+              </div>
+            </div>
+            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Easy Returns</h4>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>7-day easy returns</p>
           </div>
+
           <div>
-            <span style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}>🛡️</span>
-            <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#261B13", marginBottom: "4px", fontFamily: "var(--font-sans)" }}>Secure Payments</h4>
-            <p style={{ fontSize: "12.5px", color: "#6E5B4E" }}>100% safe & secure</p>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "10px" }}>
+              <div style={{ width: "42px", height: "42px", borderRadius: "50%", border: "1px solid #CFBEAD", backgroundColor: "#FAF7F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <ShieldCheckIcon size={20} color="#866951" />
+              </div>
+            </div>
+            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Secure Payments</h4>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>100% safe & encrypted</p>
           </div>
+
           <div>
-            <span style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}>💎</span>
-            <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#261B13", marginBottom: "4px", fontFamily: "var(--font-sans)" }}>Premium Quality</h4>
-            <p style={{ fontSize: "12.5px", color: "#6E5B4E" }}>Thoughtfully curated styles</p>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "10px" }}>
+              <div style={{ width: "42px", height: "42px", borderRadius: "50%", border: "1px solid #CFBEAD", backgroundColor: "#FAF7F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <DiamondCrownIcon size={20} color="#866951" />
+              </div>
+            </div>
+            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Pure Silks</h4>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Handcrafted in India</p>
           </div>
         </div>
 
         {/* 4. Signature Calligraphy & Bottom Bar */}
-        <div style={{ textAlign: "center", padding: "40px 0 20px 0" }}>
+        <div style={{ textAlign: "center", padding: "36px 0 16px 0" }}>
           <p
             style={{
               fontFamily: "var(--font-serif), Georgia, serif",
-              fontSize: "38px",
+              fontSize: "36px",
               fontStyle: "italic",
               color: "#543E2E",
               marginBottom: "8px",
@@ -294,7 +348,7 @@ export default function Footer() {
           >
             Wear the moment.
           </p>
-          <div style={{ width: "40px", height: "1px", backgroundColor: "#C4AB94", margin: "0 auto 30px auto" }} />
+          <div style={{ width: "36px", height: "1px", backgroundColor: "#C4AB94", margin: "0 auto 24px auto" }} />
 
           <div
             style={{
@@ -303,12 +357,12 @@ export default function Footer() {
               justifyContent: "space-between",
               flexWrap: "wrap",
               gap: "16px",
-              fontSize: "12.5px",
+              fontSize: "12px",
               color: "#7E6E62",
             }}
           >
             <span>© 2026 Avsaraa. All rights reserved.</span>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", fontWeight: 600, fontSize: "11px", letterSpacing: "0.05em", color: "#4A3525" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: 600, fontSize: "10.5px", letterSpacing: "0.05em", color: "#543E2E" }}>
               <span>VISA</span>
               <span>•</span>
               <span>MASTERCARD</span>

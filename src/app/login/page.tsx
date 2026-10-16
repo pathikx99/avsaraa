@@ -90,7 +90,7 @@ export default function LoginPage() {
           >
             <Image
               src="/images/saree_model_hero.jpg"
-              alt="Avsaraa Royal Ethnic Wear"
+              alt="Avsaraa Sarees"
               fill
               sizes="(min-width: 900px) 50vw, 100vw"
               style={{
@@ -132,14 +132,14 @@ export default function LoginPage() {
                   style={{
                     fontSize: "11px",
                     fontWeight: 600,
-                    letterSpacing: "0.22em",
+                    letterSpacing: "0.14em",
                     textTransform: "uppercase",
                     color: "#C4AB94",
                     display: "block",
                     marginBottom: "8px",
                   }}
                 >
-                  AVSARAA ATELIER
+                  WELCOME TO AVSARAA
                 </span>
                 <p
                   style={{
@@ -151,7 +151,7 @@ export default function LoginPage() {
                     textShadow: "0 2px 10px rgba(0,0,0,0.3)",
                   }}
                 >
-                  &ldquo;Your Style Story Continues Here.&rdquo;
+                  &ldquo;Thoughtfully paired. Beautifully yours.&rdquo;
                 </p>
                 <p
                   style={{
@@ -161,7 +161,7 @@ export default function LoginPage() {
                     maxWidth: "400px",
                   }}
                 >
-                  Sign in to manage your saved addresses, client profile, and enjoy exclusive access to artisanal saree collections.
+                  Sign in to view your account, manage saved addresses, and shop handmade sarees with ease.
                 </p>
               </div>
             </div>

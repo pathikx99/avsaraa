@@ -1,14 +1,34 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ProductsSection from "@/components/ProductsSection";
 import AboutSection from "@/components/AboutSection";
 import ContactSection from "@/components/ContactSection";
+import { supabase } from "@/lib/supabaseClient";
+import type { User } from "@supabase/supabase-js";
 
 export default function HomePage() {
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
   return (
     <div
       style={{
@@ -18,53 +38,77 @@ export default function HomePage() {
         backgroundColor: "#F7F2EE",
       }}
     >
-      {/* 1. Official Header & Announcement Bar */}
+      {/* 1. Header & Announcement Bar */}
       <Header />
 
-      {/* 2. Hero Section */}
+      {/* 2. Home Section (Luxury Editorial Showcase) */}
       <section
+        id="home"
         style={{
           position: "relative",
           backgroundColor: "#FAF7F2",
           borderBottom: "1px solid #E6DACF",
           overflow: "hidden",
+          padding: "70px 24px 80px 24px",
         }}
       >
+        {/* Subtle Luxury Corner Flourish */}
         <div
           style={{
-            maxWidth: "1280px",
-            margin: "0 auto",
-            padding: "36px 20px 52px 20px",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            alignItems: "center",
-            gap: "36px",
+            position: "absolute",
+            left: "-40px",
+            top: "-40px",
+            width: "240px",
+            height: "240px",
+            pointerEvents: "none",
+            opacity: 0.4,
+            zIndex: 0,
           }}
         >
-          {/* Left Text / Actions */}
-          <div style={{ maxWidth: "560px" }}>
-            <span
-              style={{
-                fontSize: "11px",
-                fontWeight: 600,
-                letterSpacing: "0.22em",
-                textTransform: "uppercase",
-                color: "#866951",
-                display: "block",
-                marginBottom: "12px",
-              }}
-            >
-              INTRODUCING
-            </span>
+          <Image
+            src="/images/botanical_flowers.jpg"
+            alt=""
+            fill
+            sizes="240px"
+            style={{ objectFit: "contain", mixBlendMode: "multiply" }}
+          />
+        </div>
+
+        <div
+          style={{
+            maxWidth: "1200px",
+            margin: "0 auto",
+            position: "relative",
+            zIndex: 1,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: "48px",
+            alignItems: "center",
+          }}
+        >
+          {/* Left Column: Editorial Brand Essence */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              textAlign: "left",
+            }}
+          >
+            <div style={{ marginBottom: "18px" }}>
+              <span className="luxury-badge">
+                ✦ PURE HANDLOOM SILKS • MUMBAI STUDIO ✦
+              </span>
+            </div>
 
             <h1
               style={{
                 fontFamily: "var(--font-serif), Georgia, serif",
-                fontSize: "clamp(34px, 5vw, 54px)",
+                fontSize: "clamp(46px, 6.5vw, 76px)",
                 fontWeight: 500,
                 color: "#261B13",
-                lineHeight: 1.1,
-                letterSpacing: "0.02em",
+                lineHeight: 1.05,
+                letterSpacing: "0.05em",
                 marginBottom: "14px",
               }}
             >
@@ -74,191 +118,227 @@ export default function HomePage() {
             <p
               style={{
                 fontFamily: "var(--font-serif), Georgia, serif",
-                fontSize: "clamp(22px, 3vw, 28px)",
+                fontSize: "clamp(22px, 3.2vw, 32px)",
                 fontStyle: "italic",
-                color: "#543E2E",
-                lineHeight: 1.3,
-                marginBottom: "16px",
+                color: "#6E523D",
+                lineHeight: 1.25,
+                marginBottom: "20px",
               }}
             >
-              Thoughtfully paired. <br />
-              Beautifully yours.
+              Thoughtfully chosen. Beautifully worn.
             </p>
+
+            <div style={{ width: "56px", height: "1.5px", backgroundColor: "#C4AB94", marginBottom: "20px" }} />
 
             <p
               style={{
-                fontSize: "14.5px",
-                lineHeight: 1.6,
-                color: "#6E5B4E",
+                fontSize: "15.5px",
+                lineHeight: 1.8,
+                color: "#5C4A3E",
                 marginBottom: "28px",
-                maxWidth: "460px",
+                maxWidth: "520px",
               }}
             >
-              Born from a reverent celebration of Indian heritage handlooms. Explore bespoke styling, custom tailored silhouettes, and effortless grace.
+              Handcrafted Indian sarees and silks from Banaras, Chanderi, and Bengal. Simple, timeless, and made with care for your special moments.
             </p>
 
+            {/* Handloom Provenance Tags */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "8px",
+                marginBottom: "34px",
+              }}
+            >
+              {["Banarasi Katan Silk", "Chanderi Handloom", "Royal Zari Drapes"].map((tag) => (
+                <span
+                  key={tag}
+                  style={{
+                    fontSize: "11.5px",
+                    color: "#866951",
+                    backgroundColor: "#FFFFFF",
+                    border: "1px solid #E2D7CC",
+                    borderRadius: "16px",
+                    padding: "4px 12px",
+                    fontWeight: 500,
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  ✦ {tag}
+                </span>
+              ))}
+            </div>
+
             {/* Core Action Buttons */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "14px", width: "100%" }}>
               <Link
-                href="/login"
+                href="#products"
                 className="avsaraa-btn-primary"
                 style={{
                   display: "inline-flex",
                   width: "auto",
-                  padding: "0 28px",
-                  height: "48px",
-                  fontSize: "13.5px",
+                  padding: "0 34px",
+                  height: "52px",
+                  fontSize: "13px",
                   fontWeight: 600,
-                  letterSpacing: "0.06em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                 }}
               >
-                Sign In →
+                <span>Explore Collection</span>
+                <span>↓</span>
               </Link>
 
               <Link
-                href="/register"
+                href="#about"
                 className="avsaraa-btn-outline"
                 style={{
                   display: "inline-flex",
                   width: "auto",
-                  padding: "0 24px",
-                  height: "48px",
-                  fontSize: "13.5px",
+                  padding: "0 28px",
+                  height: "52px",
+                  fontSize: "13px",
                   fontWeight: 600,
-                  letterSpacing: "0.06em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   backgroundColor: "#FFFFFF",
                 }}
               >
-                Join Free
-              </Link>
-
-              <Link
-                href="/account"
-                className="avsaraa-btn-outline"
-                style={{
-                  display: "inline-flex",
-                  width: "auto",
-                  padding: "0 20px",
-                  height: "48px",
-                  fontSize: "13.5px",
-                  fontWeight: 600,
-                  letterSpacing: "0.04em",
-                  backgroundColor: "#FAF7F2",
-                  color: "#866951",
-                  border: "1px solid #CFBEAD",
-                }}
-              >
-                <span>👤</span>
-                <span>My Account</span>
+                <span>Our Story</span>
+                <span>→</span>
               </Link>
             </div>
 
-            {/* Quick Links to About & Contact */}
-            <div style={{ display: "flex", gap: "16px", fontSize: "13px" }}>
-              <Link href="#about-us" style={{ color: "#866951", textDecoration: "underline", textUnderlineOffset: "3px", fontWeight: 500 }}>
-                Our Heritage & Story ↓
-              </Link>
-              <span style={{ color: "#CFBEAD" }}>•</span>
-              <Link href="#contact-us" style={{ color: "#866951", textDecoration: "underline", textUnderlineOffset: "3px", fontWeight: 500 }}>
-                Atelier Concierge & Contact ↓
-              </Link>
+            {/* Trust Micro-bar */}
+            <div
+              style={{
+                marginTop: "32px",
+                paddingTop: "20px",
+                borderTop: "1px solid #EAE0D5",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "18px",
+                fontSize: "12px",
+                color: "#8E7D70",
+              }}
+            >
+              <span>✦ Free Delivery in India</span>
+              <span>•</span>
+              <span>✦ 100% Handloom Guarantee</span>
+              <span>•</span>
+              <span>✦ WhatsApp Concierge</span>
             </div>
           </div>
 
-          {/* Right Hero Image */}
+          {/* Right Column: Royal Arch Fashion Portrait */}
           <div
             style={{
+              display: "flex",
+              justifyContent: "center",
               position: "relative",
-              width: "100%",
-              height: "clamp(340px, 45vw, 500px)",
-              borderRadius: "24px",
-              overflow: "hidden",
-              boxShadow: "0 15px 40px -10px rgba(38,27,19,0.12)",
             }}
           >
-            <Image
-              src="/images/saree_model_hero.jpg"
-              alt="Avsaraa Style Couture"
-              fill
-              sizes="(min-width: 900px) 50vw, 100vw"
-              style={{ objectFit: "cover", objectPosition: "center 18%" }}
-              priority
-            />
-            {/* Soft decorative flower in corner */}
             <div
+              className="luxury-arch-frame"
               style={{
-                position: "absolute",
-                right: "-20px",
-                bottom: "-20px",
-                width: "150px",
-                height: "150px",
-                pointerEvents: "none",
-                opacity: 0.85,
+                position: "relative",
+                width: "100%",
+                maxWidth: "440px",
+                height: "clamp(440px, 50vw, 560px)",
+                backgroundColor: "#EFE6DC",
               }}
             >
               <Image
-                src="/images/botanical_flowers.jpg"
-                alt=""
+                src="/images/royal_organza_saree.jpg"
+                alt="Avsaraa Handcrafted Royal Silk Saree"
                 fill
-                sizes="150px"
-                style={{ objectFit: "contain", mixBlendMode: "multiply" }}
+                priority
+                sizes="(min-width: 900px) 440px, 90vw"
+                style={{ objectFit: "cover", objectPosition: "center 20%" }}
               />
+
+              {/* Top Season Pill */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: "24px",
+                  right: "24px",
+                  backgroundColor: "rgba(38, 27, 19, 0.82)",
+                  backdropFilter: "blur(6px)",
+                  WebkitBackdropFilter: "blur(6px)",
+                  color: "#FAF7F2",
+                  padding: "6px 14px",
+                  borderRadius: "20px",
+                  fontSize: "11px",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                  boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
+                }}
+              >
+                ✦ Festive 2026
+              </div>
+
+              {/* Floating Bottom Glass Atelier Card */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "20px",
+                  left: "20px",
+                  right: "20px",
+                  backgroundColor: "rgba(250, 247, 242, 0.92)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
+                  border: "1px solid rgba(196, 171, 148, 0.5)",
+                  borderRadius: "16px",
+                  padding: "14px 18px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  boxShadow: "0 10px 30px rgba(38, 27, 19, 0.15)",
+                }}
+              >
+                <div>
+                  <span style={{ display: "block", fontSize: "10.5px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>
+                    HANDWOVEN SILK
+                  </span>
+                  <span style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "17px", color: "#261B13", fontWeight: 600 }}>
+                    Emerald Tissue Organza
+                  </span>
+                </div>
+                <Link
+                  href="#products"
+                  style={{
+                    backgroundColor: "#261B13",
+                    color: "#FAF7F2",
+                    fontSize: "11.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    padding: "7px 14px",
+                    borderRadius: "20px",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  View Drape →
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3. Three Pillars */}
-      <section
-        style={{
-          backgroundColor: "#F7F2EE",
-          borderBottom: "1px solid #E6DACF",
-          padding: "30px 20px",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "960px",
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "16px",
-            textAlign: "center",
-          }}
-        >
-          <div>
-            <span style={{ fontSize: "24px", display: "block", marginBottom: "6px" }}>🎨</span>
-            <h3 style={{ fontSize: "13px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>
-              Curated by Avsaraa
-            </h3>
-            <p style={{ fontSize: "11.5px", color: "#6E5B4E" }}>Hand-selected silhouettes</p>
-          </div>
-          <div>
-            <span style={{ fontSize: "24px", display: "block", marginBottom: "6px" }}>👗</span>
-            <h3 style={{ fontSize: "13px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>
-              Perfect Combinations
-            </h3>
-            <p style={{ fontSize: "11.5px", color: "#6E5B4E" }}>Head-to-toe grace</p>
-          </div>
-          <div>
-            <span style={{ fontSize: "24px", display: "block", marginBottom: "6px" }}>✨</span>
-            <h3 style={{ fontSize: "13px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>
-              Effortless Looks
-            </h3>
-            <p style={{ fontSize: "11.5px", color: "#6E5B4E" }}>Ready for every moment</p>
-          </div>
-        </div>
-      </section>
+      {/* 3. Products Section with 4 Categories from reference image */}
+      <ProductsSection />
 
-      {/* 4. About Us Section */}
+      {/* 4. About Section (Simple Terms) */}
       <AboutSection />
 
-      {/* 5. Contact Section */}
+      {/* 5. Contact Section (Simple Terms) */}
       <ContactSection />
 
-      {/* 6. Official Footer */}
+      {/* 5. Footer (Simple Terms) */}
       <Footer />
     </div>
   );

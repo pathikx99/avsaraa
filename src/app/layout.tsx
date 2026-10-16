@@ -18,8 +18,8 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "AVSARAA | Wear The Moment - Luxury Ethnic Wear",
-  description: "Sign in or create an account with Avsaraa. Explore royal sarees, exquisite lehengas, and couture festive bridal wear.",
+  title: "AVSARAA | Handcrafted Indian Sarees & Silks",
+  description: "Thoughtfully paired Indian sarees and handloom silks for your special moments.",
   icons: {
     icon: "/favicon.ico",
   },

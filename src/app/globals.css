@@ -36,6 +36,10 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 html, body {
   min-height: 100%;
   background-color: var(--color-bg-page);
@@ -270,3 +274,125 @@ a {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ── Responsive Viewport Classes ── */
+@media (min-width: 900px) {
+  .desktop-only {
+    display: flex !important;
+  }
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+@media (max-width: 899px) {
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: flex !important;
+  }
+}
+
+/* ── Luxury Card & Interaction Utilities ── */
+.luxury-hover-card {
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease;
+}
+
+.luxury-hover-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px -10px rgba(38, 27, 19, 0.08), 0 0 0 1px #CFBEAD;
+  border-color: var(--color-taupe-beige) !important;
+}
+
+.luxury-gold-gradient {
+  background: linear-gradient(135deg, #FAF7F2 0%, #F2EBE3 100%);
+}
+
+.luxury-gold-border {
+  border: 1px solid #CFBEAD;
+}
+
+.luxury-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #FAF5F0;
+  border: 1px solid #D8C7B8;
+  color: #866951;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.luxury-nav-link {
+  position: relative;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #543E2E;
+  padding: 6px 0;
+  transition: color 0.2s ease;
+}
+
+.luxury-nav-link::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 1.5px;
+  background-color: #866951;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.luxury-nav-link:hover {
+  color: #261B13;
+}
+
+.luxury-nav-link:hover::after {
+  width: 100%;
+}
+
+/* ── Royal Indian Arch & Editorial Styles ── */
+.luxury-arch-frame {
+  border-top-left-radius: 180px;
+  border-top-right-radius: 180px;
+  border-bottom-left-radius: 24px;
+  border-bottom-right-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px -15px rgba(38, 27, 19, 0.18), 0 0 0 1px #E6DACF;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.luxury-arch-frame:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 28px 60px -18px rgba(38, 27, 19, 0.24), 0 0 0 1.5px #C4AB94;
+}
+
+.luxury-image-zoom-container {
+  overflow: hidden;
+  position: relative;
+}
+
+.luxury-image-zoom-container img {
+  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.luxury-hover-card:hover .luxury-image-zoom-container img {
+  transform: scale(1.06);
+}
+
+.luxury-pill-tab {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.luxury-pill-tab:hover {
+  border-color: #866951 !important;
+  color: #261B13 !important;
+}
+

@@ -3,12 +3,12 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
+import { PhoneIcon, MailIcon, ClockIcon, WhatsAppIcon, SpinnerIcon } from "./Icons";
 
 export default function ContactSection() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [inquiryType, setInquiryType] = useState("Bespoke Bridal Styling");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -29,7 +29,6 @@ export default function ContactSection() {
     setIsSubmitting(true);
 
     try {
-      // Check if user is logged in
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -39,26 +38,25 @@ export default function ContactSection() {
           full_name: fullName.trim(),
           email: email.trim().toLowerCase(),
           phone_number: phone.trim() || null,
-          subject: inquiryType,
+          subject: "Customer Inquiry",
           message: message.trim(),
           user_id: user?.id || null,
         },
       ]);
 
       if (error) {
-        console.warn("Supabase contact_inquiries insert note:", error.message);
+        console.warn("Contact form note:", error.message);
       }
 
       setSubmitted(true);
-      showToast("Your inquiry has been saved! An Avsaraa concierge will reach out within 24 hours.");
+      showToast("Thank you! We received your message and will reply soon.");
       setFullName("");
       setEmail("");
       setPhone("");
       setMessage("");
-    } catch (err) {
-      console.error("Failed to submit contact inquiry:", err);
+    } catch {
       setSubmitted(true);
-      showToast("Thank you. An Avsaraa concierge has received your request.");
+      showToast("Thank you! Your message has been received.");
     } finally {
       setIsSubmitting(false);
     }
@@ -66,11 +64,12 @@ export default function ContactSection() {
 
   return (
     <section
-      id="contact-us"
+      id="contact"
       style={{
         backgroundColor: "#F7F2EE",
-        padding: "60px 20px 80px 20px",
+        padding: "80px 24px",
         position: "relative",
+        borderBottom: "1px solid #E6DACF",
         overflow: "hidden",
       }}
     >
@@ -84,7 +83,7 @@ export default function ContactSection() {
             transform: "translateX(-50%)",
             background: "#261B13",
             color: "#FAF6F0",
-            padding: "10px 22px",
+            padding: "10px 24px",
             borderRadius: "10px",
             fontSize: "13px",
             zIndex: 1000,
@@ -98,16 +97,16 @@ export default function ContactSection() {
         </div>
       )}
 
-      {/* Decorative Botanical Flourish on Bottom Left */}
+      {/* Decorative Botanical Flourish */}
       <div
         style={{
           position: "absolute",
-          left: "-40px",
-          bottom: "-40px",
-          width: "240px",
-          height: "240px",
+          left: "-30px",
+          bottom: "-30px",
+          width: "220px",
+          height: "220px",
           pointerEvents: "none",
-          opacity: 0.65,
+          opacity: 0.5,
           zIndex: 0,
         }}
       >
@@ -115,26 +114,16 @@ export default function ContactSection() {
           src="/images/botanical_flowers.jpg"
           alt=""
           fill
-          sizes="240px"
+          sizes="220px"
           style={{ objectFit: "contain", transform: "rotate(45deg)", mixBlendMode: "multiply" }}
         />
       </div>
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", position: "relative", zIndex: 1 }}>
         {/* Section Header */}
-        <div style={{ textAlign: "center", marginBottom: "48px" }}>
-          <span
-            style={{
-              fontSize: "11px",
-              fontWeight: 600,
-              letterSpacing: "0.22em",
-              textTransform: "uppercase",
-              color: "#866951",
-              display: "block",
-              marginBottom: "8px",
-            }}
-          >
-            ATELIER & STYLIST CONCIERGE
+        <div style={{ textAlign: "center", marginBottom: "52px" }}>
+          <span className="luxury-badge" style={{ marginBottom: "14px" }}>
+            ✦ CONTACT US ✦
           </span>
           <h2
             style={{
@@ -142,27 +131,27 @@ export default function ContactSection() {
               fontSize: "clamp(30px, 4.5vw, 44px)",
               fontWeight: 500,
               color: "#261B13",
-              lineHeight: 1.2,
-              marginBottom: "12px",
+              lineHeight: 1.15,
+              marginBottom: "14px",
             }}
           >
-            Connect With Avsaraa
+            Get in Touch
           </h2>
-          <div style={{ width: "40px", height: "1px", backgroundColor: "#C4AB94", margin: "0 auto 16px auto" }} />
+          <div style={{ width: "48px", height: "1.5px", backgroundColor: "#C4AB94", margin: "0 auto 18px auto" }} />
           <p
             style={{
               fontSize: "15px",
               color: "#6E5B4E",
               maxWidth: "600px",
               margin: "0 auto",
-              lineHeight: 1.6,
+              lineHeight: 1.7,
             }}
           >
-            Whether you are planning bridal trousseau styling, desire custom blouse measurements, or have an order inquiry, our master atelier team is at your service.
+            Have a question about our sarees, orders, or custom sizing? We are here to help.
           </p>
         </div>
 
-        {/* 2-Column Layout: Details on Left, Form on Right */}
+        {/* 2-Column Minimal Layout */}
         <div
           style={{
             display: "grid",
@@ -171,13 +160,13 @@ export default function ContactSection() {
             alignItems: "stretch",
           }}
         >
-          {/* Left Column: Atelier Contact Information */}
+          {/* Left Column: Store Details */}
           <div
             style={{
               backgroundColor: "#FAF7F2",
               border: "1px solid #E6DACF",
               borderRadius: "20px",
-              padding: "36px 28px",
+              padding: "36px 30px",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
@@ -188,75 +177,121 @@ export default function ContactSection() {
                 style={{
                   fontSize: "10.5px",
                   fontWeight: 600,
-                  letterSpacing: "0.18em",
+                  letterSpacing: "0.14em",
                   textTransform: "uppercase",
                   color: "#866951",
                   display: "block",
                   marginBottom: "8px",
                 }}
               >
-                FLAGSHIP SANCTUARY
+                OUR STORE
               </span>
               <h3
                 style={{
                   fontFamily: "var(--font-serif), Georgia, serif",
                   fontSize: "26px",
                   color: "#261B13",
-                  marginBottom: "16px",
+                  marginBottom: "14px",
                 }}
               >
-                Mumbai Atelier
+                Mumbai Store & Studio
               </h3>
               <p style={{ fontSize: "14px", color: "#543E2E", lineHeight: 1.7, marginBottom: "28px" }}>
-                Avsaraa Atelier & Design Studio<br />
+                Avsaraa Studio<br />
                 Level 3, Linking Road, Bandra West<br />
                 Mumbai, Maharashtra - 400050, India
               </p>
 
-              {/* Direct Channels */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "18px", marginBottom: "32px" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-                  <span style={{ fontSize: "20px", marginTop: "2px" }}>📞</span>
+              {/* Contact Channels */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "32px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                  <div
+                    style={{
+                      width: "38px",
+                      height: "38px",
+                      borderRadius: "50%",
+                      backgroundColor: "#FFFFFF",
+                      border: "1px solid #E6DACF",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#866951",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <PhoneIcon size={16} color="#866951" />
+                  </div>
                   <div>
                     <span style={{ display: "block", fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      Private Telephone & Concierge
+                      Phone
                     </span>
-                    <a href="tel:+919876543210" style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13" }}>
-                      +91 98765 43210
+                    <a href="tel:+912226401234" style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
+                      +91 22 2640 1234
                     </a>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-                  <span style={{ fontSize: "20px", marginTop: "2px" }}>✉️</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                  <div
+                    style={{
+                      width: "38px",
+                      height: "38px",
+                      borderRadius: "50%",
+                      backgroundColor: "#FFFFFF",
+                      border: "1px solid #E6DACF",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#866951",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <MailIcon size={16} color="#866951" />
+                  </div>
                   <div>
                     <span style={{ display: "block", fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      Direct Email Inquiries
+                      Email
                     </span>
-                    <a href="mailto:concierge@avsaraa.in" style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13" }}>
-                      concierge@avsaraa.in
+                    <a href="mailto:hello@avsaraa.in" style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
+                      hello@avsaraa.in
                     </a>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-                  <span style={{ fontSize: "20px", marginTop: "2px" }}>🕒</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                  <div
+                    style={{
+                      width: "38px",
+                      height: "38px",
+                      borderRadius: "50%",
+                      backgroundColor: "#FFFFFF",
+                      border: "1px solid #E6DACF",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#866951",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ClockIcon size={16} color="#866951" />
+                  </div>
                   <div>
                     <span style={{ display: "block", fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      Visiting & Consultation Hours
+                      Opening Hours
                     </span>
-                    <span style={{ fontSize: "14px", color: "#543E2E" }}>
-                      Monday – Saturday: 10:00 AM – 7:30 PM IST
+                    <span style={{ fontSize: "13.5px", color: "#261B13" }}>
+                      Monday – Saturday: 10:00 AM – 7:30 PM
                     </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Instant WhatsApp Concierge Button */}
-            <button
-              type="button"
-              onClick={() => showToast("Opening WhatsApp Stylist Chat (+91 98765 43210)...")}
+            {/* WhatsApp CTA */}
+            <a
+              href="https://wa.me/912226401234?text=Hello%20Avsaraa%2C%20I%20have%20a%20question%20about%20your%20sarees."
+              target="_blank"
+              rel="noopener noreferrer"
               style={{
                 width: "100%",
                 height: "50px",
@@ -273,18 +308,18 @@ export default function ContactSection() {
                 boxShadow: "0 6px 18px -4px rgba(38, 27, 19, 0.35)",
               }}
             >
-              <span>💬</span>
-              <span>Chat with Stylist on WhatsApp</span>
-            </button>
+              <WhatsAppIcon size={18} color="#25D366" />
+              <span>Chat with Us on WhatsApp</span>
+            </a>
           </div>
 
-          {/* Right Column: Interactive Contact Form */}
+          {/* Right Column: Simple Message Form */}
           <div
             style={{
               backgroundColor: "#FFFFFF",
               border: "1px solid #E8DED3",
               borderRadius: "20px",
-              padding: "36px 28px",
+              padding: "36px 30px",
               boxShadow: "0 8px 30px -10px rgba(38,27,19,0.06)",
             }}
           >
@@ -296,10 +331,10 @@ export default function ContactSection() {
                 marginBottom: "6px",
               }}
             >
-              Send an Atelier Inquiry
+              Send us a Message
             </h3>
             <p style={{ fontSize: "13px", color: "#6E5B4E", marginBottom: "24px" }}>
-              Leave your details below and our personal stylist will respond shortly.
+              Leave your details below and our team will get back to you soon.
             </p>
 
             {submitted ? (
@@ -312,12 +347,27 @@ export default function ContactSection() {
                   border: "1px solid #E6DACF",
                 }}
               >
-                <span style={{ fontSize: "36px", display: "block", marginBottom: "12px" }}>✨</span>
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    backgroundColor: "#866951",
+                    color: "#FFFFFF",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 16px auto",
+                    fontSize: "20px",
+                  }}
+                >
+                  ✓
+                </div>
                 <h4 style={{ fontFamily: "var(--font-serif)", fontSize: "22px", color: "#261B13", marginBottom: "8px" }}>
-                  Message Received with Grace
+                  Message Sent
                 </h4>
                 <p style={{ fontSize: "13.5px", color: "#6E5B4E", lineHeight: 1.6, marginBottom: "20px" }}>
-                  Our concierge team will review your inquiry and contact you via email or phone within 24 hours.
+                  Thank you for contacting us. We will reply to your email or phone within 24 hours.
                 </p>
                 <button
                   type="button"
@@ -325,12 +375,11 @@ export default function ContactSection() {
                   className="avsaraa-btn-outline"
                   style={{ width: "auto", padding: "0 24px", height: "42px", fontSize: "12.5px" }}
                 >
-                  Send Another Inquiry
+                  Send Another Message
                 </button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {/* Full Name */}
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
                     Full Name *
@@ -338,16 +387,15 @@ export default function ContactSection() {
                   <div className="avsaraa-input-group" style={{ height: "48px" }}>
                     <input
                       type="text"
+                      required
                       placeholder="e.g. Radhika Kapoor"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      required
-                      style={{ width: "100%", fontSize: "13.5px", color: "#261B13" }}
+                      style={{ width: "100%", height: "100%", padding: "0 14px", fontSize: "13.5px", color: "#261B13" }}
                     />
                   </div>
                 </div>
 
-                {/* Email & Phone in 2 Columns */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                   <div>
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
@@ -356,14 +404,15 @@ export default function ContactSection() {
                     <div className="avsaraa-input-group" style={{ height: "48px" }}>
                       <input
                         type="email"
+                        required
                         placeholder="you@domain.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        required
-                        style={{ width: "100%", fontSize: "13.5px", color: "#261B13" }}
+                        style={{ width: "100%", height: "100%", padding: "0 14px", fontSize: "13.5px", color: "#261B13" }}
                       />
                     </div>
                   </div>
+
                   <div>
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
                       Mobile Number
@@ -374,64 +423,33 @@ export default function ContactSection() {
                         placeholder="+91 98765 00000"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        style={{ width: "100%", fontSize: "13.5px", color: "#261B13" }}
+                        style={{ width: "100%", height: "100%", padding: "0 14px", fontSize: "13.5px", color: "#261B13" }}
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Inquiry Type */}
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
-                    Inquiry Topic
-                  </label>
-                  <select
-                    value={inquiryType}
-                    onChange={(e) => setInquiryType(e.target.value)}
-                    style={{
-                      width: "100%",
-                      height: "48px",
-                      padding: "0 16px",
-                      border: "1px solid var(--color-border-subtle)",
-                      borderRadius: "var(--radius-md)",
-                      backgroundColor: "#FCFAF7",
-                      color: "#261B13",
-                      fontSize: "13.5px",
-                      outline: "none",
-                      fontFamily: "inherit",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <option value="Bespoke Bridal Styling">Bespoke Bridal Styling Consultation</option>
-                    <option value="Custom Blouse Tailoring">Custom Blouse Tailoring & Measurements</option>
-                    <option value="Order & Delivery Inquiry">Order Status & Delivery Inquiry</option>
-                    <option value="Artisanal Collaboration">Artisanal & Press Inquiries</option>
-                    <option value="General Question">General Style Inquiry</option>
-                  </select>
-                </div>
-
-                {/* Message */}
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
                     Your Message *
                   </label>
                   <textarea
+                    required
                     rows={4}
-                    placeholder="Tell us about your upcoming occasion, sizing questions, or styling vision..."
+                    placeholder="Ask about sarees, sizing, delivery, or anything else..."
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    required
                     style={{
                       width: "100%",
-                      padding: "14px 16px",
-                      border: "1px solid var(--color-border-subtle)",
-                      borderRadius: "var(--radius-md)",
-                      backgroundColor: "#FCFAF7",
-                      color: "#261B13",
+                      padding: "12px 14px",
                       fontSize: "13.5px",
-                      outline: "none",
+                      color: "#261B13",
+                      backgroundColor: "#FFFFFF",
+                      border: "1px solid #CFBEAD",
+                      borderRadius: "10px",
                       fontFamily: "inherit",
                       resize: "vertical",
+                      outline: "none",
                     }}
                   />
                 </div>
@@ -441,13 +459,22 @@ export default function ContactSection() {
                   disabled={isSubmitting}
                   className="avsaraa-btn-primary"
                   style={{
-                    height: "48px",
-                    fontSize: "13.5px",
+                    height: "50px",
+                    fontSize: "13px",
+                    fontWeight: 600,
                     letterSpacing: "0.06em",
                     textTransform: "uppercase",
+                    marginTop: "6px",
                   }}
                 >
-                  {isSubmitting ? "Submitting Inquiry..." : "Submit Inquiry →"}
+                  {isSubmitting ? (
+                    <>
+                      <SpinnerIcon size={16} color="#FAF7F2" />
+                      <span>Sending Message...</span>
+                    </>
+                  ) : (
+                    <span>Send Message →</span>
+                  )}
                 </button>
               </form>
             )}

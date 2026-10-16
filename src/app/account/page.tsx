@@ -2,10 +2,22 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabaseClient";
+import { Product, ProductCategory } from "@/types/product";
+import { SpinnerIcon } from "@/components/Icons";
+
+const PRESET_PRODUCT_IMAGES = [
+  { label: "Banarasi Silk Saree", url: "/images/banarasi_silk_saree.jpg" },
+  { label: "Emerald Organza Saree", url: "/images/royal_organza_saree.jpg" },
+  { label: "Heritage Anarkali Gown", url: "/images/royal_occasion_dress.jpg" },
+  { label: "Chanderi Dress", url: "/images/festive_chanderi_dress.jpg" },
+  { label: "Royal Zari Bridal Drape", url: "/images/saree_model_hero.jpg" },
+  { label: "Handloom Weave Texture", url: "/images/account_hero.jpg" },
+];
 
 interface UserProfile {
   id: string;
@@ -35,7 +47,8 @@ interface AddressItem {
 }
 
 export default function AccountPage() {
-  const [activeTab, setActiveTab] = useState<"profile" | "addresses" | "concierge">("profile");
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"profile" | "addresses" | "products" | "support">("profile");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -43,6 +56,18 @@ export default function AccountPage() {
   const [authUser, setAuthUser] = useState<{ id: string; email?: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [addresses, setAddresses] = useState<AddressItem[]>([]);
+
+  // Products Management State (Only for authenticated members)
+  const [products, setProducts] = useState<Product[]>([]);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    category: "Sarees" as ProductCategory,
+    price: "",
+    image_url: PRESET_PRODUCT_IMAGES[0].url,
+    description: "",
+  });
 
   // Profile Edit Mode
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -71,7 +96,7 @@ export default function AccountPage() {
     setTimeout(() => setToastMessage(null), 3600);
   };
 
-  // Fetch real profile & addresses from Supabase database
+  // Fetch real profile, addresses, and products from Supabase database
   const loadUserData = useCallback(async (userId: string, userEmail?: string) => {
     setIsLoading(true);
 
@@ -92,13 +117,12 @@ export default function AccountPage() {
         setEditFullName(profileData.full_name || "");
         setEditPhoneNumber(profileData.phone_number || "");
       } else {
-        // Fallback default profile from auth session
         const defaultProfile: UserProfile = {
           id: userId,
-          full_name: userEmail ? userEmail.split("@")[0].replace(/[._]/g, " ") : "Avsaraa Patron",
+          full_name: userEmail ? userEmail.split("@")[0].replace(/[._]/g, " ") : "Avsaraa Member",
           email: userEmail || "",
           phone_number: null,
-          membership_tier: "Privilege",
+          membership_tier: "Member",
           created_at: new Date().toISOString(),
         };
         setProfile(defaultProfile);
@@ -115,7 +139,6 @@ export default function AccountPage() {
 
       if (addrErr) {
         console.warn("Addresses fetch note:", addrErr.message);
-        // Fallback to localStorage if table is pending schema creation
         const cached = localStorage.getItem(`avsaraa_addresses_${userId}`);
         if (cached) {
           try {
@@ -129,6 +152,21 @@ export default function AccountPage() {
       } else if (addressData) {
         setAddresses(addressData);
         localStorage.setItem(`avsaraa_addresses_${userId}`, JSON.stringify(addressData));
+      }
+
+      // 3. Fetch Products strictly from Supabase database
+      const { data: prodData, error: prodErr } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (prodErr) {
+        console.warn("Database products query note:", prodErr.message);
+        setProducts([]);
+      } else if (prodData) {
+        setProducts(prodData);
+      } else {
+        setProducts([]);
       }
     } catch (err) {
       console.error("Error loading account data:", err);
@@ -156,10 +194,14 @@ export default function AccountPage() {
           setProfile(null);
           setAddresses([]);
           setIsLoading(false);
+          router.replace("/login");
         }
       } catch (err) {
         console.error("Auth check error:", err);
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+          router.replace("/login");
+        }
       }
     }
 
@@ -176,6 +218,7 @@ export default function AccountPage() {
         setProfile(null);
         setAddresses([]);
         setIsLoading(false);
+        router.replace("/login");
       }
     });
 
@@ -183,9 +226,9 @@ export default function AccountPage() {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [loadUserData]);
+  }, [loadUserData, router]);
 
-  // Handle Save Profile
+  // Handle Save Profile to Database
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authUser) {
@@ -206,7 +249,7 @@ export default function AccountPage() {
       const { error } = await supabase.from("profiles").upsert(updatedData);
 
       if (error) {
-        console.warn("Profile update error:", error.message);
+        console.warn("Profile update note:", error.message);
       }
 
       setProfile((prev) =>
@@ -220,7 +263,7 @@ export default function AccountPage() {
       );
 
       setIsEditingProfile(false);
-      showToast("Profile details updated successfully");
+      showToast("Profile details saved to database");
     } catch (err) {
       console.error("Failed to save profile:", err);
       showToast("Could not update profile. Please try again.");
@@ -229,7 +272,7 @@ export default function AccountPage() {
     }
   };
 
-  // Handle Add Address
+  // Handle Add Address to Database
   const handleAddAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authUser) {
@@ -267,7 +310,6 @@ export default function AccountPage() {
     };
 
     try {
-      // If setting as default, uncheck other addresses first in DB
       if (addressRecord.is_default && addresses.length > 0) {
         await supabase
           .from("addresses")
@@ -282,7 +324,7 @@ export default function AccountPage() {
         .single();
 
       if (error) {
-        console.warn("DB insert error, saving to local cache:", error.message);
+        console.warn("DB insert note, saving to local cache:", error.message);
         const fallbackItem: AddressItem = {
           ...addressRecord,
           id: `local-${Date.now()}`,
@@ -301,7 +343,7 @@ export default function AccountPage() {
         localStorage.setItem(`avsaraa_addresses_${authUser.id}`, JSON.stringify(updated));
       }
 
-      showToast("Delivery address saved successfully");
+      showToast("Delivery address saved to database");
       setShowAddressModal(false);
       setNewAddress({
         recipient_name: "",
@@ -332,7 +374,7 @@ export default function AccountPage() {
       const filtered = addresses.filter((a) => a.id !== addressId);
       setAddresses(filtered);
       localStorage.setItem(`avsaraa_addresses_${authUser.id}`, JSON.stringify(filtered));
-      showToast("Address removed");
+      showToast("Address deleted");
     } catch (err) {
       console.error("Failed to delete address:", err);
       showToast("Could not remove address");
@@ -359,6 +401,84 @@ export default function AccountPage() {
     }
   };
 
+  // Handle Add Product (Strictly Logged-in member only)
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authUser) {
+      showToast("Only logged-in members can add products. Please sign in.");
+      setShowProductModal(false);
+      return;
+    }
+
+    if (!newProduct.name.trim() || !newProduct.price.trim()) {
+      showToast("Please enter product name and price");
+      return;
+    }
+
+    const priceNum = parseFloat(newProduct.price);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      showToast("Please enter a valid price");
+      return;
+    }
+
+    setIsSavingProduct(true);
+    const productRecord = {
+      name: newProduct.name.trim(),
+      category: newProduct.category,
+      price: priceNum,
+      image_url: newProduct.image_url || PRESET_PRODUCT_IMAGES[0].url,
+      description: newProduct.description.trim() || null,
+      user_id: authUser.id,
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .insert([productRecord])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("DB insert error:", error);
+        showToast("Database error: " + (error.message || "Failed to save product"));
+        return;
+      }
+
+      if (data) {
+        setProducts((prev) => [data, ...prev]);
+        showToast(`Added "${newProduct.name}" to database!`);
+        setShowProductModal(false);
+        setNewProduct({
+          name: "",
+          category: "Sarees",
+          price: "",
+          image_url: PRESET_PRODUCT_IMAGES[0].url,
+          description: "",
+        });
+      }
+    } catch {
+      showToast("Could not save product to database.");
+    } finally {
+      setIsSavingProduct(false);
+    }
+  };
+
+  // Handle Delete Product from Database
+  const handleDeleteProduct = async (productId: string) => {
+    if (!authUser) return;
+    try {
+      const { error } = await supabase.from("products").delete().eq("id", productId);
+      if (error) {
+        showToast("Database error: " + error.message);
+        return;
+      }
+      setProducts((prev) => prev.filter((p) => p.id !== productId));
+      showToast("Product deleted from database");
+    } catch {
+      showToast("Could not delete product");
+    }
+  };
+
   // Handle Sign Out
   const handleSignOut = async () => {
     try {
@@ -367,18 +487,18 @@ export default function AccountPage() {
       setProfile(null);
       setAddresses([]);
       showToast("Signed out safely");
-      window.location.href = "/login";
+      router.replace("/login");
     } catch {
-      window.location.href = "/login";
+      router.replace("/login");
     }
   };
 
-  // Quick Demo Patron Login (for easy testing without manual credentials)
+  // Quick Demo Member Login
   const handleDemoSignIn = async () => {
     setIsLoading(true);
     try {
-      const demoEmail = "demo.patron@avsaraa.in";
-      const demoPassword = "AvsaraaPatron2026!";
+      const demoEmail = "demo.member@avsaraa.in";
+      const demoPassword = "AvsaraaMember2026!";
 
       const { data: signInData, error } = await supabase.auth.signInWithPassword({
         email: demoEmail,
@@ -388,13 +508,12 @@ export default function AccountPage() {
       let targetUser = signInData?.user || null;
 
       if (error || !targetUser) {
-        // Sign up demo user if not existing
         const { data: signUpData } = await supabase.auth.signUp({
           email: demoEmail,
           password: demoPassword,
           options: {
             data: {
-              full_name: "Avsaraa Patron",
+              full_name: "Avsaraa Member",
               phone_number: "+91 98200 12345",
             },
           },
@@ -405,17 +524,16 @@ export default function AccountPage() {
       if (targetUser) {
         setAuthUser(targetUser);
         await loadUserData(targetUser.id, targetUser.email);
-        showToast("Signed in as Demo Patron");
+        showToast("Signed in as Demo Member");
       }
     } catch (err) {
       console.error("Demo login error:", err);
-      showToast("Could not sign in with demo patron");
+      showToast("Could not sign in with demo account");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Avatar Initials
   const getInitials = (name?: string | null) => {
     if (!name) return "✦";
     const parts = name.trim().split(" ");
@@ -424,6 +542,47 @@ export default function AccountPage() {
     }
     return name.slice(0, 2).toUpperCase();
   };
+
+  if (isLoading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          backgroundColor: "#F7F2EE",
+        }}
+      >
+        <Header />
+        <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 24px" }}>
+          <p style={{ color: "#8E7D70", fontSize: "14px" }}>Loading your account...</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          backgroundColor: "#F7F2EE",
+        }}
+      >
+        <Header />
+        <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 24px" }}>
+          <div style={{ textAlign: "center" }}>
+            <p style={{ color: "#261B13", fontSize: "16px", marginBottom: "8px" }}>Redirecting to Sign In...</p>
+            <p style={{ color: "#8E7D70", fontSize: "13px" }}>Please sign in to view your account.</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -444,24 +603,25 @@ export default function AccountPage() {
             transform: "translateX(-50%)",
             background: "#261B13",
             color: "#FAF6F0",
-            padding: "10px 22px",
-            borderRadius: "10px",
+            padding: "11px 24px",
+            borderRadius: "12px",
             fontSize: "13px",
             zIndex: 1000,
             textAlign: "center",
-            boxShadow: "0 8px 24px rgba(38, 27, 19, 0.35)",
+            boxShadow: "0 10px 30px rgba(38, 27, 19, 0.4)",
             animation: "fadeIn 0.25s ease",
             maxWidth: "90vw",
+            letterSpacing: "0.02em",
           }}
         >
           {toastMessage}
         </div>
       )}
 
-      {/* Official Header & Announcement Bar */}
+      {/* Official Header */}
       <Header />
 
-      <main style={{ flex: 1, paddingBottom: "60px" }}>
+      <main style={{ flex: 1, paddingBottom: "70px" }}>
         {/* Profile Header Hero */}
         <div
           style={{
@@ -469,33 +629,33 @@ export default function AccountPage() {
             borderBottom: "1px solid #E6DACF",
             position: "relative",
             overflow: "hidden",
-            padding: "36px 20px 28px 20px",
+            padding: "40px 24px 32px 24px",
           }}
         >
-          {/* Decorative Corner Flowers */}
+          {/* Subtle Corner Botanical Flower */}
           <div
             style={{
               position: "absolute",
               right: "-25px",
               top: "-25px",
-              width: "140px",
-              height: "140px",
+              width: "160px",
+              height: "160px",
               pointerEvents: "none",
-              opacity: 0.75,
+              opacity: 0.65,
             }}
           >
             <Image
               src="/images/botanical_flowers.jpg"
               alt=""
               fill
-              sizes="140px"
+              sizes="160px"
               style={{ objectFit: "contain", mixBlendMode: "multiply" }}
             />
           </div>
 
           <div
             style={{
-              maxWidth: "880px",
+              maxWidth: "1100px",
               margin: "0 auto",
               position: "relative",
               zIndex: 1,
@@ -507,204 +667,138 @@ export default function AccountPage() {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                fontSize: "12px",
+                fontSize: "11.5px",
                 color: "#866951",
-                marginBottom: "20px",
+                marginBottom: "24px",
                 textTransform: "uppercase",
-                letterSpacing: "0.08em",
+                letterSpacing: "0.12em",
+                fontWeight: 600,
               }}
             >
               <Link href="/" style={{ opacity: 0.7 }}>
                 Home
               </Link>
               <span>›</span>
-              <span style={{ fontWeight: 600, color: "#261B13" }}>My Account</span>
+              <span style={{ color: "#866951" }}>My Account</span>
             </div>
 
             {/* Profile Info Card */}
-            {isLoading ? (
-              <div style={{ padding: "30px 0", textAlign: "center", color: "#8E7D70", fontSize: "14px" }}>
-                Loading patron account details from database...
-              </div>
-            ) : authUser ? (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: "20px",
-                  flexWrap: "wrap",
-                }}
-              >
-                {/* User Avatar */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "24px",
+                flexWrap: "wrap",
+              }}
+            >
+              {/* User Details */}
+              <div style={{ display: "flex", alignItems: "center", gap: "22px", flexWrap: "wrap" }}>
                 <div
                   style={{
-                    width: "72px",
-                    height: "72px",
+                    width: "80px",
+                    height: "80px",
                     borderRadius: "50%",
-                    background: "linear-gradient(135deg, #C4AB94 0%, #866951 100%)",
+                    background: "radial-gradient(circle at 35% 35%, #D4BEAA 0%, #866951 100%)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "#FFFFFF",
                     fontFamily: "var(--font-serif), Georgia, serif",
-                    fontSize: "24px",
+                    fontSize: "26px",
                     fontWeight: 600,
-                    boxShadow: "0 6px 20px rgba(134, 105, 81, 0.25)",
+                    boxShadow: "0 8px 24px rgba(134, 105, 81, 0.28)",
+                    border: "2px solid #FFFFFF",
                     flexShrink: 0,
                   }}
                 >
                   {getInitials(profile?.full_name)}
                 </div>
 
-                {/* Name & Membership */}
-                <div style={{ flex: 1, minWidth: "220px" }}>
+                <div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "4px" }}>
                     <h1
                       style={{
                         fontFamily: "var(--font-serif), Georgia, serif",
-                        fontSize: "26px",
-                        fontWeight: 600,
+                        fontSize: "clamp(24px, 3.5vw, 32px)",
+                        fontWeight: 500,
                         color: "#261B13",
                         textTransform: "capitalize",
+                        lineHeight: 1.15,
                       }}
                     >
-                      {profile?.full_name || "Avsaraa Patron"}
+                      {profile?.full_name || "Member"}
                     </h1>
-                    <span
-                      style={{
-                        backgroundColor: "#EFE6DC",
-                        color: "#866951",
-                        border: "1px solid #CFBEAD",
-                        borderRadius: "20px",
-                        padding: "3px 10px",
-                        fontSize: "10.5px",
-                        fontWeight: 600,
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
-                      <span>✦</span> {profile?.membership_tier || "PRIVILEGE"} MEMBER
+                    <span className="luxury-badge">
+                      ✦ {profile?.membership_tier || "MEMBER"}
                     </span>
                   </div>
-                  <p style={{ fontSize: "13.5px", color: "#6E5B4E", marginBottom: "2px" }}>
+
+                  <p style={{ fontSize: "13.5px", color: "#6E5B4E", marginBottom: "3px" }}>
                     {profile?.phone_number ? `${profile.phone_number} • ` : ""}
                     {profile?.email || authUser.email}
                   </p>
-                  <p style={{ fontSize: "12px", color: "#AC9885" }}>
-                    Connected with Database Account
+                  <p style={{ fontSize: "12px", color: "#A88B70" }}>
+                    ✦ Verified Member
                   </p>
                 </div>
-
-                {/* Action Buttons */}
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button
-                    onClick={handleSignOut}
-                    style={{
-                      padding: "8px 16px",
-                      border: "1px solid #CFBEAD",
-                      borderRadius: "20px",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#543E2E",
-                      backgroundColor: "#FFFFFF",
-                      transition: "all 0.2s ease",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <span>Sign Out</span>
-                    <span style={{ fontSize: "14px" }}>→</span>
-                  </button>
-                </div>
               </div>
-            ) : (
-              /* Guest Not Signed In Banner */
-              <div
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  border: "1px solid #E8DED3",
-                  borderRadius: "16px",
-                  padding: "24px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: "16px",
-                }}
-              >
-                <div>
-                  <h2 style={{ fontFamily: "var(--font-serif)", fontSize: "20px", color: "#261B13", marginBottom: "4px" }}>
-                    Welcome to Avsaraa Atelier
-                  </h2>
-                  <p style={{ fontSize: "13.5px", color: "#6E5B4E" }}>
-                    Sign in to view your verified database profile, save delivery addresses, and manage account preferences.
-                  </p>
-                </div>
 
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                  <Link
-                    href="/login"
-                    className="avsaraa-btn-primary"
-                    style={{ height: "42px", padding: "0 22px", fontSize: "13px" }}
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="avsaraa-btn-outline"
-                    style={{ height: "42px", padding: "0 20px", fontSize: "13px" }}
-                  >
-                    Create Account
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleDemoSignIn}
-                    className="avsaraa-btn-outline"
-                    style={{ height: "42px", padding: "0 16px", fontSize: "12px", borderColor: "#866951", color: "#866951" }}
-                  >
-                    ⚡ Demo Sign In
-                  </button>
-                </div>
+              {/* Sign Out Action */}
+              <div>
+                <button
+                  onClick={handleSignOut}
+                  className="avsaraa-btn-outline"
+                  style={{
+                    height: "40px",
+                    padding: "0 20px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    backgroundColor: "#FFFFFF",
+                    width: "auto",
+                  }}
+                >
+                  <span>Logout</span>
+                  <span>→</span>
+                </button>
               </div>
-            )}
+            </div>
 
-            {/* Account Quick Metrics */}
+            {/* Quick Metrics Bar */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: "12px",
-                marginTop: "24px",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: "14px",
+                marginTop: "28px",
               }}
             >
               {[
-                { label: "Account Status", value: authUser ? "Verified Active" : "Guest Mode" },
-                { label: "Saved Addresses", value: `${addresses.length} ${addresses.length === 1 ? "Address" : "Addresses"}` },
-                { label: "Membership Tier", value: authUser ? `✦ ${profile?.membership_tier || "Privilege"}` : "✦ Guest" },
-                { label: "Data Source", value: "Supabase DB" },
+                { label: "Status", value: "Active Member" },
+                { label: "Saved Addresses", value: `${addresses.length} Saved` },
+                { label: "Account Type", value: `✦ ${profile?.membership_tier || "Member"}` },
+                { label: "Store", value: "Mumbai Studio" },
               ].map((stat, i) => (
                 <div
                   key={i}
                   style={{
                     backgroundColor: "#FFFFFF",
                     border: "1px solid #E8DED3",
-                    borderRadius: "12px",
-                    padding: "12px 16px",
+                    borderRadius: "14px",
+                    padding: "14px 18px",
+                    boxShadow: "0 4px 15px rgba(38,27,19,0.02)",
                   }}
                 >
-                  <span style={{ display: "block", fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  <span style={{ display: "block", fontSize: "10.5px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "2px" }}>
                     {stat.label}
                   </span>
                   <span
                     style={{
                       fontFamily: "var(--font-serif), Georgia, serif",
-                      fontSize: "17px",
+                      fontSize: "18px",
                       fontWeight: 600,
                       color: "#261B13",
                     }}
@@ -717,21 +811,21 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Tab Navigation (Horizontal Scrollable for Mobile) */}
+        {/* Mobile Horizontal Tabs (< 900px) */}
         <div
+          className="mobile-only"
           style={{
             backgroundColor: "#FFFFFF",
             borderBottom: "1px solid #E8DED3",
             position: "sticky",
             top: "57px",
             zIndex: 40,
+            width: "100%",
           }}
         >
           <div
             className="no-scrollbar"
             style={{
-              maxWidth: "880px",
-              margin: "0 auto",
               padding: "0 16px",
               display: "flex",
               gap: "24px",
@@ -740,9 +834,10 @@ export default function AccountPage() {
             }}
           >
             {[
-              { id: "profile", label: "Profile Details" },
-              { id: "addresses", label: `Saved Addresses (${addresses.length})` },
-              { id: "concierge", label: "Private Concierge" },
+              { id: "profile", label: "My Profile" },
+              { id: "addresses", label: `Addresses (${addresses.length})` },
+              { id: "products", label: `Products (${products.length})` },
+              { id: "support", label: "Help & Support" },
             ].map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -755,7 +850,6 @@ export default function AccountPage() {
                     fontWeight: isActive ? 600 : 500,
                     color: isActive ? "#261B13" : "#8E7D70",
                     borderBottom: isActive ? "2px solid #866951" : "2px solid transparent",
-                    transition: "all 0.2s ease",
                     cursor: "pointer",
                   }}
                 >
@@ -766,322 +860,675 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Tab Content Panels */}
-        <div style={{ maxWidth: "880px", margin: "28px auto 0 auto", padding: "0 20px" }}>
-          {/* 1. PROFILE DETAILS TAB */}
-          {activeTab === "profile" && (
-            <div className="fade-in-up" style={{ maxWidth: "640px", margin: "0 auto" }}>
-              <div
+        {/* Main Content Layout (Desktop 2-Column or Mobile Stack) */}
+        <div
+          style={{
+            maxWidth: "1100px",
+            margin: "32px auto 0 auto",
+            padding: "0 24px",
+            display: "flex",
+            gap: "32px",
+            alignItems: "flex-start",
+          }}
+        >
+          {/* Desktop Left Sidebar Navigation (min-width: 900px) */}
+          <aside
+            className="desktop-only"
+            style={{
+              width: "280px",
+              flexShrink: 0,
+              flexDirection: "column",
+              gap: "12px",
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #E8DED3",
+                borderRadius: "18px",
+                padding: "14px",
+                boxShadow: "0 6px 20px -6px rgba(38,27,19,0.04)",
+              }}
+            >
+              <span
                 style={{
-                  backgroundColor: "#FFFFFF",
-                  border: "1px solid #E8DED3",
-                  borderRadius: "18px",
-                  padding: "28px 24px",
-                  boxShadow: "0 6px 24px -6px rgba(38,27,19,0.04)",
+                  display: "block",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "#866951",
+                  padding: "8px 12px",
+                  marginBottom: "4px",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "22px", color: "#261B13" }}>
-                    Personal Information
-                  </h3>
-                  {authUser && (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingProfile(!isEditingProfile)}
-                      style={{
-                        fontSize: "12.5px",
-                        fontWeight: 600,
-                        color: "#866951",
-                        textDecoration: "underline",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {isEditingProfile ? "Cancel" : "Edit Details"}
-                    </button>
-                  )}
-                </div>
+                MENU
+              </span>
 
-                {isEditingProfile ? (
-                  <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                    <div>
-                      <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                        Full Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={editFullName}
-                        onChange={(e) => setEditFullName(e.target.value)}
-                        required
-                        style={{
-                          width: "100%",
-                          height: "44px",
-                          padding: "0 14px",
-                          border: "1px solid #CFBEAD",
-                          borderRadius: "8px",
-                          fontSize: "14px",
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                        Mobile Number
-                      </label>
-                      <input
-                        type="tel"
-                        value={editPhoneNumber}
-                        onChange={(e) => setEditPhoneNumber(e.target.value)}
-                        placeholder="+91 98765 43210"
-                        style={{
-                          width: "100%",
-                          height: "44px",
-                          padding: "0 14px",
-                          border: "1px solid #CFBEAD",
-                          borderRadius: "8px",
-                          fontSize: "14px",
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                        Email Address (Read-only)
-                      </label>
-                      <input
-                        type="email"
-                        value={profile?.email || authUser?.email || ""}
-                        disabled
-                        style={{
-                          width: "100%",
-                          height: "44px",
-                          padding: "0 14px",
-                          border: "1px solid #E8DED3",
-                          backgroundColor: "#FAF7F2",
-                          borderRadius: "8px",
-                          fontSize: "14px",
-                          color: "#8E7D70",
-                        }}
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSavingProfile}
-                      className="avsaraa-btn-primary"
-                      style={{ height: "44px", fontSize: "13px", marginTop: "8px" }}
-                    >
-                      {isSavingProfile ? "Saving to Database..." : "Save Changes to Database"}
-                    </button>
-                  </form>
-                ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
-                    <div>
-                      <span style={{ fontSize: "11px", color: "#8E7D70", display: "block" }}>Full Name</span>
-                      <span style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13", textTransform: "capitalize" }}>
-                        {profile?.full_name || (authUser ? "Avsaraa Patron" : "Guest User")}
-                      </span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: "11px", color: "#8E7D70", display: "block" }}>Mobile Number</span>
-                      <span style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13" }}>
-                        {profile?.phone_number || "Not provided"}
-                      </span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: "11px", color: "#8E7D70", display: "block" }}>Email Address</span>
-                      <span style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13" }}>
-                        {profile?.email || authUser?.email || "guest@avsaraa.in"}
-                      </span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: "11px", color: "#8E7D70", display: "block" }}>Membership Tier</span>
-                      <span style={{ fontSize: "14.5px", fontWeight: 600, color: "#866951" }}>
-                        ✦ {profile?.membership_tier || "Standard Patron"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ borderTop: "1px solid #EFE6DC", paddingTop: "16px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                  <Link
-                    href="/#about-us"
-                    className="avsaraa-btn-outline"
-                    style={{ flex: 1, height: "42px", fontSize: "13px" }}
+              {[
+                { id: "profile", label: "My Profile", icon: "✦" },
+                { id: "addresses", label: `Addresses (${addresses.length})`, icon: "📍" },
+                { id: "products", label: `Manage Products (${products.length})`, icon: "👗" },
+                { id: "support", label: "Help & Support", icon: "💬" },
+              ].map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      fontSize: "13.5px",
+                      fontWeight: isActive ? 600 : 500,
+                      backgroundColor: isActive ? "#F2EBE3" : "transparent",
+                      color: isActive ? "#261B13" : "#6E5B4E",
+                      border: "none",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
                   >
-                    Read About Us
-                  </Link>
-                  <Link
-                    href="/#contact-us"
-                    className="avsaraa-btn-primary"
-                    style={{ flex: 1, height: "42px", fontSize: "13px" }}
-                  >
-                    Contact Concierge
-                  </Link>
-                </div>
-              </div>
+                    <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "14px" }}>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </span>
+                    {isActive && <span style={{ color: "#866951", fontSize: "14px" }}>•</span>}
+                  </button>
+                );
+              })}
             </div>
-          )}
 
-          {/* 2. ADDRESSES TAB */}
-          {activeTab === "addresses" && (
-            <div className="fade-in-up" style={{ maxWidth: "640px", margin: "0 auto" }}>
-              {/* Saved Addresses List */}
-              {addresses.length === 0 ? (
+            {/* Member Benefits Card */}
+            <div
+              style={{
+                backgroundColor: "#FAF7F2",
+                border: "1px solid #E6DACF",
+                borderRadius: "16px",
+                padding: "18px 20px",
+              }}
+            >
+              <span style={{ fontSize: "11px", fontWeight: 600, color: "#866951", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                MEMBER BENEFITS
+              </span>
+              <p style={{ fontSize: "13px", color: "#6E5B4E", lineHeight: 1.5, marginTop: "6px" }}>
+                Enjoy free delivery on orders above ₹2,999 and fast support on WhatsApp.
+              </p>
+            </div>
+          </aside>
+
+          {/* Right Main Stage Content Panel */}
+          <div style={{ flex: 1, width: "100%", maxWidth: "800px" }}>
+            {/* 1. PROFILE DETAILS TAB */}
+            {activeTab === "profile" && (
+              <div className="fade-in-up">
                 <div
                   style={{
                     backgroundColor: "#FFFFFF",
-                    border: "1px dashed #CFBEAD",
-                    borderRadius: "16px",
-                    padding: "36px 20px",
-                    textAlign: "center",
-                    marginBottom: "16px",
+                    border: "1px solid #E8DED3",
+                    borderRadius: "20px",
+                    padding: "32px 28px",
+                    boxShadow: "0 8px 30px -8px rgba(38,27,19,0.04)",
                   }}
                 >
-                  <span style={{ fontSize: "30px", display: "block", marginBottom: "8px" }}>📍</span>
-                  <h4 style={{ fontFamily: "var(--font-serif)", fontSize: "18px", color: "#261B13", marginBottom: "4px" }}>
-                    No Saved Addresses
-                  </h4>
-                  <p style={{ fontSize: "13px", color: "#8E7D70", maxWidth: "360px", margin: "0 auto 16px auto" }}>
-                    {authUser
-                      ? "You haven't added any delivery addresses yet. Add your primary residence or atelier address to save to the database."
-                      : "Sign in to save and manage your delivery addresses directly in your account."}
-                  </p>
-                </div>
-              ) : (
-                addresses.map((addr) => (
-                  <div
-                    key={addr.id}
-                    style={{
-                      backgroundColor: "#FFFFFF",
-                      border: "1px solid #E8DED3",
-                      borderRadius: "16px",
-                      padding: "20px 24px",
-                      marginBottom: "16px",
-                      boxShadow: "0 4px 15px rgba(38,27,19,0.03)",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontWeight: 600, fontSize: "14px", color: "#261B13" }}>
-                          {addr.recipient_name} ({addr.address_type})
-                        </span>
-                        {addr.is_default && (
-                          <span
-                            style={{
-                              backgroundColor: "#EFE6DC",
-                              color: "#866951",
-                              fontSize: "10px",
-                              padding: "2px 8px",
-                              borderRadius: "10px",
-                              fontWeight: 600,
-                            }}
-                          >
-                            DEFAULT
-                          </span>
-                        )}
-                      </div>
-
-                      <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                        {!addr.is_default && (
-                          <button
-                            type="button"
-                            onClick={() => handleSetDefaultAddress(addr.id)}
-                            style={{ fontSize: "12px", color: "#866951", textDecoration: "underline", cursor: "pointer" }}
-                          >
-                            Set Default
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAddress(addr.id)}
-                          style={{ fontSize: "12px", color: "#A83E2D", textDecoration: "underline", cursor: "pointer" }}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                    <div>
+                      <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", display: "block" }}>
+                        YOUR DETAILS
+                      </span>
+                      <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "24px", color: "#261B13" }}>
+                        Personal Details
+                      </h3>
                     </div>
 
-                    <p style={{ fontSize: "13.5px", color: "#4A3525", lineHeight: 1.6, marginBottom: "4px" }}>
-                      {addr.address_line1}
-                      {addr.address_line2 ? `, ${addr.address_line2}` : ""}
-                      {addr.landmark ? ` (Near ${addr.landmark})` : ""}
-                      <br />
-                      {addr.city}, {addr.state} - {addr.postal_code}
-                      <br />
-                      Phone: {addr.phone_number}
-                    </p>
+                    {authUser && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingProfile(!isEditingProfile)}
+                        style={{
+                          fontSize: "12.5px",
+                          fontWeight: 600,
+                          color: "#866951",
+                          textDecoration: "underline",
+                          cursor: "pointer",
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          backgroundColor: "#FAF7F2",
+                          border: "1px solid #E6DACF",
+                        }}
+                      >
+                        {isEditingProfile ? "Cancel" : "Edit Details"}
+                      </button>
+                    )}
                   </div>
-                ))
-              )}
 
-              {/* Add Address Trigger */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!authUser) {
-                    showToast("Please sign in to add and save delivery addresses");
-                  } else {
-                    setShowAddressModal(true);
-                  }
-                }}
-                className="avsaraa-btn-outline"
-                style={{ width: "100%", height: "48px", fontSize: "13.5px", backgroundColor: "#FFFFFF" }}
-              >
-                + Add New Address
-              </button>
-            </div>
-          )}
+                  {isEditingProfile ? (
+                    <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
+                          Full Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={editFullName}
+                          onChange={(e) => setEditFullName(e.target.value)}
+                          required
+                          style={{
+                            width: "100%",
+                            height: "46px",
+                            padding: "0 16px",
+                            border: "1px solid #CFBEAD",
+                            borderRadius: "10px",
+                            fontSize: "14px",
+                            backgroundColor: "#FCFAF7",
+                          }}
+                        />
+                      </div>
 
-          {/* 3. PRIVATE CONCIERGE TAB */}
-          {activeTab === "concierge" && (
-            <div className="fade-in-up" style={{ maxWidth: "600px", margin: "0 auto" }}>
-              <div
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  border: "1px solid #E8DED3",
-                  borderRadius: "16px",
-                  padding: "28px 24px",
-                  textAlign: "center",
-                }}
-              >
-                <span style={{ fontSize: "32px", display: "block", marginBottom: "12px" }}>👑</span>
-                <h3
-                  style={{
-                    fontFamily: "var(--font-serif), Georgia, serif",
-                    fontSize: "24px",
-                    color: "#261B13",
-                    marginBottom: "8px",
-                  }}
-                >
-                  Avsaraa Private Concierge
-                </h3>
-                <p style={{ fontSize: "13.5px", color: "#6E5B4E", lineHeight: 1.6, marginBottom: "24px" }}>
-                  Need personal assistance with order inquiries, artisanal weaves, or bespoke drape recommendations? Our concierge desk is available directly via WhatsApp.
-                </p>
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
+                          Mobile Number
+                        </label>
+                        <input
+                          type="tel"
+                          value={editPhoneNumber}
+                          onChange={(e) => setEditPhoneNumber(e.target.value)}
+                          placeholder="+91 98765 43210"
+                          style={{
+                            width: "100%",
+                            height: "46px",
+                            padding: "0 16px",
+                            border: "1px solid #CFBEAD",
+                            borderRadius: "10px",
+                            fontSize: "14px",
+                            backgroundColor: "#FCFAF7",
+                          }}
+                        />
+                      </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <button
-                    onClick={() => showToast("Opening Avsaraa WhatsApp Concierge...")}
-                    className="avsaraa-btn-primary"
-                    style={{ height: "48px", fontSize: "13.5px", backgroundColor: "#261B13" }}
-                  >
-                    💬 Chat with Concierge on WhatsApp
-                  </button>
-                  <Link
-                    href="/#contact-us"
-                    className="avsaraa-btn-outline"
-                    style={{ height: "48px", fontSize: "13.5px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                  >
-                    ✉️ Send Inquiry Form
-                  </Link>
+                      <div>
+                        <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          value={profile?.email || authUser?.email || ""}
+                          disabled
+                          style={{
+                            width: "100%",
+                            height: "46px",
+                            padding: "0 16px",
+                            border: "1px solid #E8DED3",
+                            backgroundColor: "#F7F2EE",
+                            borderRadius: "10px",
+                            fontSize: "14px",
+                            color: "#8E7D70",
+                          }}
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isSavingProfile}
+                        className="avsaraa-btn-primary"
+                        style={{ height: "48px", fontSize: "13.5px", marginTop: "10px" }}
+                      >
+                        {isSavingProfile ? "Saving..." : "Save Details"}
+                      </button>
+                    </form>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "20px", marginBottom: "24px" }}>
+                      <div style={{ backgroundColor: "#FAF7F2", padding: "16px", borderRadius: "12px", border: "1px solid #EFE6DC" }}>
+                        <span style={{ fontSize: "11px", color: "#8E7D70", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>Full Name</span>
+                        <span style={{ fontSize: "15px", fontWeight: 600, color: "#261B13", textTransform: "capitalize", marginTop: "2px", display: "block" }}>
+                          {profile?.full_name || (authUser ? "Member" : "Guest User")}
+                        </span>
+                      </div>
+
+                      <div style={{ backgroundColor: "#FAF7F2", padding: "16px", borderRadius: "12px", border: "1px solid #EFE6DC" }}>
+                        <span style={{ fontSize: "11px", color: "#8E7D70", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>Mobile Number</span>
+                        <span style={{ fontSize: "15px", fontWeight: 600, color: "#261B13", marginTop: "2px", display: "block" }}>
+                          {profile?.phone_number || "Not provided"}
+                        </span>
+                      </div>
+
+                      <div style={{ backgroundColor: "#FAF7F2", padding: "16px", borderRadius: "12px", border: "1px solid #EFE6DC" }}>
+                        <span style={{ fontSize: "11px", color: "#8E7D70", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>Email Address</span>
+                        <span style={{ fontSize: "15px", fontWeight: 600, color: "#261B13", marginTop: "2px", display: "block" }}>
+                          {profile?.email || authUser?.email || "guest@avsaraa.in"}
+                        </span>
+                      </div>
+
+                      <div style={{ backgroundColor: "#FAF7F2", padding: "16px", borderRadius: "12px", border: "1px solid #EFE6DC" }}>
+                        <span style={{ fontSize: "11px", color: "#8E7D70", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>Account Type</span>
+                        <span style={{ fontSize: "15px", fontWeight: 600, color: "#866951", marginTop: "2px", display: "block" }}>
+                          ✦ {profile?.membership_tier || "Member"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ borderTop: "1px solid #EFE6DC", paddingTop: "20px", display: "flex", gap: "14px", flexWrap: "wrap" }}>
+                    <Link
+                      href="/#about"
+                      className="avsaraa-btn-outline"
+                      style={{ flex: 1, height: "44px", fontSize: "13px", minWidth: "160px" }}
+                    >
+                      About Us
+                    </Link>
+                    <Link
+                      href="/#contact"
+                      className="avsaraa-btn-primary"
+                      style={{ flex: 1, height: "44px", fontSize: "13px", minWidth: "160px" }}
+                    >
+                      Contact Us
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* 2. SAVED ADDRESSES TAB */}
+            {activeTab === "addresses" && (
+              <div className="fade-in-up">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <div>
+                    <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", display: "block" }}>
+                      DELIVERY ADDRESSES
+                    </span>
+                    <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "24px", color: "#261B13" }}>
+                      Saved Addresses ({addresses.length})
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!authUser) {
+                        showToast("Please sign in to add delivery addresses");
+                      } else {
+                        setShowAddressModal(true);
+                      }
+                    }}
+                    className="avsaraa-btn-primary"
+                    style={{ height: "40px", padding: "0 20px", fontSize: "12.5px", width: "auto" }}
+                  >
+                    + Add Address
+                  </button>
+                </div>
+
+                {addresses.length === 0 ? (
+                  <div
+                    style={{
+                      backgroundColor: "#FFFFFF",
+                      border: "1px dashed #CFBEAD",
+                      borderRadius: "20px",
+                      padding: "44px 24px",
+                      textAlign: "center",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    <span style={{ fontSize: "36px", display: "block", marginBottom: "12px" }}>📍</span>
+                    <h4 style={{ fontFamily: "var(--font-serif)", fontSize: "22px", color: "#261B13", marginBottom: "6px" }}>
+                      No Saved Addresses Yet
+                    </h4>
+                    <p style={{ fontSize: "13.5px", color: "#8E7D70", maxWidth: "380px", margin: "0 auto 20px auto", lineHeight: 1.6 }}>
+                      {authUser
+                        ? "Save your home or work address for quick and easy delivery."
+                        : "Sign in to save and manage your delivery addresses."}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!authUser) {
+                          showToast("Please sign in to add addresses");
+                        } else {
+                          setShowAddressModal(true);
+                        }
+                      }}
+                      className="avsaraa-btn-outline"
+                      style={{ width: "auto", display: "inline-flex", padding: "0 24px", height: "42px", fontSize: "13px" }}
+                    >
+                      + Add Address
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                      gap: "18px",
+                    }}
+                  >
+                    {addresses.map((addr) => (
+                      <div
+                        key={addr.id}
+                        className="luxury-hover-card"
+                        style={{
+                          backgroundColor: "#FFFFFF",
+                          border: addr.is_default ? "1.5px solid #866951" : "1px solid #E8DED3",
+                          borderRadius: "18px",
+                          padding: "22px",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                          boxShadow: "0 4px 18px rgba(38,27,19,0.03)",
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span style={{ fontWeight: 600, fontSize: "14.5px", color: "#261B13" }}>
+                                {addr.recipient_name}
+                              </span>
+                              <span style={{ fontSize: "11px", color: "#8E7D70", backgroundColor: "#FAF7F2", padding: "2px 8px", borderRadius: "10px", border: "1px solid #EFE6DC" }}>
+                                {addr.address_type}
+                              </span>
+                            </div>
+
+                            {addr.is_default && (
+                              <span className="luxury-badge" style={{ fontSize: "10px", padding: "2px 8px" }}>
+                                DEFAULT
+                              </span>
+                            )}
+                          </div>
+
+                          <p style={{ fontSize: "13.5px", color: "#4A3525", lineHeight: 1.65, marginBottom: "8px" }}>
+                            {addr.address_line1}
+                            {addr.address_line2 ? `, ${addr.address_line2}` : ""}
+                            {addr.landmark ? ` (Near ${addr.landmark})` : ""}
+                            <br />
+                            {addr.city}, {addr.state} - {addr.postal_code}
+                            <br />
+                            <span style={{ color: "#786556", fontSize: "12.5px" }}>Phone: {addr.phone_number}</span>
+                          </p>
+                        </div>
+
+                        <div style={{ borderTop: "1px solid #F0E8DF", paddingTop: "12px", marginTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          {!addr.is_default ? (
+                            <button
+                              type="button"
+                              onClick={() => handleSetDefaultAddress(addr.id)}
+                              style={{ fontSize: "12px", color: "#866951", textDecoration: "underline", cursor: "pointer", fontWeight: 500 }}
+                            >
+                              Set as Default
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: "11.5px", color: "#866951", fontWeight: 600 }}>✦ Default Address</span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAddress(addr.id)}
+                            style={{ fontSize: "12px", color: "#A83E2D", textDecoration: "underline", cursor: "pointer" }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 3. MANAGE PRODUCTS TAB (Authenticated Members Only) */}
+            {activeTab === "products" && (
+              <div className="fade-in-up">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                  <div>
+                    <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", display: "block" }}>
+                      AUTHENTICATED PRODUCT DEMO
+                    </span>
+                    <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "24px", color: "#261B13" }}>
+                      Manage Products ({products.length})
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowProductModal(true)}
+                    className="avsaraa-btn-primary"
+                    style={{ height: "40px", padding: "0 20px", fontSize: "12.5px", width: "auto" }}
+                  >
+                    + Add Product
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    backgroundColor: "#FAF7F2",
+                    border: "1px solid #E6DACF",
+                    borderRadius: "14px",
+                    padding: "14px 18px",
+                    marginBottom: "20px",
+                    fontSize: "13px",
+                    color: "#6E5B4E",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  ✦ <strong>Demo Mode:</strong> Only signed-in members can add and manage products. All products added here appear immediately on the store homepage under their respective category (Sarees, Dresses, New Arrivals, Occasion Wear).
+                </div>
+
+                {products.length === 0 ? (
+                  <div
+                    style={{
+                      backgroundColor: "#FFFFFF",
+                      border: "1px dashed #D4C3B3",
+                      borderRadius: "20px",
+                      padding: "48px 24px",
+                      textAlign: "center",
+                      margin: "12px 0 24px 0",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "52px",
+                        height: "52px",
+                        borderRadius: "50%",
+                        backgroundColor: "#FAF7F2",
+                        border: "1px solid #E6DACF",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        margin: "0 auto 16px auto",
+                        fontSize: "20px",
+                        color: "#866951",
+                      }}
+                    >
+                      ✦
+                    </div>
+                    <h4
+                      style={{
+                        fontFamily: "var(--font-serif), Georgia, serif",
+                        fontSize: "20px",
+                        color: "#261B13",
+                        marginBottom: "6px",
+                        fontWeight: 500,
+                      }}
+                    >
+                      No Products in Database Yet
+                    </h4>
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        color: "#6E5B4E",
+                        maxWidth: "400px",
+                        margin: "0 auto 20px auto",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      Click the &ldquo;+ Add Product&rdquo; button above to create and save your first handcrafted piece to Supabase.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowProductModal(true)}
+                      className="avsaraa-btn-primary"
+                      style={{ height: "40px", padding: "0 22px", fontSize: "12px", width: "auto" }}
+                    >
+                      + Add Product Now
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                      gap: "18px",
+                    }}
+                  >
+                    {products.map((prod) => (
+                      <div
+                        key={prod.id}
+                        className="luxury-hover-card"
+                        style={{
+                          backgroundColor: "#FFFFFF",
+                          border: "1px solid #E8DED3",
+                          borderRadius: "16px",
+                          overflow: "hidden",
+                          display: "flex",
+                          flexDirection: "column",
+                          boxShadow: "0 4px 16px rgba(38,27,19,0.04)",
+                        }}
+                      >
+                        <div style={{ position: "relative", width: "100%", height: "200px", backgroundColor: "#F2EBE3" }}>
+                          <Image
+                            src={prod.image_url || PRESET_PRODUCT_IMAGES[0].url}
+                            alt={prod.name}
+                            fill
+                            sizes="240px"
+                            style={{ objectFit: "cover" }}
+                          />
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: "8px",
+                              left: "8px",
+                              backgroundColor: "rgba(38, 27, 19, 0.85)",
+                              color: "#FAF7F2",
+                              padding: "3px 8px",
+                              borderRadius: "10px",
+                              fontSize: "10px",
+                              fontWeight: 600,
+                              letterSpacing: "0.06em",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            {prod.category}
+                          </span>
+                        </div>
+
+                        <div style={{ padding: "14px", display: "flex", flexDirection: "column", flex: 1 }}>
+                          <h4
+                            style={{
+                              fontFamily: "var(--font-serif), Georgia, serif",
+                              fontSize: "15px",
+                              fontWeight: 600,
+                              color: "#261B13",
+                              marginBottom: "4px",
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {prod.name}
+                          </h4>
+
+                          {prod.description && (
+                            <p style={{ fontSize: "12px", color: "#6E5B4E", lineHeight: 1.45, marginBottom: "10px", flex: 1 }}>
+                              {prod.description}
+                            </p>
+                          )}
+
+                          <div
+                            style={{
+                              marginTop: "auto",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              paddingTop: "8px",
+                              borderTop: "1px solid #F2EBE3",
+                            }}
+                          >
+                            <span style={{ fontSize: "14.5px", fontWeight: 700, color: "#261B13" }}>
+                              ₹{prod.price.toLocaleString("en-IN")}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProduct(prod.id)}
+                              style={{ fontSize: "11.5px", color: "#A83E2D", textDecoration: "underline", cursor: "pointer", background: "none", border: "none" }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 4. HELP & SUPPORT TAB */}
+            {activeTab === "support" && (
+              <div className="fade-in-up">
+                <div
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    border: "1px solid #E8DED3",
+                    borderRadius: "20px",
+                    padding: "36px 28px",
+                    textAlign: "center",
+                    boxShadow: "0 8px 30px -8px rgba(38,27,19,0.04)",
+                  }}
+                >
+                  <span style={{ fontSize: "36px", display: "block", marginBottom: "14px" }}>💬</span>
+                  <span className="luxury-badge" style={{ marginBottom: "8px" }}>
+                    ✦ CUSTOMER SUPPORT ✦
+                  </span>
+                  <h3
+                    style={{
+                      fontFamily: "var(--font-serif), Georgia, serif",
+                      fontSize: "26px",
+                      color: "#261B13",
+                      marginTop: "6px",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    Help & Support
+                  </h3>
+                  <p style={{ fontSize: "14px", color: "#6E5B4E", lineHeight: 1.7, marginBottom: "28px", maxWidth: "520px", margin: "0 auto 28px auto" }}>
+                    Have questions about your order, sizing, or our sarees? Chat with our team directly on WhatsApp or send us a message.
+                  </p>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "420px", margin: "0 auto" }}>
+                    <a
+                      href="https://wa.me/912226401234?text=Hello%20Avsaraa%2C%20I%20have%20a%20question."
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="avsaraa-btn-primary"
+                      style={{ height: "50px", fontSize: "13.5px", backgroundColor: "#261B13", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+                    >
+                      <span>Chat on WhatsApp</span>
+                    </a>
+                    <Link
+                      href="/#contact"
+                      className="avsaraa-btn-outline"
+                      style={{ height: "48px", fontSize: "13px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      Send us a Message
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
-      {/* Add Address Modal Dialog */}
+      {/* Add Address Modal Dialog (Universal & Responsive) */}
       {showAddressModal && (
         <div
           style={{
@@ -1090,8 +1537,9 @@ export default function AccountPage() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(38, 27, 19, 0.6)",
-            backdropFilter: "blur(4px)",
+            backgroundColor: "rgba(38, 27, 19, 0.65)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -1103,33 +1551,38 @@ export default function AccountPage() {
             style={{
               backgroundColor: "#FAF7F2",
               border: "1px solid #E6DACF",
-              borderRadius: "20px",
-              padding: "28px 24px",
-              maxWidth: "520px",
+              borderRadius: "24px",
+              padding: "32px 28px",
+              maxWidth: "540px",
               width: "100%",
               maxHeight: "90vh",
               overflowY: "auto",
-              boxShadow: "0 20px 50px rgba(0,0,0,0.2)",
+              boxShadow: "0 25px 60px rgba(0,0,0,0.25)",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-              <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "22px", color: "#261B13" }}>
-                Add New Delivery Address
-              </h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <div>
+                <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", display: "block" }}>
+                  NEW ADDRESS
+                </span>
+                <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "24px", color: "#261B13" }}>
+                  Add Address
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowAddressModal(false)}
-                style={{ fontSize: "20px", color: "#8E7D70", cursor: "pointer", background: "none", border: "none" }}
+                style={{ fontSize: "22px", color: "#8E7D70", cursor: "pointer", background: "none", border: "none" }}
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleAddAddress} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <form onSubmit={handleAddAddress} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                    Recipient Full Name *
+                    Full Name *
                   </label>
                   <input
                     type="text"
@@ -1137,7 +1590,7 @@ export default function AccountPage() {
                     onChange={(e) => setNewAddress({ ...newAddress, recipient_name: e.target.value })}
                     required
                     placeholder="e.g. Radhika Kapoor"
-                    style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "8px", border: "1px solid #CFBEAD", fontSize: "13.5px" }}
+                    style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>
                 <div>
@@ -1150,36 +1603,36 @@ export default function AccountPage() {
                     onChange={(e) => setNewAddress({ ...newAddress, phone_number: e.target.value })}
                     required
                     placeholder="+91 98765 43210"
-                    style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "8px", border: "1px solid #CFBEAD", fontSize: "13.5px" }}
+                    style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>
               </div>
 
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                  Address Line 1 (Flat, House No, Building) *
+                  Flat, House No, Building *
                 </label>
                 <input
                   type="text"
                   value={newAddress.address_line1}
                   onChange={(e) => setNewAddress({ ...newAddress, address_line1: e.target.value })}
                   required
-                  placeholder="e.g. Flat 301, Rosewood Heights"
-                  style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "8px", border: "1px solid #CFBEAD", fontSize: "13.5px" }}
+                  placeholder="e.g. Flat 301, Rosewood Residences"
+                  style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                 />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                    Address Line 2 / Area
+                    Street, Area *
                   </label>
                   <input
                     type="text"
                     value={newAddress.address_line2}
                     onChange={(e) => setNewAddress({ ...newAddress, address_line2: e.target.value })}
                     placeholder="e.g. Linking Road, Bandra West"
-                    style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "8px", border: "1px solid #CFBEAD", fontSize: "13.5px" }}
+                    style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>
                 <div>
@@ -1191,12 +1644,12 @@ export default function AccountPage() {
                     value={newAddress.landmark}
                     onChange={(e) => setNewAddress({ ...newAddress, landmark: e.target.value })}
                     placeholder="e.g. Near Grand Hotel"
-                    style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "8px", border: "1px solid #CFBEAD", fontSize: "13.5px" }}
+                    style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
                     City *
@@ -1207,7 +1660,7 @@ export default function AccountPage() {
                     onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
                     required
                     placeholder="Mumbai"
-                    style={{ width: "100%", height: "42px", padding: "0 10px", borderRadius: "8px", border: "1px solid #CFBEAD", fontSize: "13.5px" }}
+                    style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>
                 <div>
@@ -1220,7 +1673,7 @@ export default function AccountPage() {
                     onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
                     required
                     placeholder="Maharashtra"
-                    style={{ width: "100%", height: "42px", padding: "0 10px", borderRadius: "8px", border: "1px solid #CFBEAD", fontSize: "13.5px" }}
+                    style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>
                 <div>
@@ -1234,15 +1687,15 @@ export default function AccountPage() {
                     required
                     placeholder="400050"
                     maxLength={6}
-                    style={{ width: "100%", height: "42px", padding: "0 10px", borderRadius: "8px", border: "1px solid #CFBEAD", fontSize: "13.5px" }}
+                    style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "16px", alignItems: "center", marginTop: "4px" }}>
+              <div style={{ display: "flex", gap: "18px", alignItems: "center", marginTop: "4px" }}>
                 <span style={{ fontSize: "12px", fontWeight: 600, color: "#261B13" }}>Address Type:</span>
-                {["Home", "Work", "Studio"].map((type) => (
-                  <label key={type} style={{ fontSize: "13px", color: "#4A3525", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+                {["Home", "Work", "Other"].map((type) => (
+                  <label key={type} style={{ fontSize: "13px", color: "#4A3525", display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
                     <input
                       type="radio"
                       name="address_type"
@@ -1261,15 +1714,15 @@ export default function AccountPage() {
                   checked={newAddress.is_default}
                   onChange={(e) => setNewAddress({ ...newAddress, is_default: e.target.checked })}
                 />
-                Make this my default shipping address
+                Set as default delivery address
               </label>
 
-              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+              <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
                 <button
                   type="button"
                   onClick={() => setShowAddressModal(false)}
                   className="avsaraa-btn-outline"
-                  style={{ flex: 1, height: "44px", fontSize: "13px" }}
+                  style={{ flex: 1, height: "46px", fontSize: "13px" }}
                 >
                   Cancel
                 </button>
@@ -1277,9 +1730,187 @@ export default function AccountPage() {
                   type="submit"
                   disabled={isSavingAddress}
                   className="avsaraa-btn-primary"
+                  style={{ flex: 1, height: "46px", fontSize: "13px" }}
+                >
+                  {isSavingAddress ? "Saving..." : "Save Address"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Product Modal for Account Dashboard (Strictly Logged-in only) */}
+      {showProductModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(38, 27, 19, 0.65)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#FAF7F2",
+              border: "1px solid #E6DACF",
+              borderRadius: "22px",
+              padding: "30px 26px",
+              maxWidth: "520px",
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 25px 60px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+              <div>
+                <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", display: "block" }}>
+                  MEMBER DASHBOARD
+                </span>
+                <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "24px", color: "#261B13" }}>
+                  Add Product
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProductModal(false)}
+                style={{ fontSize: "22px", color: "#8E7D70", cursor: "pointer", background: "none", border: "none" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddProduct} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                  Product Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Pure Georgette Zari Saree"
+                  value={newProduct.name}
+                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                  style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FFFFFF" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                    Category *
+                  </label>
+                  <select
+                    value={newProduct.category}
+                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value as ProductCategory })}
+                    style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FFFFFF" }}
+                  >
+                    <option value="Sarees">Sarees</option>
+                    <option value="Dresses">Dresses</option>
+                    <option value="New Arrivals">New Arrivals</option>
+                    <option value="Occasion Wear">Occasion Wear</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                    Price (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    placeholder="e.g. 12500"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                    style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FFFFFF" }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
+                  Product Photo Choice *
+                </label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                  {PRESET_PRODUCT_IMAGES.map((img) => {
+                    const isSelected = newProduct.image_url === img.url;
+                    return (
+                      <div
+                        key={img.url}
+                        onClick={() => setNewProduct({ ...newProduct, image_url: img.url })}
+                        style={{
+                          position: "relative",
+                          height: "75px",
+                          borderRadius: "10px",
+                          overflow: "hidden",
+                          cursor: "pointer",
+                          border: isSelected ? "2px solid #866951" : "1px solid #CFBEAD",
+                          opacity: isSelected ? 1 : 0.65,
+                        }}
+                      >
+                        <Image src={img.url} alt={img.label} fill sizes="80px" style={{ objectFit: "cover" }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                  Short Description
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Handcrafted festive drape with intricate border details."
+                  value={newProduct.description}
+                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #CFBEAD",
+                    fontSize: "13.5px",
+                    backgroundColor: "#FFFFFF",
+                    fontFamily: "inherit",
+                    resize: "vertical",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowProductModal(false)}
+                  className="avsaraa-btn-outline"
                   style={{ flex: 1, height: "44px", fontSize: "13px" }}
                 >
-                  {isSavingAddress ? "Saving..." : "Save to Database"}
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProduct}
+                  className="avsaraa-btn-primary"
+                  style={{ flex: 1, height: "44px", fontSize: "13px" }}
+                >
+                  {isSavingProduct ? (
+                    <>
+                      <SpinnerIcon size={16} color="#FFFFFF" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    "Save Product →"
+                  )}
                 </button>
               </div>
             </form>

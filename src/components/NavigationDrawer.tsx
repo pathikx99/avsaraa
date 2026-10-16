@@ -4,14 +4,30 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import AvsaraaLogo from "./AvsaraaLogo";
+import { UserIcon, WhatsAppIcon, ShoppingBagIcon, HeartIcon } from "./Icons";
+import type { User } from "@supabase/supabase-js";
 
 interface NavigationDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  user?: User | null;
+  onLogout?: () => void;
 }
 
-export default function NavigationDrawer({ isOpen, onClose }: NavigationDrawerProps) {
+export default function NavigationDrawer({
+  isOpen,
+  onClose,
+  user,
+  onLogout,
+}: NavigationDrawerProps) {
   if (!isOpen) return null;
+
+  const categories = [
+    { label: "SAREES", href: "/#products-sarees" },
+    { label: "DRESSES", href: "/#products-dresses" },
+    { label: "NEW ARRIVALS", href: "/#products-new-arrivals" },
+    { label: "OCCASION WEAR", href: "/#products-occasion-wear" },
+  ];
 
   return (
     <div
@@ -29,139 +45,288 @@ export default function NavigationDrawer({ isOpen, onClose }: NavigationDrawerPr
           position: "absolute",
           inset: 0,
           backgroundColor: "rgba(38, 27, 19, 0.45)",
-          backdropFilter: "blur(3px)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
         }}
       />
 
-      {/* Drawer Panel matching Docs/WhatsApp Image 2026-10-13 at 12.24.34 AM.jpeg */}
+      {/* Drawer Panel */}
       <div
         style={{
           position: "relative",
-          width: "320px",
+          width: "330px",
           maxWidth: "85vw",
           height: "100%",
           backgroundColor: "#FAF7F2",
+          borderRight: "1px solid #E6DACF",
           display: "flex",
           flexDirection: "column",
-          padding: "24px 20px 32px 24px",
-          boxShadow: "10px 0 30px rgba(0,0,0,0.15)",
+          padding: "24px 22px 32px 22px",
+          boxShadow: "10px 0 35px rgba(38, 27, 19, 0.2)",
           animation: "slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
           overflowY: "auto",
         }}
       >
+        {/* Botanical watercolor art in bottom right matching reference image */}
+        <div
+          style={{
+            position: "absolute",
+            right: "-20px",
+            bottom: "-10px",
+            width: "210px",
+            height: "210px",
+            pointerEvents: "none",
+            opacity: 0.65,
+            zIndex: 0,
+          }}
+        >
+          <Image
+            src="/images/botanical_flowers.jpg"
+            alt=""
+            fill
+            sizes="210px"
+            style={{ objectFit: "contain", transform: "rotate(-15deg)", mixBlendMode: "multiply" }}
+          />
+        </div>
+
         {/* Top Header: Logo + Close Button */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: "32px",
+            marginBottom: "28px",
+            position: "relative",
+            zIndex: 1,
           }}
         >
-          <AvsaraaLogo size="md" width={155} />
+          <AvsaraaLogo size="md" width={138} />
           <button
             onClick={onClose}
             aria-label="Close menu"
             style={{
-              padding: "8px",
+              padding: "6px",
               color: "#261B13",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              cursor: "pointer",
+              background: "none",
+              border: "none",
             }}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
 
-        {/* Primary Navigation */}
-        <nav style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          {[
-            { label: "HOME", href: "/", icon: "✦" },
-            { label: "MY ACCOUNT", href: "/account", icon: "👤" },
-            { label: "LOGIN", href: "/login", icon: "→" },
-            { label: "REGISTER", href: "/register", icon: "✨" },
-            { label: "ABOUT US", href: "/#about-us", icon: "📜" },
-            { label: "CONTACT US", href: "/#contact-us", icon: "✉️" },
-          ].map((item) => (
+        {/* 1. PRODUCT CATEGORIES (Matching Reference Image) */}
+        <nav style={{ display: "flex", flexDirection: "column", position: "relative", zIndex: 1 }}>
+          {categories.map((cat) => (
             <Link
-              key={item.label}
-              href={item.href}
+              key={cat.label}
+              href={cat.href}
               onClick={onClose}
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "14px 0",
+                padding: "16px 0",
                 borderBottom: "1px solid #EFE6DC",
-                fontSize: "13px",
-                fontWeight: 600,
+                fontSize: "13.5px",
+                fontFamily: "var(--font-serif), Georgia, serif",
                 letterSpacing: "0.12em",
                 color: "#261B13",
-                textTransform: "uppercase",
-                transition: "all 0.2s ease",
+                fontWeight: 600,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <span style={{ color: "#AC9885", fontSize: "14px" }}>{item.icon}</span>
-                <span>{item.label}</span>
-              </div>
-              <span style={{ color: "#AC9885", fontSize: "16px" }}>›</span>
+              <span>{cat.label}</span>
+              <span style={{ color: "#866951", fontSize: "16px" }}>›</span>
             </Link>
           ))}
         </nav>
 
-        {/* Quick Access Section */}
-        <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "6px" }}>
-          <div
+        {/* 2. USER ACTIONS: My Account (only when signed in), Wishlist, My Bag */}
+        <div style={{ display: "flex", flexDirection: "column", marginTop: "10px", position: "relative", zIndex: 1 }}>
+          {user && (
+            <Link
+              href="/account"
+              onClick={onClose}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "15px 0",
+                borderBottom: "1px solid #EFE6DC",
+                fontSize: "14px",
+                color: "#3B2A1E",
+                fontWeight: 500,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <UserIcon size={18} color="#866951" />
+                <span>My Account</span>
+              </div>
+              <span style={{ color: "#866951", fontSize: "16px" }}>›</span>
+            </Link>
+          )}
+
+          <Link
+            href="/#wishlist"
+            onClick={onClose}
             style={{
-              padding: "16px",
-              backgroundColor: "#F2EBE3",
-              borderRadius: "14px",
-              border: "1px solid #E6DACF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "15px 0",
+              borderBottom: "1px solid #EFE6DC",
+              fontSize: "14px",
+              color: "#3B2A1E",
+              fontWeight: 500,
             }}
           >
-            <span
-              style={{
-                fontSize: "10.5px",
-                fontWeight: 600,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: "#866951",
-                display: "block",
-                marginBottom: "4px",
-              }}
-            >
-              AVSARAA ATELIER
-            </span>
-            <p
-              style={{
-                fontFamily: "var(--font-serif), Georgia, serif",
-                fontSize: "16px",
-                color: "#261B13",
-                fontStyle: "italic",
-                marginBottom: "10px",
-              }}
-            >
-              Welcome to effortless grace.
-            </p>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <HeartIcon size={18} color="#866951" />
+              <span>Wishlist</span>
+            </div>
+            <span style={{ color: "#866951", fontSize: "16px" }}>›</span>
+          </Link>
+
+          <Link
+            href={user ? "/account" : "/login"}
+            onClick={onClose}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "15px 0",
+              borderBottom: "1px solid #EFE6DC",
+              fontSize: "14px",
+              color: "#3B2A1E",
+              fontWeight: 500,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <ShoppingBagIcon size={18} color="#866951" />
+              <span>My Bag (0)</span>
+            </div>
+            <span style={{ color: "#866951", fontSize: "16px" }}>›</span>
+          </Link>
+        </div>
+
+        {/* 3. MINIMAL INFO LINKS: About Us, Contact Us */}
+        <div style={{ display: "flex", flexDirection: "column", marginTop: "12px", position: "relative", zIndex: 1 }}>
+          <Link
+            href="/#about"
+            onClick={onClose}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "14px 0",
+              borderBottom: "1px solid #EFE6DC",
+              fontSize: "13.5px",
+              color: "#543E2E",
+              fontWeight: 500,
+            }}
+          >
+            <span>About Us</span>
+            <span style={{ color: "#AC9885", fontSize: "16px" }}>›</span>
+          </Link>
+
+          <Link
+            href="/#contact"
+            onClick={onClose}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "14px 0",
+              borderBottom: "1px solid #EFE6DC",
+              fontSize: "13.5px",
+              color: "#543E2E",
+              fontWeight: 500,
+            }}
+          >
+            <span>Contact Us</span>
+            <span style={{ color: "#AC9885", fontSize: "16px" }}>›</span>
+          </Link>
+        </div>
+
+        {/* Signature Quote from Image: "Thoughtfully chosen. Beautifully worn." */}
+        <div style={{ marginTop: "24px", position: "relative", zIndex: 1 }}>
+          <p
+            style={{
+              fontFamily: "var(--font-serif), Georgia, serif",
+              fontSize: "16px",
+              fontStyle: "italic",
+              color: "#6E5B4E",
+              lineHeight: 1.35,
+            }}
+          >
+            Thoughtfully chosen.<br />
+            Beautifully worn.
+          </p>
+        </div>
+
+        {/* Auth Actions in Drawer */}
+        <div style={{ marginTop: "28px" }}>
+          {user ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div
+                style={{
+                  padding: "14px 16px",
+                  backgroundColor: "#F2EBE3",
+                  borderRadius: "12px",
+                  border: "1px solid #E6DACF",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}
+              >
+                <UserIcon size={18} color="#866951" />
+                <div style={{ overflow: "hidden" }}>
+                  <span style={{ display: "block", fontSize: "11px", color: "#866951", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.06em" }}>
+                    Signed in as
+                  </span>
+                  <span style={{ display: "block", fontSize: "13px", color: "#261B13", fontWeight: 500, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                    {user.email}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  onClose();
+                  onLogout?.();
+                }}
+                className="avsaraa-btn-outline"
+                style={{
+                  height: "44px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  borderColor: "#866951",
+                  color: "#866951",
+                  cursor: "pointer",
+                }}
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: "10px" }}>
               <Link
                 href="/login"
                 onClick={onClose}
+                className="avsaraa-btn-primary"
                 style={{
                   flex: 1,
-                  padding: "9px 0",
-                  backgroundColor: "#261B13",
-                  color: "#FAF7F2",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  textAlign: "center",
-                  letterSpacing: "0.04em",
+                  height: "44px",
+                  fontSize: "12.5px",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
                 }}
               >
                 Sign In
@@ -169,61 +334,47 @@ export default function NavigationDrawer({ isOpen, onClose }: NavigationDrawerPr
               <Link
                 href="/register"
                 onClick={onClose}
+                className="avsaraa-btn-outline"
                 style={{
                   flex: 1,
-                  padding: "9px 0",
+                  height: "44px",
+                  fontSize: "12.5px",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
                   backgroundColor: "#FFFFFF",
-                  color: "#261B13",
-                  border: "1px solid #CFBEAD",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  textAlign: "center",
-                  letterSpacing: "0.04em",
                 }}
               >
-                Join Free
+                Register
               </Link>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Bottom Tagline & Botanical Sprig */}
-        <div style={{ marginTop: "auto", paddingTop: "32px", position: "relative" }}>
-          <div style={{ width: "36px", height: "1px", backgroundColor: "#C4AB94", marginBottom: "12px" }} />
-          <p
+        {/* WhatsApp Callout */}
+        <div style={{ marginTop: "auto", paddingTop: "28px" }}>
+          <a
+            href="https://wa.me/912226401234?text=Hello%20Avsaraa%2C%20I%20have%20a%20question%20about%20your%20sarees."
+            target="_blank"
+            rel="noopener noreferrer"
             style={{
-              fontFamily: "var(--font-serif), Georgia, serif",
-              fontSize: "18px",
-              fontStyle: "italic",
-              color: "#543E2E",
-              lineHeight: 1.3,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              padding: "12px",
+              borderRadius: "10px",
+              backgroundColor: "#261B13",
+              color: "#FAF7F2",
+              fontSize: "12.5px",
+              fontWeight: 500,
             }}
           >
-            Thoughtfully chosen.
-            <br />
-            Beautifully worn.
+            <WhatsAppIcon size={16} color="#25D366" />
+            <span>Chat on WhatsApp</span>
+          </a>
+          <p style={{ marginTop: "12px", textAlign: "center", fontSize: "11px", color: "#8E7D70" }}>
+            Mumbai Studio • Mon-Sat 10:00 - 19:30
           </p>
-
-          <div
-            style={{
-              position: "absolute",
-              right: "-20px",
-              bottom: "-20px",
-              width: "120px",
-              height: "120px",
-              pointerEvents: "none",
-              opacity: 0.6,
-            }}
-          >
-            <Image
-              src="/images/botanical_flowers.jpg"
-              alt=""
-              fill
-              sizes="120px"
-              style={{ objectFit: "contain", mixBlendMode: "multiply" }}
-            />
-          </div>
         </div>
       </div>
     </div>

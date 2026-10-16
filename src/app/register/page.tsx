@@ -90,7 +90,7 @@ export default function RegisterPage() {
           >
             <Image
               src="/images/saree_model_hero.jpg"
-              alt="Avsaraa Royal Weaves"
+              alt="Avsaraa Sarees"
               fill
               sizes="(min-width: 900px) 50vw, 100vw"
               style={{
@@ -132,14 +132,14 @@ export default function RegisterPage() {
                   style={{
                     fontSize: "11px",
                     fontWeight: 600,
-                    letterSpacing: "0.22em",
+                    letterSpacing: "0.14em",
                     textTransform: "uppercase",
                     color: "#C4AB94",
                     display: "block",
                     marginBottom: "8px",
                   }}
                 >
-                  JOIN THE CIRCLE
+                  JOIN AVSARAA
                 </span>
                 <p
                   style={{
@@ -151,7 +151,7 @@ export default function RegisterPage() {
                     textShadow: "0 2px 10px rgba(0,0,0,0.3)",
                   }}
                 >
-                  &ldquo;Wear The Moment. Belong to Timeless Grace.&rdquo;
+                  &ldquo;Thoughtfully paired. Beautifully yours.&rdquo;
                 </p>
 
                 <div
@@ -165,15 +165,15 @@ export default function RegisterPage() {
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ color: "#C4AB94" }}>✦</span>
-                    <span>Priority access to Avsaraa concierge assistance</span>
+                    <span>Fast customer support on WhatsApp</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ color: "#C4AB94" }}>✦</span>
-                    <span>Early access to bespoke handloom saree drops</span>
+                    <span>Updates on new handmade saree collections</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ color: "#C4AB94" }}>✦</span>
-                    <span>Exclusive VIP privileges at Avsaraa ateliers</span>
+                    <span>Free delivery on orders above ₹2,999</span>
                   </div>
                 </div>
               </div>

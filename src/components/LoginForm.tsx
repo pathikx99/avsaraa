@@ -351,7 +351,7 @@ export default function LoginForm({
             >
               Welcome back!
               <br />
-              Sign in to continue your journey with Avsaraa.
+              Sign in to your account with Avsaraa.
             </p>
           </div>
 

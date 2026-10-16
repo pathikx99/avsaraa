@@ -88,7 +88,7 @@ export default function RegisterForm({
             full_name: cleanName,
             email: cleanEmail,
             phone_number: cleanPhone,
-            membership_tier: "Privilege",
+            membership_tier: "Member",
             updated_at: new Date().toISOString(),
           });
         } catch (profileErr) {
