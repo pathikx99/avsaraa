@@ -258,52 +258,58 @@ export default function HomePage() {
                 style={{ objectFit: "cover", objectPosition: "center 20%" }}
               />
 
-              {/* Top Season Pill */}
+              {/* Top Season Pill - Centered at the apex of the arch so it is NEVER cut off */}
               <div
                 style={{
                   position: "absolute",
-                  top: "24px",
-                  right: "24px",
-                  backgroundColor: "rgba(38, 27, 19, 0.82)",
-                  backdropFilter: "blur(6px)",
-                  WebkitBackdropFilter: "blur(6px)",
+                  top: "22px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  backgroundColor: "rgba(38, 27, 19, 0.88)",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
                   color: "#FAF7F2",
-                  padding: "6px 14px",
+                  padding: "6px 16px",
                   borderRadius: "20px",
                   fontSize: "11px",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
                   fontWeight: 600,
-                  boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
+                  boxShadow: "0 4px 18px rgba(0,0,0,0.2)",
+                  whiteSpace: "nowrap",
+                  zIndex: 2,
+                  border: "1px solid rgba(196, 171, 148, 0.35)",
                 }}
               >
-                ✦ Festive 2026
+                ✦ Festive 2026 Edition ✦
               </div>
 
               {/* Floating Bottom Glass Atelier Card */}
               <div
                 style={{
                   position: "absolute",
-                  bottom: "20px",
-                  left: "20px",
-                  right: "20px",
-                  backgroundColor: "rgba(250, 247, 242, 0.92)",
-                  backdropFilter: "blur(12px)",
-                  WebkitBackdropFilter: "blur(12px)",
-                  border: "1px solid rgba(196, 171, 148, 0.5)",
+                  bottom: "16px",
+                  left: "16px",
+                  right: "16px",
+                  backgroundColor: "rgba(250, 247, 242, 0.94)",
+                  backdropFilter: "blur(14px)",
+                  WebkitBackdropFilter: "blur(14px)",
+                  border: "1px solid rgba(196, 171, 148, 0.55)",
                   borderRadius: "16px",
-                  padding: "14px 18px",
+                  padding: "12px 16px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  gap: "10px",
                   boxShadow: "0 10px 30px rgba(38, 27, 19, 0.15)",
+                  zIndex: 2,
                 }}
               >
-                <div>
-                  <span style={{ display: "block", fontSize: "10.5px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>
+                <div style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: "10px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>
                     HANDWOVEN SILK
                   </span>
-                  <span style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "17px", color: "#261B13", fontWeight: 600 }}>
+                  <span style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "16px", color: "#261B13", fontWeight: 600, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", display: "block" }}>
                     Emerald Tissue Organza
                   </span>
                 </div>
@@ -312,13 +318,15 @@ export default function HomePage() {
                   style={{
                     backgroundColor: "#261B13",
                     color: "#FAF7F2",
-                    fontSize: "11.5px",
+                    fontSize: "11px",
                     fontWeight: 600,
                     letterSpacing: "0.06em",
                     textTransform: "uppercase",
-                    padding: "7px 14px",
+                    padding: "8px 14px",
                     borderRadius: "20px",
                     transition: "all 0.2s ease",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
                   }}
                 >
                   View Drape →
