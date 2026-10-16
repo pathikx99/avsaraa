@@ -6,8 +6,6 @@ import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProductsSection from "@/components/ProductsSection";
-import AboutSection from "@/components/AboutSection";
-import ContactSection from "@/components/ContactSection";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
@@ -191,7 +189,7 @@ export default function HomePage() {
               </Link>
 
               <Link
-                href="#about"
+                href="/about"
                 className="avsaraa-btn-outline"
                 style={{
                   display: "inline-flex",
@@ -340,13 +338,7 @@ export default function HomePage() {
       {/* 3. Products Section with 4 Categories from reference image */}
       <ProductsSection />
 
-      {/* 4. About Section (Simple Terms) */}
-      <AboutSection />
-
-      {/* 5. Contact Section (Simple Terms) */}
-      <ContactSection />
-
-      {/* 5. Footer (Simple Terms) */}
+      {/* 4. Footer */}
       <Footer />
     </div>
   );

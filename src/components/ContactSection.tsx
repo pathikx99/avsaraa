@@ -5,7 +5,11 @@ import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
 import { PhoneIcon, MailIcon, ClockIcon, WhatsAppIcon, SpinnerIcon } from "./Icons";
 
-export default function ContactSection() {
+interface ContactSectionProps {
+  showHeader?: boolean;
+}
+
+export default function ContactSection({ showHeader = true }: ContactSectionProps) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -67,7 +71,7 @@ export default function ContactSection() {
       id="contact"
       style={{
         backgroundColor: "#F7F2EE",
-        padding: "80px 24px",
+        padding: showHeader ? "80px 24px" : "60px 24px 80px 24px",
         position: "relative",
         borderBottom: "1px solid #E6DACF",
         overflow: "hidden",
@@ -121,35 +125,37 @@ export default function ContactSection() {
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", position: "relative", zIndex: 1 }}>
         {/* Section Header */}
-        <div style={{ textAlign: "center", marginBottom: "52px" }}>
-          <span className="luxury-badge" style={{ marginBottom: "14px" }}>
-            ✦ CONTACT US ✦
-          </span>
-          <h2
-            style={{
-              fontFamily: "var(--font-serif), Georgia, serif",
-              fontSize: "clamp(30px, 4.5vw, 44px)",
-              fontWeight: 500,
-              color: "#261B13",
-              lineHeight: 1.15,
-              marginBottom: "14px",
-            }}
-          >
-            Get in Touch
-          </h2>
-          <div style={{ width: "48px", height: "1.5px", backgroundColor: "#C4AB94", margin: "0 auto 18px auto" }} />
-          <p
-            style={{
-              fontSize: "15px",
-              color: "#6E5B4E",
-              maxWidth: "600px",
-              margin: "0 auto",
-              lineHeight: 1.7,
-            }}
-          >
-            Have a question about our sarees, orders, or custom sizing? We are here to help.
-          </p>
-        </div>
+        {showHeader && (
+          <div style={{ textAlign: "center", marginBottom: "52px" }}>
+            <span className="luxury-badge" style={{ marginBottom: "14px" }}>
+              ✦ CONTACT US ✦
+            </span>
+            <h2
+              style={{
+                fontFamily: "var(--font-serif), Georgia, serif",
+                fontSize: "clamp(30px, 4.5vw, 44px)",
+                fontWeight: 500,
+                color: "#261B13",
+                lineHeight: 1.15,
+                marginBottom: "14px",
+              }}
+            >
+              Get in Touch
+            </h2>
+            <div style={{ width: "48px", height: "1.5px", backgroundColor: "#C4AB94", margin: "0 auto 18px auto" }} />
+            <p
+              style={{
+                fontSize: "15px",
+                color: "#6E5B4E",
+                maxWidth: "600px",
+                margin: "0 auto",
+                lineHeight: 1.7,
+              }}
+            >
+              Have a question about our sarees, orders, or custom sizing? We are here to help.
+            </p>
+          </div>
+        )}
 
         {/* 2-Column Minimal Layout */}
         <div

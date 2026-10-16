@@ -219,7 +219,7 @@ export default function NavigationDrawer({
         {/* 3. MINIMAL INFO LINKS: About Us, Contact Us */}
         <div style={{ display: "flex", flexDirection: "column", marginTop: "12px", position: "relative", zIndex: 1 }}>
           <Link
-            href="/#about"
+            href="/about"
             onClick={onClose}
             style={{
               display: "flex",
@@ -237,7 +237,7 @@ export default function NavigationDrawer({
           </Link>
 
           <Link
-            href="/#contact"
+            href="/contact"
             onClick={onClose}
             style={{
               display: "flex",

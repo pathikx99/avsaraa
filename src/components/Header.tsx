@@ -168,10 +168,10 @@ export default function Header() {
             <Link href="/#products" className="luxury-nav-link">
               Collection
             </Link>
-            <Link href="/#about" className="luxury-nav-link">
+            <Link href="/about" className="luxury-nav-link">
               About
             </Link>
-            <Link href="/#contact" className="luxury-nav-link">
+            <Link href="/contact" className="luxury-nav-link">
               Contact
             </Link>
             {user && (

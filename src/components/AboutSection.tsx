@@ -4,13 +4,17 @@ import React from "react";
 import Image from "next/image";
 import { LoomWeaveIcon, SilkSpoolIcon, NeedleThreadIcon } from "./Icons";
 
-export default function AboutSection() {
+interface AboutSectionProps {
+  showHeader?: boolean;
+}
+
+export default function AboutSection({ showHeader = true }: AboutSectionProps) {
   return (
     <section
       id="about"
       style={{
         backgroundColor: "#FAF7F2",
-        padding: "80px 24px",
+        padding: showHeader ? "80px 24px" : "60px 24px 80px 24px",
         position: "relative",
         borderBottom: "1px solid #E6DACF",
         overflow: "hidden",
@@ -40,35 +44,37 @@ export default function AboutSection() {
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", position: "relative", zIndex: 1 }}>
         {/* Section Header */}
-        <div style={{ textAlign: "center", marginBottom: "56px" }}>
-          <span className="luxury-badge" style={{ marginBottom: "14px" }}>
-            ✦ OUR STORY ✦
-          </span>
-          <h2
-            style={{
-              fontFamily: "var(--font-serif), Georgia, serif",
-              fontSize: "clamp(32px, 4.5vw, 48px)",
-              fontWeight: 500,
-              color: "#261B13",
-              lineHeight: 1.15,
-              marginBottom: "16px",
-            }}
-          >
-            About Avsaraa
-          </h2>
-          <div style={{ width: "48px", height: "1.5px", backgroundColor: "#C4AB94", margin: "0 auto 20px auto" }} />
-          <p
-            style={{
-              fontSize: "15px",
-              color: "#6E5B4E",
-              maxWidth: "680px",
-              margin: "0 auto",
-              lineHeight: 1.8,
-            }}
-          >
-            Avsaraa is inspired by special moments and family celebrations. We bring you authentic Indian handloom sarees and sets that are comfortable, timeless, and made to last.
-          </p>
-        </div>
+        {showHeader && (
+          <div style={{ textAlign: "center", marginBottom: "56px" }}>
+            <span className="luxury-badge" style={{ marginBottom: "14px" }}>
+              ✦ OUR STORY ✦
+            </span>
+            <h2
+              style={{
+                fontFamily: "var(--font-serif), Georgia, serif",
+                fontSize: "clamp(32px, 4.5vw, 48px)",
+                fontWeight: 500,
+                color: "#261B13",
+                lineHeight: 1.15,
+                marginBottom: "16px",
+              }}
+            >
+              About Avsaraa
+            </h2>
+            <div style={{ width: "48px", height: "1.5px", backgroundColor: "#C4AB94", margin: "0 auto 20px auto" }} />
+            <p
+              style={{
+                fontSize: "15px",
+                color: "#6E5B4E",
+                maxWidth: "680px",
+                margin: "0 auto",
+                lineHeight: 1.8,
+              }}
+            >
+              Avsaraa is inspired by special moments and family celebrations. We bring you authentic Indian handloom sarees and sets that are comfortable, timeless, and made to last.
+            </p>
+          </div>
+        )}
 
         {/* 2-Column Minimal Layout */}
         <div

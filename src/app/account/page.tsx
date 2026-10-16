@@ -1113,14 +1113,14 @@ export default function AccountPage() {
 
                   <div style={{ borderTop: "1px solid #EFE6DC", paddingTop: "20px", display: "flex", gap: "14px", flexWrap: "wrap" }}>
                     <Link
-                      href="/#about"
+                      href="/about"
                       className="avsaraa-btn-outline"
                       style={{ flex: 1, height: "44px", fontSize: "13px", minWidth: "160px" }}
                     >
                       About Us
                     </Link>
                     <Link
-                      href="/#contact"
+                      href="/contact"
                       className="avsaraa-btn-primary"
                       style={{ flex: 1, height: "44px", fontSize: "13px", minWidth: "160px" }}
                     >
@@ -1514,7 +1514,7 @@ export default function AccountPage() {
                       <span>Chat on WhatsApp</span>
                     </a>
                     <Link
-                      href="/#contact"
+                      href="/contact"
                       className="avsaraa-btn-outline"
                       style={{ height: "48px", fontSize: "13px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                     >

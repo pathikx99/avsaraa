@@ -251,8 +251,8 @@ export default function Footer() {
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
               <li><Link href="/" className="luxury-nav-link">Home</Link></li>
-              <li><Link href="/#about" className="luxury-nav-link">About Us</Link></li>
-              <li><Link href="/#contact" className="luxury-nav-link">Contact Us</Link></li>
+              <li><Link href="/about" className="luxury-nav-link">About Us</Link></li>
+              <li><Link href="/contact" className="luxury-nav-link">Contact Us</Link></li>
               {user && <li><Link href="/account" className="luxury-nav-link">My Account</Link></li>}
             </ul>
           </div>
@@ -263,9 +263,9 @@ export default function Footer() {
               ABOUT
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
-              <li><Link href="/#about">Our Story</Link></li>
-              <li><Link href="/#about">Handmade Silks</Link></li>
-              <li><Link href="/#contact">Mumbai Store</Link></li>
+              <li><Link href="/about">Our Story</Link></li>
+              <li><Link href="/about">Handmade Silks</Link></li>
+              <li><Link href="/contact">Mumbai Store</Link></li>
             </ul>
           </div>
 
@@ -275,7 +275,7 @@ export default function Footer() {
               HELP & SUPPORT
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
-              <li><Link href="/#contact">Contact Us</Link></li>
+              <li><Link href="/contact">Contact Us</Link></li>
               <li><a href="https://wa.me/912226401234">WhatsApp Help</a></li>
               <li><a href="mailto:hello@avsaraa.in">hello@avsaraa.in</a></li>
             </ul>
