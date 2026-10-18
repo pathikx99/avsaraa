@@ -174,6 +174,10 @@ export default function Header() {
             <Link href="/contact" className="luxury-nav-link">
               Contact
             </Link>
+            <Link href="/admin" className="luxury-nav-link" style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#866951" }} />
+              <span>Admin</span>
+            </Link>
             {user && (
               <Link href="/account" className="luxury-nav-link">
                 My Account

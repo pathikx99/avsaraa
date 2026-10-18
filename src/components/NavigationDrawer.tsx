@@ -253,6 +253,26 @@ export default function NavigationDrawer({
             <span>Contact Us</span>
             <span style={{ color: "#AC9885", fontSize: "16px" }}>›</span>
           </Link>
+
+          <Link
+            href="/admin"
+            onClick={onClose}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "14px 0",
+              borderBottom: "1px solid #EFE6DC",
+              fontSize: "13.5px",
+              color: "#866951",
+              fontWeight: 600,
+            }}
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>🛡️ Admin Console</span>
+            </span>
+            <span style={{ color: "#866951", fontSize: "16px" }}>›</span>
+          </Link>
         </div>
 
         {/* Signature Quote from Image: "Thoughtfully chosen. Beautifully worn." */}

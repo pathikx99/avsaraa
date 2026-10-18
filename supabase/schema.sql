@@ -207,3 +207,113 @@ CREATE INDEX IF NOT EXISTS idx_inquiries_email ON public.contact_inquiries(email
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category);
 CREATE INDEX IF NOT EXISTS idx_products_user ON public.products(user_id);
 CREATE INDEX IF NOT EXISTS idx_products_created ON public.products(created_at DESC);
+
+-- ==============================================================================
+-- 6. ADMIN USERS (Platform Administrators, Roles, Permissions & Activity)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.admin_users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    full_name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    role TEXT NOT NULL DEFAULT 'Admin' CHECK (role IN ('Super Admin', 'Admin', 'Product Manager', 'Store Manager', 'Support Lead')),
+    department TEXT DEFAULT 'Operations',
+    phone_number TEXT,
+    avatar_url TEXT,
+    status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Suspended')),
+    permissions TEXT[] DEFAULT ARRAY['users:manage', 'products:manage', 'analytics:view'],
+    notes TEXT,
+    last_active TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
+
+-- Helper function to check if the current requester is an active administrator
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN (
+        auth.jwt() IS NOT NULL AND (
+            EXISTS (
+                SELECT 1 FROM public.admin_users
+                WHERE (user_id = auth.uid() OR LOWER(email) = LOWER(auth.jwt()->>'email'))
+                  AND status = 'Active'
+            )
+            OR (auth.jwt()->'app_metadata'->>'role') = 'admin'
+        )
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+-- 1. admin_users policies:
+-- Only active admins or the user themselves can view admin user profiles
+DROP POLICY IF EXISTS "Public or admin can view admin users" ON public.admin_users;
+CREATE POLICY "Admins or self can view admin users" 
+    ON public.admin_users FOR SELECT 
+    USING (public.is_admin() OR auth.uid() = user_id);
+
+-- Only active admins can create new admin accounts
+DROP POLICY IF EXISTS "Admins can insert admin users" ON public.admin_users;
+CREATE POLICY "Only admins can insert admin users" 
+    ON public.admin_users FOR INSERT 
+    WITH CHECK (public.is_admin());
+
+-- Only active admins can update admin user accounts
+DROP POLICY IF EXISTS "Admins can update admin users" ON public.admin_users;
+CREATE POLICY "Only admins can update admin users" 
+    ON public.admin_users FOR UPDATE 
+    USING (public.is_admin());
+
+-- Only active admins can delete admin user accounts
+DROP POLICY IF EXISTS "Admins can delete admin users" ON public.admin_users;
+CREATE POLICY "Only admins can delete admin users" 
+    ON public.admin_users FOR DELETE 
+    USING (public.is_admin());
+
+-- 2. Enhanced products policies:
+-- Admins can update any product, or authors can update their own
+DROP POLICY IF EXISTS "Admins can manage any product" ON public.products;
+DROP POLICY IF EXISTS "Users can update their own products" ON public.products;
+CREATE POLICY "Users or admins can update products" 
+    ON public.products FOR UPDATE 
+    USING (auth.uid() = user_id OR public.is_admin());
+
+-- Admins can delete any product, or authors can delete their own
+DROP POLICY IF EXISTS "Users can delete their own products" ON public.products;
+CREATE POLICY "Users or admins can delete products" 
+    ON public.products FOR DELETE 
+    USING (auth.uid() = user_id OR public.is_admin());
+
+-- 3. Enhanced profiles policies:
+-- Admins can delete customer profiles if needed for compliance/abuse
+DROP POLICY IF EXISTS "Admins can manage any profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can delete profiles" ON public.profiles;
+CREATE POLICY "Admins can delete profiles" 
+    ON public.profiles FOR DELETE 
+    USING (public.is_admin());
+
+CREATE INDEX IF NOT EXISTS idx_admin_users_email ON public.admin_users(email);
+CREATE INDEX IF NOT EXISTS idx_admin_users_role ON public.admin_users(role);
+CREATE INDEX IF NOT EXISTS idx_admin_users_status ON public.admin_users(status);
+
+-- Initial Seed for Default Admin Users
+INSERT INTO public.admin_users (full_name, email, role, department, phone_number, status, permissions, notes)
+VALUES 
+    ('Kratos Lord', 'admin@avsaraa.com', 'Super Admin', 'Executive Leadership', '+91 98765 43210', 'Active', ARRAY['users:manage', 'products:manage', 'orders:manage', 'system:admin'], 'Founding administrator with full system privileges.'),
+    ('Aanya Sharma', 'aanya.atelier@avsaraa.com', 'Product Manager', 'Atelier Curation', '+91 98250 11223', 'Active', ARRAY['products:manage', 'inventory:update'], 'Head of Saree & Luxury Drape procurement in Surat.'),
+    ('Devendra Rathore', 'devendra@avsaraa.com', 'Store Manager', 'Retail Operations', '+91 99130 44556', 'Active', ARRAY['products:manage', 'users:manage'], 'Oversees dispatch and inventory verification.')
+ON CONFLICT (email) DO NOTHING;
+
+-- Initial Seed for Luxury Products Catalog
+INSERT INTO public.products (name, category, price, image_url, description)
+VALUES
+    ('Royal Banarasi Katan Silk Saree', 'Sarees', 24999.00, '/images/banarasi_silk_saree.jpg', 'Authentic handwoven pure Banarasi katan silk saree with antique gold zari kadhwa borders and delicate floral jaal.'),
+    ('Emerald Organza Embroidered Saree', 'Sarees', 18450.00, '/images/royal_organza_saree.jpg', 'Weightless sheer organza drape adorned with resham threadwork, scalloped borders, and pearl highlights.'),
+    ('Heritage Anarkali Silk Gown', 'Occasion Wear', 28900.00, '/images/royal_occasion_dress.jpg', 'Regal floor-sweeping Kalidar gown tailored in Surat silk with heritage hand-zardozi neckline.'),
+    ('Festive Chanderi Foil Print Dress', 'Dresses', 12500.00, '/images/festive_chanderi_dress.jpg', 'Contemporary silhouette crafted from lightweight Chanderi weave featuring artisanal metallic foil accents.'),
+    ('Royal Zari Bridal Drape', 'New Arrivals', 34500.00, '/images/saree_model_hero.jpg', 'Exquisite bridal drape with intricate floral motifs and royal pallu, hand-crafted for auspicious moments.')
+ON CONFLICT DO NOTHING;
+
+

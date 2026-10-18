@@ -75,7 +75,25 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
       setUser(session?.user ?? null);
     });
 
-    fetchProducts();
+    let isMounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!isMounted) return;
+        if (error) {
+          console.warn("Database products query:", error.message);
+          setProducts([]);
+        } else if (data) {
+          setProducts(data);
+        }
+      } catch {
+        if (isMounted) setProducts([]);
+      }
+    })();
 
     // Listen to hash changes on URL (e.g. #products-sarees)
     const handleHashChange = () => {
@@ -90,10 +108,11 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
     window.addEventListener("hashchange", handleHashChange);
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
       window.removeEventListener("hashchange", handleHashChange);
     };
-  }, [fetchProducts]);
+  }, []);
 
   // Handle Add Product (Only available when logged in)
   const handleAddProduct = async (e: React.FormEvent) => {
