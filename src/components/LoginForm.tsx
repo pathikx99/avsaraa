@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AvsaraaLogo from "./AvsaraaLogo";
 import { supabase } from "@/lib/supabaseClient";
 import { BackArrowIcon, PhoneIcon, MailIcon, ChevronDownIcon, FlourishDivider, SpinnerIcon } from "./Icons";
@@ -17,6 +18,7 @@ export default function LoginForm({
   onNavigateToRegister,
   onBack,
 }: LoginFormProps) {
+  const router = useRouter();
   const [authMode, setAuthMode] = useState<"phone" | "email">("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [countryCode, setCountryCode] = useState("+91");
@@ -81,7 +83,8 @@ export default function LoginForm({
       }
       showToast("Welcome back to Avsaraa!");
       setTimeout(() => {
-        window.location.href = "/account";
+        router.push("/account");
+        router.refresh();
       }, 500);
     } catch {
       showToast("Invalid verification code");
@@ -110,7 +113,8 @@ export default function LoginForm({
 
       showToast("Welcome back to Avsaraa!");
       setTimeout(() => {
-        window.location.href = "/account";
+        router.push("/account");
+        router.refresh();
       }, 500);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to sign in";
@@ -181,7 +185,7 @@ export default function LoginForm({
         }}
       >
         <button
-          onClick={onBack || (() => { if (typeof window !== "undefined" && window.history.length > 1) { window.history.back(); } else { window.location.href = "/"; } })}
+          onClick={onBack || (() => { if (typeof window !== "undefined" && window.history.length > 1) { window.history.back(); } else { router.push("/"); } })}
           aria-label="Back"
           style={{
             width: "36px",

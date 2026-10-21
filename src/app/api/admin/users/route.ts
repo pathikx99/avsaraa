@@ -3,7 +3,6 @@ import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const VALID_ROLES = ["Super Admin", "Admin", "Product Manager", "Store Manager", "Support Lead"];
 const VALID_STATUSES = ["Active", "Inactive", "Suspended"];
 const VALID_MEMBERSHIP_TIERS = ["Standard", "Privilege", "Atelier Circle", "VIP"];
 
@@ -26,6 +25,7 @@ export async function GET(request: Request) {
       const { data, error } = await supabaseAdmin
         .from("admin_users")
         .select("id, user_id, full_name, email, role, department, phone_number, avatar_url, status, permissions, notes, last_active, created_at, updated_at")
+        .eq("role", "Super Admin")
         .order("created_at", { ascending: false });
 
       if (!error && data) {
@@ -68,75 +68,13 @@ export async function POST(request: Request) {
     const { target = "admin", ...payload } = body;
 
     if (target === "admin") {
-      const {
-        full_name,
-        email,
-        role = "Admin",
-        department = "Operations",
-        phone_number = null,
-        status = "Active",
-        permissions = ["users:manage", "products:manage"],
-        notes = "",
-      } = payload;
-
-      // Validation
-      if (!full_name || typeof full_name !== "string" || full_name.trim().length < 2 || full_name.length > 100) {
-        return NextResponse.json(
-          { success: false, error: "Full name must be between 2 and 100 characters." },
-          { status: 400 }
-        );
-      }
-
-      if (!email || typeof email !== "string" || !EMAIL_REGEX.test(email.trim().toLowerCase())) {
-        return NextResponse.json(
-          { success: false, error: "A valid email address is required." },
-          { status: 400 }
-        );
-      }
-
-      if (!VALID_ROLES.includes(role)) {
-        return NextResponse.json(
-          { success: false, error: `Invalid role. Allowed roles: ${VALID_ROLES.join(", ")}` },
-          { status: 400 }
-        );
-      }
-
-      if (!VALID_STATUSES.includes(status)) {
-        return NextResponse.json(
-          { success: false, error: `Invalid status. Allowed: ${VALID_STATUSES.join(", ")}` },
-          { status: 400 }
-        );
-      }
-
-      const sanitizedPhone = phone_number ? String(phone_number).trim().slice(0, 20) : null;
-      const sanitizedNotes = notes ? String(notes).trim().slice(0, 500) : null;
-      const sanitizedDept = department ? String(department).trim().slice(0, 60) : "Operations";
-      const sanitizedPerms = Array.isArray(permissions)
-        ? permissions.map((p) => String(p).trim().slice(0, 50)).slice(0, 20)
-        : ["users:manage"];
-
-      const { data, error } = await supabaseAdmin
-        .from("admin_users")
-        .insert({
-          full_name: full_name.trim(),
-          email: email.trim().toLowerCase(),
-          role,
-          department: sanitizedDept,
-          phone_number: sanitizedPhone,
-          status,
-          permissions: sanitizedPerms,
-          notes: sanitizedNotes,
-          last_active: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) {
-        return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-      }
-
-      return NextResponse.json({ success: true, data, message: "Admin user created successfully." });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Security Policy: Avsaraa operates strictly under a single Super Admin authority. Creating additional administrators is disabled.",
+        },
+        { status: 403 }
+      );
     } else {
       // Customer profile creation
       const {
@@ -229,12 +167,7 @@ export async function PUT(request: Request) {
         updateData.email = updates.email.trim().toLowerCase();
       }
 
-      if (updates.role !== undefined) {
-        if (!VALID_ROLES.includes(updates.role)) {
-          return NextResponse.json({ success: false, error: `Invalid role: ${updates.role}` }, { status: 400 });
-        }
-        updateData.role = updates.role;
-      }
+      updateData.role = "Super Admin";
 
       if (updates.status !== undefined) {
         if (!VALID_STATUSES.includes(updates.status)) {
@@ -261,7 +194,7 @@ export async function PUT(request: Request) {
         return NextResponse.json({ success: false, error: error.message }, { status: 400 });
       }
 
-      return NextResponse.json({ success: true, data, message: "Admin user updated successfully." });
+      return NextResponse.json({ success: true, data, message: "Super Admin details updated successfully." });
     } else {
       // Update customer profile
       const updateData: Record<string, unknown> = {
@@ -324,43 +257,10 @@ export async function DELETE(request: Request) {
     }
 
     if (target === "admin") {
-      // Prevent deleting the currently authenticated admin
-      if (auth.user && auth.adminProfile && auth.adminProfile.id === id) {
-        return NextResponse.json(
-          { success: false, error: "Security Restriction: You cannot delete your own administrative account." },
-          { status: 400 }
-        );
-      }
-
-      // Prevent deleting the sole Super Admin
-      const { count } = await supabaseAdmin
-        .from("admin_users")
-        .select("*", { count: "exact", head: true })
-        .eq("role", "Super Admin");
-
-      const { data: targetAdmin } = await supabaseAdmin
-        .from("admin_users")
-        .select("role")
-        .eq("id", id)
-        .maybeSingle();
-
-      if (targetAdmin?.role === "Super Admin" && count !== null && count <= 1) {
-        return NextResponse.json(
-          { success: false, error: "Security Restriction: The last remaining Super Admin cannot be deleted." },
-          { status: 400 }
-        );
-      }
-
-      const { error } = await supabaseAdmin
-        .from("admin_users")
-        .delete()
-        .eq("id", id);
-
-      if (error) {
-        return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-      }
-
-      return NextResponse.json({ success: true, message: "Admin user deleted successfully." });
+      return NextResponse.json(
+        { success: false, error: "Security Restriction: The Super Admin account is the permanent master authority and cannot be deleted." },
+        { status: 403 }
+      );
     } else {
       const { error } = await supabaseAdmin
         .from("profiles")

@@ -493,47 +493,6 @@ export default function AccountPage() {
     }
   };
 
-  // Quick Demo Member Login
-  const handleDemoSignIn = async () => {
-    setIsLoading(true);
-    try {
-      const demoEmail = "demo.member@avsaraa.in";
-      const demoPassword = "AvsaraaMember2026!";
-
-      const { data: signInData, error } = await supabase.auth.signInWithPassword({
-        email: demoEmail,
-        password: demoPassword,
-      });
-
-      let targetUser = signInData?.user || null;
-
-      if (error || !targetUser) {
-        const { data: signUpData } = await supabase.auth.signUp({
-          email: demoEmail,
-          password: demoPassword,
-          options: {
-            data: {
-              full_name: "Avsaraa Member",
-              phone_number: "+91 98200 12345",
-            },
-          },
-        });
-        targetUser = signUpData?.user || null;
-      }
-
-      if (targetUser) {
-        setAuthUser(targetUser);
-        await loadUserData(targetUser.id, targetUser.email);
-        showToast("Signed in as Demo Member");
-      }
-    } catch (err) {
-      console.error("Demo login error:", err);
-      showToast("Could not sign in with demo account");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const getInitials = (name?: string | null) => {
     if (!name) return "✦";
     const parts = name.trim().split(" ");

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AvsaraaLogo from "./AvsaraaLogo";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -25,6 +26,7 @@ export default function RegisterForm({
   onNavigateToLogin,
   onBack,
 }: RegisterFormProps) {
+  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
@@ -98,7 +100,8 @@ export default function RegisterForm({
 
       showToast(`Welcome to Avsaraa, ${cleanName.split(" ")[0]}!`);
       setTimeout(() => {
-        window.location.href = "/account";
+        router.push("/account");
+        router.refresh();
       }, 600);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to create account";
@@ -189,7 +192,7 @@ export default function RegisterForm({
         }}
       >
         <button
-          onClick={onBack || (() => { if (typeof window !== "undefined" && window.history.length > 1) { window.history.back(); } else { window.location.href = "/"; } })}
+          onClick={onBack || (() => { if (typeof window !== "undefined" && window.history.length > 1) { window.history.back(); } else { router.push("/"); } })}
           aria-label="Back"
           style={{
             width: "36px",

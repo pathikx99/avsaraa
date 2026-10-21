@@ -81,15 +81,16 @@ export async function authenticateAdminRequest(): Promise<AdminAuthResult> {
       };
     }
 
-    // 5. Verify the user is an active administrator in admin_users or has admin role
+    // 5. Verify the user is the active Super Admin in admin_users or has Super Admin identity
     const userEmail = user.email?.toLowerCase().trim();
 
-    // Check admin_users table
+    // Check admin_users table for active Super Admin
     const { data: adminRecord, error: adminQueryErr } = await adminClient
       .from("admin_users")
       .select("*")
       .or(`user_id.eq.${user.id},email.eq.${userEmail}`)
       .eq("status", "Active")
+      .eq("role", "Super Admin")
       .maybeSingle();
 
     if (!adminQueryErr && adminRecord) {
@@ -101,13 +102,15 @@ export async function authenticateAdminRequest(): Promise<AdminAuthResult> {
       };
     }
 
-    // Check user metadata or admin email convention
-    const hasAdminMeta =
+    // Check user metadata or default super admin email convention
+    const hasSuperAdminMeta =
+      user.app_metadata?.role === "super_admin" ||
       user.app_metadata?.role === "admin" ||
+      user.user_metadata?.role === "super_admin" ||
       user.user_metadata?.role === "admin" ||
       userEmail === "admin@avsaraa.com";
 
-    if (hasAdminMeta) {
+    if (hasSuperAdminMeta) {
       return {
         authorized: true,
         status: 200,
@@ -115,11 +118,11 @@ export async function authenticateAdminRequest(): Promise<AdminAuthResult> {
       };
     }
 
-    // User is logged in, but not an administrator
+    // User is logged in, but not the Super Admin
     return {
       authorized: false,
       status: 403,
-      error: `Access Denied: Account (${userEmail}) does not possess active administrator privileges.`,
+      error: `Access Denied: Account (${userEmail}) does not possess Super Admin privileges. Only the single Super Admin can control this platform.`,
       user,
     };
   } catch (err: unknown) {

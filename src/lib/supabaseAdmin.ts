@@ -6,10 +6,23 @@ const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   "https://slovsjusigggadxxkgcs.supabase.co";
 
-const supabaseSecretKey =
+const rawSecretKey =
   process.env.SUPABASE_SECRET_KEY ||
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   "";
+
+// Fallback if key is empty or a masked placeholder string (e.g. contains bullets or dots)
+const isMaskedOrInvalid =
+  !rawSecretKey ||
+  rawSecretKey.includes("•") ||
+  rawSecretKey.includes("...");
+
+const publishableKey =
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  "sb_publishable_TM_iuGMbcMcqHEeRPNET9A_cTwB8lfv";
+
+const supabaseSecretKey = isMaskedOrInvalid ? publishableKey : rawSecretKey;
 
 /**
  * Creates an administrative Supabase client using the Secret Key
@@ -19,9 +32,9 @@ const supabaseSecretKey =
  * to client-side code bundles.
  */
 export function getAdminSupabaseClient() {
-  if (!supabaseSecretKey) {
+  if (isMaskedOrInvalid) {
     console.warn(
-      "WARNING: SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY is not defined. Admin queries may fail or be restricted by RLS."
+      "NOTICE: Using publishable key fallback because SUPABASE_SECRET_KEY is masked or unset."
     );
   }
 

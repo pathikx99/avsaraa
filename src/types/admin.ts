@@ -1,9 +1,4 @@
-export type AdminRole =
-  | "Super Admin"
-  | "Admin"
-  | "Product Manager"
-  | "Store Manager"
-  | "Support Lead";
+export type AdminRole = "Super Admin";
 
 export type AdminStatus = "Active" | "Inactive" | "Suspended";
 
@@ -35,4 +30,24 @@ export interface CustomerProfile {
   preferred_currency?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ContactInquiry {
+  id: string;
+  user_id?: string | null;
+  full_name: string;
+  email: string;
+  phone_number?: string | null;
+  subject: string;
+  message: string;
+  status: "Unread" | "In Progress" | "Resolved" | "Archived";
+  created_at: string;
+}
+
+export interface NewsletterSubscriber {
+  id: string;
+  email: string;
+  status: "Subscribed" | "Unsubscribed";
+  source?: string;
+  created_at: string;
 }

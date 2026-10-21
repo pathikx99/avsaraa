@@ -109,7 +109,17 @@ CREATE POLICY "Anyone can submit a contact inquiry"
 DROP POLICY IF EXISTS "Users can view their own contact inquiries" ON public.contact_inquiries;
 CREATE POLICY "Users can view their own contact inquiries" 
     ON public.contact_inquiries FOR SELECT 
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id OR public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can update contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Super admin can update contact inquiries" 
+    ON public.contact_inquiries FOR UPDATE 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can delete contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Super admin can delete contact inquiries" 
+    ON public.contact_inquiries FOR DELETE 
+    USING (public.is_admin());
 
 -- ==============================================================================
 -- 4. NEWSLETTER SUBSCRIBERS (Email Updates)
@@ -128,6 +138,16 @@ DROP POLICY IF EXISTS "Anyone can subscribe to the newsletter" ON public.newslet
 CREATE POLICY "Anyone can subscribe to the newsletter" 
     ON public.newsletter_subscribers FOR INSERT 
     WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Super admin can view subscribers" ON public.newsletter_subscribers;
+CREATE POLICY "Super admin can view subscribers" 
+    ON public.newsletter_subscribers FOR SELECT 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
+CREATE POLICY "Super admin can delete subscribers" 
+    ON public.newsletter_subscribers FOR DELETE 
+    USING (public.is_admin());
 
 -- ==============================================================================
 -- AUTOMATIC PROFILE CREATION TRIGGER
@@ -157,9 +177,10 @@ CREATE TRIGGER on_auth_user_created
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ==============================================================================
--- 5. PRODUCTS (Minimal Schema for Store)
--- Categories from navigation: Sarees, Dresses, New Arrivals, Occasion Wear
--- ONLY signed-in users can add products
+-- 5. PRODUCTS (Luxury Catalog & Inventory)
+-- Categories: Sarees, Dresses, New Arrivals, Occasion Wear
+-- ONLY the Super Admin can insert, update, or delete products.
+-- Customers & public have read-only viewing access.
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -180,24 +201,28 @@ CREATE POLICY "Anyone can view products"
     ON public.products FOR SELECT 
     USING (true);
 
--- ONLY signed-in / authenticated users can add products
+-- ONLY Super Admin can add products
 DROP POLICY IF EXISTS "Only signed-in users can add products" ON public.products;
-CREATE POLICY "Only signed-in users can add products" 
+DROP POLICY IF EXISTS "Only super admin can add products" ON public.products;
+CREATE POLICY "Only super admin can add products" 
     ON public.products FOR INSERT 
-    TO authenticated
-    WITH CHECK (auth.uid() IS NOT NULL);
+    WITH CHECK (public.is_admin());
 
--- Users can update their own added products
+-- ONLY Super Admin can update products
 DROP POLICY IF EXISTS "Users can update their own products" ON public.products;
-CREATE POLICY "Users can update their own products" 
+DROP POLICY IF EXISTS "Users or admins can update products" ON public.products;
+DROP POLICY IF EXISTS "Only super admin can update products" ON public.products;
+CREATE POLICY "Only super admin can update products" 
     ON public.products FOR UPDATE 
-    USING (auth.uid() = user_id);
+    USING (public.is_admin());
 
--- Users can delete their own added products
+-- ONLY Super Admin can delete products
 DROP POLICY IF EXISTS "Users can delete their own products" ON public.products;
-CREATE POLICY "Users can delete their own products" 
+DROP POLICY IF EXISTS "Users or admins can delete products" ON public.products;
+DROP POLICY IF EXISTS "Only super admin can delete products" ON public.products;
+CREATE POLICY "Only super admin can delete products" 
     ON public.products FOR DELETE 
-    USING (auth.uid() = user_id);
+    USING (public.is_admin());
 
 -- ==============================================================================
 -- INDEXES FOR MAXIMUM QUERY PERFORMANCE
@@ -209,19 +234,20 @@ CREATE INDEX IF NOT EXISTS idx_products_user ON public.products(user_id);
 CREATE INDEX IF NOT EXISTS idx_products_created ON public.products(created_at DESC);
 
 -- ==============================================================================
--- 6. ADMIN USERS (Platform Administrators, Roles, Permissions & Activity)
+-- 6. SUPER ADMIN (Sole Master Administrator - Single Authority Model)
+-- There is strictly one Super Admin controlling everything in the platform.
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.admin_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     full_name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    role TEXT NOT NULL DEFAULT 'Admin' CHECK (role IN ('Super Admin', 'Admin', 'Product Manager', 'Store Manager', 'Support Lead')),
-    department TEXT DEFAULT 'Operations',
+    role TEXT NOT NULL DEFAULT 'Super Admin' CHECK (role = 'Super Admin'),
+    department TEXT DEFAULT 'Executive Leadership',
     phone_number TEXT,
     avatar_url TEXT,
     status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Suspended')),
-    permissions TEXT[] DEFAULT ARRAY['users:manage', 'products:manage', 'analytics:view'],
+    permissions TEXT[] DEFAULT ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'],
     notes TEXT,
     last_active TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
@@ -230,7 +256,7 @@ CREATE TABLE IF NOT EXISTS public.admin_users (
 
 ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
 
--- Helper function to check if the current requester is an active administrator
+-- Helper function to check if current requester is the active Super Admin
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -240,80 +266,56 @@ BEGIN
                 SELECT 1 FROM public.admin_users
                 WHERE (user_id = auth.uid() OR LOWER(email) = LOWER(auth.jwt()->>'email'))
                   AND status = 'Active'
+                  AND role = 'Super Admin'
             )
+            OR (auth.jwt()->'app_metadata'->>'role') = 'super_admin'
             OR (auth.jwt()->'app_metadata'->>'role') = 'admin'
+            OR LOWER(auth.jwt()->>'email') = 'admin@avsaraa.com'
         )
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- 1. admin_users policies:
--- Only active admins or the user themselves can view admin user profiles
+-- Only Super Admin can view admin details
 DROP POLICY IF EXISTS "Public or admin can view admin users" ON public.admin_users;
-CREATE POLICY "Admins or self can view admin users" 
+DROP POLICY IF EXISTS "Admins or self can view admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Super admin can view admin users" ON public.admin_users;
+CREATE POLICY "Super admin can view admin users" 
     ON public.admin_users FOR SELECT 
-    USING (public.is_admin() OR auth.uid() = user_id);
+    USING (public.is_admin());
 
--- Only active admins can create new admin accounts
+-- Only Super Admin can insert admin (initial bootstrap)
 DROP POLICY IF EXISTS "Admins can insert admin users" ON public.admin_users;
-CREATE POLICY "Only admins can insert admin users" 
+DROP POLICY IF EXISTS "Only admins can insert admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Super admin can insert admin users" ON public.admin_users;
+CREATE POLICY "Super admin can insert admin users" 
     ON public.admin_users FOR INSERT 
     WITH CHECK (public.is_admin());
 
--- Only active admins can update admin user accounts
+-- Only Super Admin can update their profile
 DROP POLICY IF EXISTS "Admins can update admin users" ON public.admin_users;
-CREATE POLICY "Only admins can update admin users" 
+DROP POLICY IF EXISTS "Only admins can update admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Super admin can update admin users" ON public.admin_users;
+CREATE POLICY "Super admin can update admin users" 
     ON public.admin_users FOR UPDATE 
     USING (public.is_admin());
 
--- Only active admins can delete admin user accounts
+-- Deleting the single Super Admin is prohibited
 DROP POLICY IF EXISTS "Admins can delete admin users" ON public.admin_users;
-CREATE POLICY "Only admins can delete admin users" 
-    ON public.admin_users FOR DELETE 
-    USING (public.is_admin());
+DROP POLICY IF EXISTS "Only admins can delete admin users" ON public.admin_users;
 
--- 2. Enhanced products policies:
--- Admins can update any product, or authors can update their own
-DROP POLICY IF EXISTS "Admins can manage any product" ON public.products;
-DROP POLICY IF EXISTS "Users can update their own products" ON public.products;
-CREATE POLICY "Users or admins can update products" 
-    ON public.products FOR UPDATE 
-    USING (auth.uid() = user_id OR public.is_admin());
-
--- Admins can delete any product, or authors can delete their own
-DROP POLICY IF EXISTS "Users can delete their own products" ON public.products;
-CREATE POLICY "Users or admins can delete products" 
-    ON public.products FOR DELETE 
-    USING (auth.uid() = user_id OR public.is_admin());
-
--- 3. Enhanced profiles policies:
--- Admins can delete customer profiles if needed for compliance/abuse
+-- 2. Customer profiles policies:
+-- Super Admin can delete customer profiles if needed for compliance or spam cleanup
 DROP POLICY IF EXISTS "Admins can manage any profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can delete profiles" ON public.profiles;
-CREATE POLICY "Admins can delete profiles" 
+DROP POLICY IF EXISTS "Super admin can delete profiles" ON public.profiles;
+CREATE POLICY "Super admin can delete profiles" 
     ON public.profiles FOR DELETE 
     USING (public.is_admin());
 
 CREATE INDEX IF NOT EXISTS idx_admin_users_email ON public.admin_users(email);
 CREATE INDEX IF NOT EXISTS idx_admin_users_role ON public.admin_users(role);
 CREATE INDEX IF NOT EXISTS idx_admin_users_status ON public.admin_users(status);
-
--- Initial Seed for Default Admin Users
-INSERT INTO public.admin_users (full_name, email, role, department, phone_number, status, permissions, notes)
-VALUES 
-    ('Kratos Lord', 'admin@avsaraa.com', 'Super Admin', 'Executive Leadership', '+91 98765 43210', 'Active', ARRAY['users:manage', 'products:manage', 'orders:manage', 'system:admin'], 'Founding administrator with full system privileges.'),
-    ('Aanya Sharma', 'aanya.atelier@avsaraa.com', 'Product Manager', 'Atelier Curation', '+91 98250 11223', 'Active', ARRAY['products:manage', 'inventory:update'], 'Head of Saree & Luxury Drape procurement in Surat.'),
-    ('Devendra Rathore', 'devendra@avsaraa.com', 'Store Manager', 'Retail Operations', '+91 99130 44556', 'Active', ARRAY['products:manage', 'users:manage'], 'Oversees dispatch and inventory verification.')
-ON CONFLICT (email) DO NOTHING;
-
--- Initial Seed for Luxury Products Catalog
-INSERT INTO public.products (name, category, price, image_url, description)
-VALUES
-    ('Royal Banarasi Katan Silk Saree', 'Sarees', 24999.00, '/images/banarasi_silk_saree.jpg', 'Authentic handwoven pure Banarasi katan silk saree with antique gold zari kadhwa borders and delicate floral jaal.'),
-    ('Emerald Organza Embroidered Saree', 'Sarees', 18450.00, '/images/royal_organza_saree.jpg', 'Weightless sheer organza drape adorned with resham threadwork, scalloped borders, and pearl highlights.'),
-    ('Heritage Anarkali Silk Gown', 'Occasion Wear', 28900.00, '/images/royal_occasion_dress.jpg', 'Regal floor-sweeping Kalidar gown tailored in Surat silk with heritage hand-zardozi neckline.'),
-    ('Festive Chanderi Foil Print Dress', 'Dresses', 12500.00, '/images/festive_chanderi_dress.jpg', 'Contemporary silhouette crafted from lightweight Chanderi weave featuring artisanal metallic foil accents.'),
-    ('Royal Zari Bridal Drape', 'New Arrivals', 34500.00, '/images/saree_model_hero.jpg', 'Exquisite bridal drape with intricate floral motifs and royal pallu, hand-crafted for auspicious moments.')
-ON CONFLICT DO NOTHING;
 
 

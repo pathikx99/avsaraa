@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
@@ -44,56 +44,39 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
     setTimeout(() => setToastMessage(null), 3600);
   };
 
-  // Load products strictly from Supabase database
-  const fetchProducts = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.warn("Database products query:", error.message);
-        setProducts([]);
-      } else if (data) {
-        setProducts(data);
-      }
-    } catch {
-      setProducts([]);
-    }
-  }, []);
-
   useEffect(() => {
+    let isMounted = true;
+
     // Check auth
     supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+      if (isMounted) setUser(data.user);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      if (isMounted) setUser(session?.user ?? null);
     });
 
-    let isMounted = true;
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!isMounted) return;
-        if (error) {
-          console.warn("Database products query:", error.message);
-          setProducts([]);
-        } else if (data) {
-          setProducts(data);
+    // Load products strictly from Supabase database
+    void supabase
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(
+        ({ data, error }) => {
+          if (!isMounted) return;
+          if (error) {
+            console.warn("Database products query:", error.message);
+            setProducts([]);
+          } else if (data) {
+            setProducts(data);
+          }
+        },
+        () => {
+          if (isMounted) setProducts([]);
         }
-      } catch {
-        if (isMounted) setProducts([]);
-      }
-    })();
+      );
 
     // Listen to hash changes on URL (e.g. #products-sarees)
     const handleHashChange = () => {
@@ -324,12 +307,11 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
             })}
           </div>
 
-          {/* Add Product Button (Only when signed in) OR Sign In Prompt */}
+          {/* Super Admin Manage Link OR Atelier Concierge Inquiries */}
           <div>
-            {user ? (
-              <button
-                type="button"
-                onClick={() => setShowAddModal(true)}
+            {user?.email?.toLowerCase() === "admin@avsaraa.com" ? (
+              <Link
+                href="/admin"
                 className="avsaraa-btn-primary"
                 style={{
                   height: "44px",
@@ -341,13 +323,14 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "6px",
+                  textDecoration: "none",
                 }}
               >
-                <span>+ Add Product</span>
-              </button>
+                <span>🛡️ Manage in Super Admin Console</span>
+              </Link>
             ) : (
               <Link
-                href="/login"
+                href="/contact"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -359,7 +342,7 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
                   textUnderlineOffset: "3px",
                 }}
               >
-                <span>Sign In to Add Products →</span>
+                <span>✦ Custom Tailoring & Inquiries →</span>
               </Link>
             )}
           </div>
