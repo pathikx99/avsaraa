@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- AVSARAA - WEAR THE MOMENT
 -- Supabase Database Schema
--- Focused on: Auth (Profiles), Addresses, Products, Contact Inquiries & Newsletter
+-- Focused on: Auth, Profiles, Super Admin, Addresses, Products, Inquiries & Newsletter
 -- ==============================================================================
 
 -- Enable required extensions
@@ -9,7 +9,75 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ==============================================================================
--- 1. PROFILES (Extends Supabase auth.users for Login & Register)
+-- 1. SUPER ADMIN (Sole Master Administrator - Single Authority Model)
+-- Must be created first so is_admin() is available for subsequent RLS policies
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.admin_users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    full_name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    role TEXT NOT NULL DEFAULT 'Super Admin' CHECK (role = 'Super Admin'),
+    department TEXT DEFAULT 'Executive Leadership',
+    phone_number TEXT,
+    avatar_url TEXT,
+    status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Suspended')),
+    permissions TEXT[] DEFAULT ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'],
+    notes TEXT,
+    last_active TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
+
+-- Helper function to check if current requester is the active Super Admin
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN (
+        auth.jwt() IS NOT NULL AND (
+            EXISTS (
+                SELECT 1 FROM public.admin_users
+                WHERE (user_id = auth.uid() OR LOWER(email) = LOWER(auth.jwt()->>'email'))
+                  AND status = 'Active'
+                  AND role = 'Super Admin'
+            )
+            OR (auth.jwt()->'app_metadata'->>'role') = 'super_admin'
+            OR (auth.jwt()->'app_metadata'->>'role') = 'admin'
+            OR LOWER(auth.jwt()->>'email') = 'admin@avsaraa.com'
+        )
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+-- Admin users RLS policies
+DROP POLICY IF EXISTS "Public or admin can view admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Admins or self can view admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Super admin can view admin users" ON public.admin_users;
+CREATE POLICY "Super admin can view admin users" 
+    ON public.admin_users FOR SELECT 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins can insert admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Only admins can insert admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Super admin can insert admin users" ON public.admin_users;
+CREATE POLICY "Super admin can insert admin users" 
+    ON public.admin_users FOR INSERT 
+    WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins can update admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Only admins can update admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Super admin can update admin users" ON public.admin_users;
+CREATE POLICY "Super admin can update admin users" 
+    ON public.admin_users FOR UPDATE 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins can delete admin users" ON public.admin_users;
+DROP POLICY IF EXISTS "Only admins can delete admin users" ON public.admin_users;
+
+-- ==============================================================================
+-- 2. PROFILES (Extends Supabase auth.users for Login & Register)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -41,8 +109,39 @@ CREATE POLICY "Users can insert their own profile"
     ON public.profiles FOR INSERT 
     WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Admins can manage any profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can delete profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Super admin can delete profiles" ON public.profiles;
+CREATE POLICY "Super admin can delete profiles" 
+    ON public.profiles FOR DELETE 
+    USING (public.is_admin());
+
+-- AUTOMATIC PROFILE CREATION TRIGGER
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.profiles (id, full_name, email, phone_number)
+    VALUES (
+        new.id,
+        COALESCE(new.raw_user_meta_data->>'full_name', 'Avsaraa Member'),
+        new.email,
+        new.phone
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        full_name = EXCLUDED.full_name,
+        email = EXCLUDED.email,
+        updated_at = NOW();
+    RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
 -- ==============================================================================
--- 2. USER ADDRESSES (User Account Delivery Locations)
+-- 3. USER ADDRESSES (User Account Delivery Locations)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.addresses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -85,99 +184,7 @@ CREATE POLICY "Users can delete their own addresses"
     USING (auth.uid() = user_id);
 
 -- ==============================================================================
--- 3. CONTACT INQUIRIES (Customer Messages)
--- ==============================================================================
-CREATE TABLE IF NOT EXISTS public.contact_inquiries (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-    full_name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    phone_number TEXT,
-    subject TEXT NOT NULL,
-    message TEXT NOT NULL,
-    status TEXT DEFAULT 'Unread' CHECK (status IN ('Unread', 'In Progress', 'Resolved', 'Archived')),
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.contact_inquiries ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can submit a contact inquiry" ON public.contact_inquiries;
-CREATE POLICY "Anyone can submit a contact inquiry" 
-    ON public.contact_inquiries FOR INSERT 
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users can view their own contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Users can view their own contact inquiries" 
-    ON public.contact_inquiries FOR SELECT 
-    USING (auth.uid() = user_id OR public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can update contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Super admin can update contact inquiries" 
-    ON public.contact_inquiries FOR UPDATE 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can delete contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Super admin can delete contact inquiries" 
-    ON public.contact_inquiries FOR DELETE 
-    USING (public.is_admin());
-
--- ==============================================================================
--- 4. NEWSLETTER SUBSCRIBERS (Email Updates)
--- ==============================================================================
-CREATE TABLE IF NOT EXISTS public.newsletter_subscribers (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email TEXT UNIQUE NOT NULL,
-    status TEXT DEFAULT 'Subscribed' CHECK (status IN ('Subscribed', 'Unsubscribed')),
-    source TEXT DEFAULT 'Website Footer',
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can subscribe to the newsletter" ON public.newsletter_subscribers;
-CREATE POLICY "Anyone can subscribe to the newsletter" 
-    ON public.newsletter_subscribers FOR INSERT 
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Super admin can view subscribers" ON public.newsletter_subscribers;
-CREATE POLICY "Super admin can view subscribers" 
-    ON public.newsletter_subscribers FOR SELECT 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
-CREATE POLICY "Super admin can delete subscribers" 
-    ON public.newsletter_subscribers FOR DELETE 
-    USING (public.is_admin());
-
--- ==============================================================================
--- AUTOMATIC PROFILE CREATION TRIGGER
--- When a user signs up via Supabase Auth, automatically insert a row in profiles
--- ==============================================================================
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO public.profiles (id, full_name, email, phone_number)
-    VALUES (
-        new.id,
-        COALESCE(new.raw_user_meta_data->>'full_name', 'Avsaraa Member'),
-        new.email,
-        new.phone
-    )
-    ON CONFLICT (id) DO UPDATE SET
-        full_name = EXCLUDED.full_name,
-        email = EXCLUDED.email,
-        updated_at = NOW();
-    RETURN new;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-    AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- ==============================================================================
--- 5. PRODUCTS (Luxury Catalog & Inventory)
+-- 4. PRODUCTS (Luxury Catalog & Inventory)
 -- Categories: Sarees, Dresses, New Arrivals, Occasion Wear
 -- ONLY the Super Admin can insert, update, or delete products.
 -- Customers & public have read-only viewing access.
@@ -225,97 +232,78 @@ CREATE POLICY "Only super admin can delete products"
     USING (public.is_admin());
 
 -- ==============================================================================
+-- 5. CONTACT INQUIRIES (Customer Messages)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.contact_inquiries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    full_name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    phone_number TEXT,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'Unread' CHECK (status IN ('Unread', 'In Progress', 'Resolved', 'Archived')),
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.contact_inquiries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can submit a contact inquiry" ON public.contact_inquiries;
+CREATE POLICY "Anyone can submit a contact inquiry" 
+    ON public.contact_inquiries FOR INSERT 
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can view their own contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Users can view their own contact inquiries" 
+    ON public.contact_inquiries FOR SELECT 
+    USING (auth.uid() = user_id OR public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can update contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Super admin can update contact inquiries" 
+    ON public.contact_inquiries FOR UPDATE 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can delete contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Super admin can delete contact inquiries" 
+    ON public.contact_inquiries FOR DELETE 
+    USING (public.is_admin());
+
+-- ==============================================================================
+-- 6. NEWSLETTER SUBSCRIBERS (Email Updates)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.newsletter_subscribers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email TEXT UNIQUE NOT NULL,
+    status TEXT DEFAULT 'Subscribed' CHECK (status IN ('Subscribed', 'Unsubscribed')),
+    source TEXT DEFAULT 'Website Footer',
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can subscribe to the newsletter" ON public.newsletter_subscribers;
+CREATE POLICY "Anyone can subscribe to the newsletter" 
+    ON public.newsletter_subscribers FOR INSERT 
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Super admin can view subscribers" ON public.newsletter_subscribers;
+CREATE POLICY "Super admin can view subscribers" 
+    ON public.newsletter_subscribers FOR SELECT 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
+CREATE POLICY "Super admin can delete subscribers" 
+    ON public.newsletter_subscribers FOR DELETE 
+    USING (public.is_admin());
+
+-- ==============================================================================
 -- INDEXES FOR MAXIMUM QUERY PERFORMANCE
 -- ==============================================================================
+CREATE INDEX IF NOT EXISTS idx_admin_users_email ON public.admin_users(email);
+CREATE INDEX IF NOT EXISTS idx_admin_users_role ON public.admin_users(role);
+CREATE INDEX IF NOT EXISTS idx_admin_users_status ON public.admin_users(status);
 CREATE INDEX IF NOT EXISTS idx_addresses_user ON public.addresses(user_id);
 CREATE INDEX IF NOT EXISTS idx_inquiries_email ON public.contact_inquiries(email);
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category);
 CREATE INDEX IF NOT EXISTS idx_products_user ON public.products(user_id);
 CREATE INDEX IF NOT EXISTS idx_products_created ON public.products(created_at DESC);
-
--- ==============================================================================
--- 6. SUPER ADMIN (Sole Master Administrator - Single Authority Model)
--- There is strictly one Super Admin controlling everything in the platform.
--- ==============================================================================
-CREATE TABLE IF NOT EXISTS public.admin_users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    full_name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    role TEXT NOT NULL DEFAULT 'Super Admin' CHECK (role = 'Super Admin'),
-    department TEXT DEFAULT 'Executive Leadership',
-    phone_number TEXT,
-    avatar_url TEXT,
-    status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Suspended')),
-    permissions TEXT[] DEFAULT ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'],
-    notes TEXT,
-    last_active TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
-
--- Helper function to check if current requester is the active Super Admin
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN (
-        auth.jwt() IS NOT NULL AND (
-            EXISTS (
-                SELECT 1 FROM public.admin_users
-                WHERE (user_id = auth.uid() OR LOWER(email) = LOWER(auth.jwt()->>'email'))
-                  AND status = 'Active'
-                  AND role = 'Super Admin'
-            )
-            OR (auth.jwt()->'app_metadata'->>'role') = 'super_admin'
-            OR (auth.jwt()->'app_metadata'->>'role') = 'admin'
-            OR LOWER(auth.jwt()->>'email') = 'admin@avsaraa.com'
-        )
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
-
--- 1. admin_users policies:
--- Only Super Admin can view admin details
-DROP POLICY IF EXISTS "Public or admin can view admin users" ON public.admin_users;
-DROP POLICY IF EXISTS "Admins or self can view admin users" ON public.admin_users;
-DROP POLICY IF EXISTS "Super admin can view admin users" ON public.admin_users;
-CREATE POLICY "Super admin can view admin users" 
-    ON public.admin_users FOR SELECT 
-    USING (public.is_admin());
-
--- Only Super Admin can insert admin (initial bootstrap)
-DROP POLICY IF EXISTS "Admins can insert admin users" ON public.admin_users;
-DROP POLICY IF EXISTS "Only admins can insert admin users" ON public.admin_users;
-DROP POLICY IF EXISTS "Super admin can insert admin users" ON public.admin_users;
-CREATE POLICY "Super admin can insert admin users" 
-    ON public.admin_users FOR INSERT 
-    WITH CHECK (public.is_admin());
-
--- Only Super Admin can update their profile
-DROP POLICY IF EXISTS "Admins can update admin users" ON public.admin_users;
-DROP POLICY IF EXISTS "Only admins can update admin users" ON public.admin_users;
-DROP POLICY IF EXISTS "Super admin can update admin users" ON public.admin_users;
-CREATE POLICY "Super admin can update admin users" 
-    ON public.admin_users FOR UPDATE 
-    USING (public.is_admin());
-
--- Deleting the single Super Admin is prohibited
-DROP POLICY IF EXISTS "Admins can delete admin users" ON public.admin_users;
-DROP POLICY IF EXISTS "Only admins can delete admin users" ON public.admin_users;
-
--- 2. Customer profiles policies:
--- Super Admin can delete customer profiles if needed for compliance or spam cleanup
-DROP POLICY IF EXISTS "Admins can manage any profile" ON public.profiles;
-DROP POLICY IF EXISTS "Admins can delete profiles" ON public.profiles;
-DROP POLICY IF EXISTS "Super admin can delete profiles" ON public.profiles;
-CREATE POLICY "Super admin can delete profiles" 
-    ON public.profiles FOR DELETE 
-    USING (public.is_admin());
-
-CREATE INDEX IF NOT EXISTS idx_admin_users_email ON public.admin_users(email);
-CREATE INDEX IF NOT EXISTS idx_admin_users_role ON public.admin_users(role);
-CREATE INDEX IF NOT EXISTS idx_admin_users_status ON public.admin_users(status);
-
-

@@ -776,75 +776,7 @@ export default function AdminDashboardPage() {
 -- Run this in your Supabase SQL Editor:
 -- ==============================================================================
 
--- 1. PRODUCTS: ONLY Super Admin can add, edit, or delete products
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can view products" ON public.products;
-CREATE POLICY "Anyone can view products" 
-    ON public.products FOR SELECT 
-    USING (true);
-
-DROP POLICY IF EXISTS "Only signed-in users can add products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can add products" ON public.products;
-CREATE POLICY "Only super admin can add products" 
-    ON public.products FOR INSERT 
-    WITH CHECK (public.is_admin());
-
-DROP POLICY IF EXISTS "Users can update their own products" ON public.products;
-DROP POLICY IF EXISTS "Users or admins can update products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can update products" ON public.products;
-CREATE POLICY "Only super admin can update products" 
-    ON public.products FOR UPDATE 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Users can delete their own products" ON public.products;
-DROP POLICY IF EXISTS "Users or admins can delete products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can delete products" ON public.products;
-CREATE POLICY "Only super admin can delete products" 
-    ON public.products FOR DELETE 
-    USING (public.is_admin());
-
--- 2. CONTACT INQUIRIES & NEWSLETTER: Public can submit; Super Admin controls all
-ALTER TABLE public.contact_inquiries ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can submit a contact inquiry" ON public.contact_inquiries;
-CREATE POLICY "Anyone can submit a contact inquiry" 
-    ON public.contact_inquiries FOR INSERT 
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users can view their own contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Users can view their own contact inquiries" 
-    ON public.contact_inquiries FOR SELECT 
-    USING (auth.uid() = user_id OR public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can update contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Super admin can update contact inquiries" 
-    ON public.contact_inquiries FOR UPDATE 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can delete contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Super admin can delete contact inquiries" 
-    ON public.contact_inquiries FOR DELETE 
-    USING (public.is_admin());
-
-ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can subscribe to the newsletter" ON public.newsletter_subscribers;
-CREATE POLICY "Anyone can subscribe to the newsletter" 
-    ON public.newsletter_subscribers FOR INSERT 
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Super admin can view subscribers" ON public.newsletter_subscribers;
-CREATE POLICY "Super admin can view subscribers" 
-    ON public.newsletter_subscribers FOR SELECT 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
-CREATE POLICY "Super admin can delete subscribers" 
-    ON public.newsletter_subscribers FOR DELETE 
-    USING (public.is_admin());
-
--- 3. SUPER ADMIN REGISTRY & VERIFICATION
+-- 1. SUPER ADMIN REGISTRY & AUTH HELPER (Must be created first for RLS policies)
 CREATE TABLE IF NOT EXISTS public.admin_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -901,7 +833,75 @@ VALUES
     ('Kratos Lord', 'admin@avsaraa.com', 'Super Admin', 'Executive Leadership', '+91 98765 43210', 'Active', ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'], 'Founding Super Administrator with full system control and supreme authority.')
 ON CONFLICT (email) DO UPDATE SET
     role = 'Super Admin',
-    status = 'Active';`;
+    status = 'Active';
+
+-- 2. PRODUCTS: ONLY Super Admin can add, edit, or delete products
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can view products" ON public.products;
+CREATE POLICY "Anyone can view products" 
+    ON public.products FOR SELECT 
+    USING (true);
+
+DROP POLICY IF EXISTS "Only signed-in users can add products" ON public.products;
+DROP POLICY IF EXISTS "Only super admin can add products" ON public.products;
+CREATE POLICY "Only super admin can add products" 
+    ON public.products FOR INSERT 
+    WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Users can update their own products" ON public.products;
+DROP POLICY IF EXISTS "Users or admins can update products" ON public.products;
+DROP POLICY IF EXISTS "Only super admin can update products" ON public.products;
+CREATE POLICY "Only super admin can update products" 
+    ON public.products FOR UPDATE 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Users can delete their own products" ON public.products;
+DROP POLICY IF EXISTS "Users or admins can delete products" ON public.products;
+DROP POLICY IF EXISTS "Only super admin can delete products" ON public.products;
+CREATE POLICY "Only super admin can delete products" 
+    ON public.products FOR DELETE 
+    USING (public.is_admin());
+
+-- 3. CONTACT INQUIRIES & NEWSLETTER: Public can submit; Super Admin controls all
+ALTER TABLE public.contact_inquiries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can submit a contact inquiry" ON public.contact_inquiries;
+CREATE POLICY "Anyone can submit a contact inquiry" 
+    ON public.contact_inquiries FOR INSERT 
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can view their own contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Users can view their own contact inquiries" 
+    ON public.contact_inquiries FOR SELECT 
+    USING (auth.uid() = user_id OR public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can update contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Super admin can update contact inquiries" 
+    ON public.contact_inquiries FOR UPDATE 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can delete contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Super admin can delete contact inquiries" 
+    ON public.contact_inquiries FOR DELETE 
+    USING (public.is_admin());
+
+ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can subscribe to the newsletter" ON public.newsletter_subscribers;
+CREATE POLICY "Anyone can subscribe to the newsletter" 
+    ON public.newsletter_subscribers FOR INSERT 
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Super admin can view subscribers" ON public.newsletter_subscribers;
+CREATE POLICY "Super admin can view subscribers" 
+    ON public.newsletter_subscribers FOR SELECT 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
+CREATE POLICY "Super admin can delete subscribers" 
+    ON public.newsletter_subscribers FOR DELETE 
+    USING (public.is_admin());`;
 
     navigator.clipboard.writeText(sql);
     setCopiedSql(true);
@@ -2525,75 +2525,7 @@ ON CONFLICT (email) DO UPDATE SET
 -- AVSARAA - SINGLE SUPER ADMIN ARCHITECTURE & ROW LEVEL SECURITY
 -- ==============================================================================
 
--- 1. PRODUCTS: ONLY Super Admin can add, edit, or delete products
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can view products" ON public.products;
-CREATE POLICY "Anyone can view products" 
-    ON public.products FOR SELECT 
-    USING (true);
-
-DROP POLICY IF EXISTS "Only signed-in users can add products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can add products" ON public.products;
-CREATE POLICY "Only super admin can add products" 
-    ON public.products FOR INSERT 
-    WITH CHECK (public.is_admin());
-
-DROP POLICY IF EXISTS "Users can update their own products" ON public.products;
-DROP POLICY IF EXISTS "Users or admins can update products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can update products" ON public.products;
-CREATE POLICY "Only super admin can update products" 
-    ON public.products FOR UPDATE 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Users can delete their own products" ON public.products;
-DROP POLICY IF EXISTS "Users or admins can delete products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can delete products" ON public.products;
-CREATE POLICY "Only super admin can delete products" 
-    ON public.products FOR DELETE 
-    USING (public.is_admin());
-
--- 2. CONTACT INQUIRIES & NEWSLETTER: Public can submit; Super Admin controls all
-ALTER TABLE public.contact_inquiries ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can submit a contact inquiry" ON public.contact_inquiries;
-CREATE POLICY "Anyone can submit a contact inquiry" 
-    ON public.contact_inquiries FOR INSERT 
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users can view their own contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Users can view their own contact inquiries" 
-    ON public.contact_inquiries FOR SELECT 
-    USING (auth.uid() = user_id OR public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can update contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Super admin can update contact inquiries" 
-    ON public.contact_inquiries FOR UPDATE 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can delete contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Super admin can delete contact inquiries" 
-    ON public.contact_inquiries FOR DELETE 
-    USING (public.is_admin());
-
-ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can subscribe to the newsletter" ON public.newsletter_subscribers;
-CREATE POLICY "Anyone can subscribe to the newsletter" 
-    ON public.newsletter_subscribers FOR INSERT 
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Super admin can view subscribers" ON public.newsletter_subscribers;
-CREATE POLICY "Super admin can view subscribers" 
-    ON public.newsletter_subscribers FOR SELECT 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
-CREATE POLICY "Super admin can delete subscribers" 
-    ON public.newsletter_subscribers FOR DELETE 
-    USING (public.is_admin());
-
--- 3. SUPER ADMIN REGISTRY & FUNCTION
+-- 1. SUPER ADMIN REGISTRY & AUTH HELPER (Must be created first for RLS policies)
 CREATE TABLE IF NOT EXISTS public.admin_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -2650,7 +2582,75 @@ VALUES
     ('Kratos Lord', 'admin@avsaraa.com', 'Super Admin', 'Executive Leadership', '+91 98765 43210', 'Active', ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'], 'Founding Super Administrator with full system control and supreme authority.')
 ON CONFLICT (email) DO UPDATE SET
     role = 'Super Admin',
-    status = 'Active';`}
+    status = 'Active';
+
+-- 2. PRODUCTS: ONLY Super Admin can add, edit, or delete products
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can view products" ON public.products;
+CREATE POLICY "Anyone can view products" 
+    ON public.products FOR SELECT 
+    USING (true);
+
+DROP POLICY IF EXISTS "Only signed-in users can add products" ON public.products;
+DROP POLICY IF EXISTS "Only super admin can add products" ON public.products;
+CREATE POLICY "Only super admin can add products" 
+    ON public.products FOR INSERT 
+    WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Users can update their own products" ON public.products;
+DROP POLICY IF EXISTS "Users or admins can update products" ON public.products;
+DROP POLICY IF EXISTS "Only super admin can update products" ON public.products;
+CREATE POLICY "Only super admin can update products" 
+    ON public.products FOR UPDATE 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Users can delete their own products" ON public.products;
+DROP POLICY IF EXISTS "Users or admins can delete products" ON public.products;
+DROP POLICY IF EXISTS "Only super admin can delete products" ON public.products;
+CREATE POLICY "Only super admin can delete products" 
+    ON public.products FOR DELETE 
+    USING (public.is_admin());
+
+-- 3. CONTACT INQUIRIES & NEWSLETTER: Public can submit; Super Admin controls all
+ALTER TABLE public.contact_inquiries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can submit a contact inquiry" ON public.contact_inquiries;
+CREATE POLICY "Anyone can submit a contact inquiry" 
+    ON public.contact_inquiries FOR INSERT 
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can view their own contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Users can view their own contact inquiries" 
+    ON public.contact_inquiries FOR SELECT 
+    USING (auth.uid() = user_id OR public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can update contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Super admin can update contact inquiries" 
+    ON public.contact_inquiries FOR UPDATE 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can delete contact inquiries" ON public.contact_inquiries;
+CREATE POLICY "Super admin can delete contact inquiries" 
+    ON public.contact_inquiries FOR DELETE 
+    USING (public.is_admin());
+
+ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can subscribe to the newsletter" ON public.newsletter_subscribers;
+CREATE POLICY "Anyone can subscribe to the newsletter" 
+    ON public.newsletter_subscribers FOR INSERT 
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Super admin can view subscribers" ON public.newsletter_subscribers;
+CREATE POLICY "Super admin can view subscribers" 
+    ON public.newsletter_subscribers FOR SELECT 
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
+CREATE POLICY "Super admin can delete subscribers" 
+    ON public.newsletter_subscribers FOR DELETE 
+    USING (public.is_admin());`}
             </pre>
           </div>
         )}

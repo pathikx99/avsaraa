@@ -176,14 +176,14 @@ DELETE FROM public.newsletter_subscribers WHERE email IN (
     'sneha.joshi@example.com'
 );
 
-INSERT INTO public.newsletter_subscribers (email, is_active, source)
+INSERT INTO public.newsletter_subscribers (email, status, source)
 VALUES
-    ('aisha.patel@example.com', true, 'storefront_footer'),
-    ('meera.kapoor@example.com', true, 'hero_announcement'),
-    ('neha.verma@example.com', true, 'checkout_modal'),
-    ('sneha.joshi@example.com', true, 'storefront_footer')
+    ('aisha.patel@example.com', 'Subscribed', 'storefront_footer'),
+    ('meera.kapoor@example.com', 'Subscribed', 'hero_announcement'),
+    ('neha.verma@example.com', 'Subscribed', 'checkout_modal'),
+    ('sneha.joshi@example.com', 'Subscribed', 'storefront_footer')
 ON CONFLICT (email) DO UPDATE SET
-    is_active = true;
+    status = 'Subscribed';
 
 COMMIT;
 
