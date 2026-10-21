@@ -7,10 +7,12 @@ import AvsaraaLogo from "./AvsaraaLogo";
 import NavigationDrawer from "./NavigationDrawer";
 import { supabase } from "@/lib/supabaseClient";
 import { UserIcon, ShoppingBagIcon } from "./Icons";
+import { useCart } from "@/context/CartContext";
 import type { User } from "@supabase/supabase-js";
 
 export default function Header() {
   const router = useRouter();
+  const { totalItems, openCart } = useCart();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [activeAnnouncement, setActiveAnnouncement] = useState(0);
@@ -294,10 +296,11 @@ export default function Header() {
               <UserIcon size={19} color="#261B13" />
             </Link>
 
-            {/* Shopping Bag Icon */}
-            <Link
-              href="/account"
-              aria-label="Shopping Bag"
+            {/* Shopping Bag Button (Gated to login for adding/checkout) */}
+            <button
+              type="button"
+              onClick={openCart}
+              aria-label={`Shopping Bag with ${totalItems} items`}
               style={{
                 position: "relative",
                 padding: "6px",
@@ -305,6 +308,10 @@ export default function Header() {
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                transition: "transform 0.15s ease",
               }}
             >
               <ShoppingBagIcon size={19} color="#261B13" />
@@ -313,21 +320,23 @@ export default function Header() {
                   position: "absolute",
                   top: "2px",
                   right: "2px",
-                  width: "14px",
-                  height: "14px",
-                  backgroundColor: "#866951",
+                  minWidth: "15px",
+                  height: "15px",
+                  padding: "0 4px",
+                  backgroundColor: totalItems > 0 ? "#866951" : "#CFBEAD",
                   color: "#FAF7F2",
-                  borderRadius: "50%",
+                  borderRadius: "10px",
                   fontSize: "9px",
                   fontWeight: 700,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
                 }}
               >
-                0
+                {totalItems > 99 ? "99+" : totalItems}
               </span>
-            </Link>
+            </button>
           </div>
         </div>
       </header>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import AvsaraaLogo from "./AvsaraaLogo";
 import { UserIcon, WhatsAppIcon, ShoppingBagIcon, HeartIcon } from "./Icons";
+import { useCart } from "@/context/CartContext";
 import type { User } from "@supabase/supabase-js";
 
 interface NavigationDrawerProps {
@@ -20,6 +21,7 @@ export default function NavigationDrawer({
   user,
   onLogout,
 }: NavigationDrawerProps) {
+  const { totalItems, openCart } = useCart();
   if (!isOpen) return null;
 
   const categories = [
@@ -194,26 +196,36 @@ export default function NavigationDrawer({
             <span style={{ color: "#866951", fontSize: "16px" }}>›</span>
           </Link>
 
-          <Link
-            href={user ? "/account" : "/login"}
-            onClick={onClose}
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              openCart();
+            }}
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               padding: "15px 0",
               borderBottom: "1px solid #EFE6DC",
+              borderTop: "none",
+              borderLeft: "none",
+              borderRight: "none",
               fontSize: "14px",
               color: "#3B2A1E",
               fontWeight: 500,
+              background: "none",
+              cursor: "pointer",
+              width: "100%",
+              textAlign: "left",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <ShoppingBagIcon size={18} color="#866951" />
-              <span>My Bag (0)</span>
+              <span>My Bag ({totalItems})</span>
             </div>
             <span style={{ color: "#866951", fontSize: "16px" }}>›</span>
-          </Link>
+          </button>
         </div>
 
         {/* 3. MINIMAL INFO LINKS: About Us, Contact Us */}

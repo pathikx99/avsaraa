@@ -100,14 +100,16 @@ CREATE POLICY "Public profiles are viewable by everyone"
     USING (true);
 
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Super admin can update any profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile" 
     ON public.profiles FOR UPDATE 
-    USING (auth.uid() = id);
+    USING (auth.uid() = id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Super admin can insert profiles" ON public.profiles;
 CREATE POLICY "Users can insert their own profile" 
     ON public.profiles FOR INSERT 
-    WITH CHECK (auth.uid() = id);
+    WITH CHECK (auth.uid() = id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Admins can manage any profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can delete profiles" ON public.profiles;
@@ -166,22 +168,22 @@ ALTER TABLE public.addresses ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view their own addresses" ON public.addresses;
 CREATE POLICY "Users can view their own addresses" 
     ON public.addresses FOR SELECT 
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Users can insert their own addresses" ON public.addresses;
 CREATE POLICY "Users can insert their own addresses" 
     ON public.addresses FOR INSERT 
-    WITH CHECK (auth.uid() = user_id);
+    WITH CHECK (auth.uid() = user_id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Users can update their own addresses" ON public.addresses;
 CREATE POLICY "Users can update their own addresses" 
     ON public.addresses FOR UPDATE 
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Users can delete their own addresses" ON public.addresses;
 CREATE POLICY "Users can delete their own addresses" 
     ON public.addresses FOR DELETE 
-    USING (auth.uid() = user_id);
+    USING (auth.uid() = user_id OR public.is_admin());
 
 -- ==============================================================================
 -- 4. PRODUCTS (Luxury Catalog & Inventory)

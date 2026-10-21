@@ -5,44 +5,22 @@ import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Product, ProductCategory } from "@/types/product";
-import { SpinnerIcon, WhatsAppIcon } from "./Icons";
+import { ShoppingBagIcon, WhatsAppIcon } from "./Icons";
+import { useCart } from "@/context/CartContext";
 import type { User } from "@supabase/supabase-js";
 
 interface ProductsSectionProps {
   initialCategory?: ProductCategory | "ALL";
 }
 
-const PRESET_IMAGES = [
-  { label: "Banarasi Silk Saree", url: "/images/banarasi_silk_saree.jpg" },
-  { label: "Emerald Organza Saree", url: "/images/royal_organza_saree.jpg" },
-  { label: "Heritage Anarkali Gown", url: "/images/royal_occasion_dress.jpg" },
-  { label: "Chanderi Dress", url: "/images/festive_chanderi_dress.jpg" },
-  { label: "Royal Zari Bridal Drape", url: "/images/saree_model_hero.jpg" },
-  { label: "Handloom Weave Texture", url: "/images/account_hero.jpg" },
-];
+const DEFAULT_FALLBACK_IMAGE = "/images/banarasi_silk_saree.jpg";
 
 export default function ProductsSection({ initialCategory = "ALL" }: ProductsSectionProps) {
+  const { addToCart } = useCart();
   const [activeCategory, setActiveCategory] = useState<ProductCategory | "ALL">(initialCategory);
   const [products, setProducts] = useState<Product[]>([]);
   const [user, setUser] = useState<User | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // New product form state
-  const [newProduct, setNewProduct] = useState({
-    name: "",
-    category: "Sarees" as ProductCategory,
-    price: "",
-    image_url: PRESET_IMAGES[0].url,
-    description: "",
-  });
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3600);
-  };
 
   useEffect(() => {
     let isMounted = true;
@@ -97,70 +75,6 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
     };
   }, []);
 
-  // Handle Add Product (Only available when logged in)
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!user) {
-      showToast("Only logged-in members can add products. Please sign in.");
-      setShowAddModal(false);
-      return;
-    }
-
-    if (!newProduct.name.trim() || !newProduct.price.trim()) {
-      showToast("Please enter product name and price");
-      return;
-    }
-
-    const priceNum = parseFloat(newProduct.price);
-    if (isNaN(priceNum) || priceNum <= 0) {
-      showToast("Please enter a valid price");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    const productRecord = {
-      name: newProduct.name.trim(),
-      category: newProduct.category,
-      price: priceNum,
-      image_url: newProduct.image_url || PRESET_IMAGES[0].url,
-      description: newProduct.description.trim() || null,
-      user_id: user.id,
-    };
-
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .insert([productRecord])
-        .select()
-        .single();
-
-      if (error) {
-        console.error("DB insert error:", error);
-        showToast("Database error: " + (error.message || "Failed to save product"));
-        return;
-      }
-
-      if (data) {
-        setProducts((prev) => [data, ...prev]);
-        showToast(`Added "${newProduct.name}" to database!`);
-        setShowAddModal(false);
-        setNewProduct({
-          name: "",
-          category: "Sarees",
-          price: "",
-          image_url: PRESET_IMAGES[0].url,
-          description: "",
-        });
-      }
-    } catch {
-      showToast("Could not save product to database.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const filteredProducts = activeCategory === "ALL"
     ? products
     : products.filter((p) => p.category === activeCategory);
@@ -188,30 +102,6 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
       <div id="products-dresses" style={{ position: "absolute", top: "-40px" }} />
       <div id="products-new-arrivals" style={{ position: "absolute", top: "-40px" }} />
       <div id="products-occasion-wear" style={{ position: "absolute", top: "-40px" }} />
-
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div
-          style={{
-            position: "fixed",
-            top: "24px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "#261B13",
-            color: "#FAF6F0",
-            padding: "10px 24px",
-            borderRadius: "10px",
-            fontSize: "13px",
-            zIndex: 1000,
-            textAlign: "center",
-            boxShadow: "0 8px 24px rgba(38, 27, 19, 0.35)",
-            animation: "fadeIn 0.25s ease",
-            maxWidth: "90vw",
-          }}
-        >
-          {toastMessage}
-        </div>
-      )}
 
       <div style={{ maxWidth: "1140px", margin: "0 auto" }}>
         {/* Section Header */}
@@ -401,28 +291,9 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
             >
               All handcrafted pieces added to your database will appear here in real time.
             </p>
-            {user ? (
-              <button
-                type="button"
-                onClick={() => setShowAddModal(true)}
-                className="avsaraa-btn-primary"
-                style={{
-                  height: "44px",
-                  padding: "0 26px",
-                  fontSize: "12px",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  width: "auto",
-                }}
-              >
-                <span>+ Add Your First Piece</span>
-              </button>
-            ) : (
+            {user?.email?.toLowerCase() === "admin@avsaraa.com" ? (
               <Link
-                href="/login"
+                href="/admin"
                 className="avsaraa-btn-primary"
                 style={{
                   height: "44px",
@@ -437,8 +308,24 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
                   width: "auto",
                 }}
               >
-                <span>Sign In to Add Pieces →</span>
+                <span>🛡️ Manage Catalog in Admin Console →</span>
               </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setActiveCategory("ALL")}
+                className="avsaraa-btn-outline"
+                style={{
+                  height: "44px",
+                  padding: "0 24px",
+                  fontSize: "12px",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  backgroundColor: "#FFFFFF",
+                }}
+              >
+                Explore All Pieces →
+              </button>
             )}
           </div>
         ) : (
@@ -477,7 +364,7 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
                   }}
                 >
                   <Image
-                    src={product.image_url || PRESET_IMAGES[0].url}
+                    src={product.image_url || DEFAULT_FALLBACK_IMAGE}
                     alt={product.name}
                     fill
                     sizes="(min-width: 900px) 25vw, 50vw"
@@ -569,57 +456,81 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
                   <div
                     style={{
                       marginTop: "auto",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
                       paddingTop: "14px",
                       borderTop: "1px solid #F0E8DF",
-                      gap: "10px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
                     }}
                   >
-                    <div>
-                      <span
-                        style={{
-                          display: "block",
-                          fontSize: "17.5px",
-                          fontWeight: 700,
-                          color: "#261B13",
-                          fontFamily: "var(--font-sans)",
-                          lineHeight: 1.1,
-                        }}
-                      >
-                        ₹{product.price.toLocaleString("en-IN")}
-                      </span>
-                      <span style={{ fontSize: "10px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                        Incl. all taxes
-                      </span>
-                    </div>
-
-                    <a
-                      href={`https://wa.me/919825012345?text=${encodeURIComponent(
-                        `Hello Avsaraa, I am inquiring about "${product.name}" (₹${product.price.toLocaleString("en-IN")}) from the ${product.category} collection.`
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <div
                       style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        backgroundColor: "#FAF7F2",
-                        border: "1px solid #CFBEAD",
-                        color: "#261B13",
-                        padding: "8px 14px",
-                        borderRadius: "18px",
-                        fontSize: "11.5px",
-                        fontWeight: 600,
-                        letterSpacing: "0.04em",
-                        textTransform: "uppercase",
-                        transition: "all 0.2s ease",
+                        display: "flex",
+                        alignItems: "baseline",
+                        justifyContent: "space-between",
                       }}
                     >
-                      <span style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: "#25D366" }} />
-                      <span>Inquire</span>
-                    </a>
+                      <div>
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: "18px",
+                            fontWeight: 700,
+                            color: "#261B13",
+                            fontFamily: "var(--font-sans)",
+                            lineHeight: 1.1,
+                          }}
+                        >
+                          ₹{product.price.toLocaleString("en-IN")}
+                        </span>
+                        <span style={{ fontSize: "10.5px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                          Handcrafted • Free Delivery
+                        </span>
+                      </div>
+
+                      <a
+                        href={`https://wa.me/919825012345?text=${encodeURIComponent(
+                          `Hello Avsaraa, I am inquiring about "${product.name}" (₹${product.price.toLocaleString("en-IN")}) from the ${product.category} collection.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          color: "#6E5B4E",
+                          fontSize: "11.5px",
+                          fontWeight: 600,
+                          textDecoration: "underline",
+                          textUnderlineOffset: "3px",
+                        }}
+                      >
+                        <span>Inquire</span>
+                        <span>↗</span>
+                      </a>
+                    </div>
+
+                    {/* Add to Bag Action Button (Gated to login) */}
+                    <button
+                      type="button"
+                      onClick={() => addToCart(product)}
+                      className="avsaraa-btn-primary"
+                      style={{
+                        height: "40px",
+                        fontSize: "11.5px",
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                        borderRadius: "20px",
+                        width: "100%",
+                      }}
+                    >
+                      <ShoppingBagIcon size={14} color="#FAF7F2" />
+                      <span>Add to Bag</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -695,7 +606,7 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
               }}
             >
               <Image
-                src={selectedProduct.image_url || PRESET_IMAGES[0].url}
+                src={selectedProduct.image_url || DEFAULT_FALLBACK_IMAGE}
                 alt={selectedProduct.name}
                 fill
                 sizes="380px"
@@ -760,14 +671,46 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {/* Add to Shopping Bag Button (Gated to login) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const added = addToCart(selectedProduct);
+                    if (added) setSelectedProduct(null);
+                  }}
+                  className="avsaraa-btn-primary"
+                  style={{
+                    height: "48px",
+                    fontSize: "13px",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <ShoppingBagIcon size={16} color="#FAF7F2" />
+                  <span>Add to Shopping Bag</span>
+                </button>
+
                 <a
                   href={`https://wa.me/919825012345?text=${encodeURIComponent(
                     `Hello Avsaraa, I would like to inquire about and order "${selectedProduct.name}" (₹${selectedProduct.price.toLocaleString("en-IN")}).`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="avsaraa-btn-primary"
-                  style={{ height: "48px", fontSize: "13px", gap: "8px" }}
+                  className="avsaraa-btn-outline"
+                  style={{
+                    height: "44px",
+                    fontSize: "12.5px",
+                    backgroundColor: "#FFFFFF",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    textDecoration: "none",
+                  }}
                 >
                   <WhatsAppIcon size={18} color="#25D366" />
                   <span>Inquire on WhatsApp</span>
@@ -776,191 +719,21 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
                 <button
                   type="button"
                   onClick={() => setSelectedProduct(null)}
-                  className="avsaraa-btn-outline"
-                  style={{ height: "44px", fontSize: "12.5px" }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Product Modal (Only accessible when signed in) */}
-      {showAddModal && user && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(38, 27, 19, 0.65)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "20px",
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "#FAF7F2",
-              border: "1px solid #E6DACF",
-              borderRadius: "22px",
-              padding: "30px 26px",
-              maxWidth: "520px",
-              width: "100%",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              boxShadow: "0 25px 60px rgba(0,0,0,0.25)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-              <div>
-                <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", display: "block" }}>
-                  MEMBER DEMO
-                </span>
-                <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "24px", color: "#261B13" }}>
-                  Add Product
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                style={{ fontSize: "22px", color: "#8E7D70", cursor: "pointer", background: "none", border: "none" }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleAddProduct} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                  Product Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Pure Georgette Zari Saree"
-                  value={newProduct.name}
-                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                  style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FFFFFF" }}
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                    Category *
-                  </label>
-                  <select
-                    value={newProduct.category}
-                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value as ProductCategory })}
-                    style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FFFFFF" }}
-                  >
-                    <option value="Sarees">Sarees</option>
-                    <option value="Dresses">Dresses</option>
-                    <option value="New Arrivals">New Arrivals</option>
-                    <option value="Occasion Wear">Occasion Wear</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                    Price (₹) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    placeholder="e.g. 12500"
-                    value={newProduct.price}
-                    onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-                    style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FFFFFF" }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
-                  Product Photo Choice *
-                </label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
-                  {PRESET_IMAGES.map((img) => {
-                    const isSelected = newProduct.image_url === img.url;
-                    return (
-                      <div
-                        key={img.url}
-                        onClick={() => setNewProduct({ ...newProduct, image_url: img.url })}
-                        style={{
-                          position: "relative",
-                          height: "75px",
-                          borderRadius: "10px",
-                          overflow: "hidden",
-                          cursor: "pointer",
-                          border: isSelected ? "2px solid #866951" : "1px solid #CFBEAD",
-                          opacity: isSelected ? 1 : 0.65,
-                        }}
-                      >
-                        <Image src={img.url} alt={img.label} fill sizes="80px" style={{ objectFit: "cover" }} />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                  Short Description
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Handcrafted festive drape with intricate border details."
-                  value={newProduct.description}
-                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
                   style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    border: "1px solid #CFBEAD",
-                    fontSize: "13.5px",
-                    backgroundColor: "#FFFFFF",
-                    fontFamily: "inherit",
-                    resize: "vertical",
+                    fontSize: "12px",
+                    color: "#8E7D70",
+                    cursor: "pointer",
+                    background: "none",
+                    border: "none",
+                    padding: "6px",
+                    textDecoration: "underline",
+                    textUnderlineOffset: "3px",
                   }}
-                />
-              </div>
-
-              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="avsaraa-btn-outline"
-                  style={{ flex: 1, height: "44px", fontSize: "13px" }}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="avsaraa-btn-primary"
-                  style={{ flex: 1, height: "44px", fontSize: "13px" }}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <SpinnerIcon size={16} color="#FFFFFF" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    "Save Product →"
-                  )}
+                  Continue Browsing
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

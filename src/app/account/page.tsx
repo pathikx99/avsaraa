@@ -56,18 +56,10 @@ export default function AccountPage() {
   const [authUser, setAuthUser] = useState<{ id: string; email?: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [addresses, setAddresses] = useState<AddressItem[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Products Management State (Only for authenticated members)
+  // Products Catalog (Viewable by Super Admin)
   const [products, setProducts] = useState<Product[]>([]);
-  const [showProductModal, setShowProductModal] = useState(false);
-  const [isSavingProduct, setIsSavingProduct] = useState(false);
-  const [newProduct, setNewProduct] = useState({
-    name: "",
-    category: "Sarees" as ProductCategory,
-    price: "",
-    image_url: PRESET_PRODUCT_IMAGES[0].url,
-    description: "",
-  });
 
   // Profile Edit Mode
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -96,11 +88,30 @@ export default function AccountPage() {
     setTimeout(() => setToastMessage(null), 3600);
   };
 
-  // Fetch real profile, addresses, and products from Supabase database
+  // Fetch real profile, addresses, and verify admin authority
   const loadUserData = useCallback(async (userId: string, userEmail?: string) => {
     setIsLoading(true);
 
     try {
+      // 0. Verify Super Admin Authority
+      const normalizedEmail = (userEmail || "").toLowerCase().trim();
+      let adminCheck = normalizedEmail === "admin@avsaraa.com";
+
+      if (!adminCheck) {
+        const { data: adminRecord } = await supabase
+          .from("admin_users")
+          .select("id")
+          .or(`user_id.eq.${userId},email.eq.${normalizedEmail}`)
+          .eq("status", "Active")
+          .eq("role", "Super Admin")
+          .maybeSingle();
+
+        if (adminRecord) {
+          adminCheck = true;
+        }
+      }
+      setIsSuperAdmin(adminCheck);
+
       // 1. Fetch Profile
       const { data: profileData, error: profileErr } = await supabase
         .from("profiles")
@@ -401,83 +412,7 @@ export default function AccountPage() {
     }
   };
 
-  // Handle Add Product (Strictly Logged-in member only)
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authUser) {
-      showToast("Only logged-in members can add products. Please sign in.");
-      setShowProductModal(false);
-      return;
-    }
 
-    if (!newProduct.name.trim() || !newProduct.price.trim()) {
-      showToast("Please enter product name and price");
-      return;
-    }
-
-    const priceNum = parseFloat(newProduct.price);
-    if (isNaN(priceNum) || priceNum <= 0) {
-      showToast("Please enter a valid price");
-      return;
-    }
-
-    setIsSavingProduct(true);
-    const productRecord = {
-      name: newProduct.name.trim(),
-      category: newProduct.category,
-      price: priceNum,
-      image_url: newProduct.image_url || PRESET_PRODUCT_IMAGES[0].url,
-      description: newProduct.description.trim() || null,
-      user_id: authUser.id,
-    };
-
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .insert([productRecord])
-        .select()
-        .single();
-
-      if (error) {
-        console.error("DB insert error:", error);
-        showToast("Database error: " + (error.message || "Failed to save product"));
-        return;
-      }
-
-      if (data) {
-        setProducts((prev) => [data, ...prev]);
-        showToast(`Added "${newProduct.name}" to database!`);
-        setShowProductModal(false);
-        setNewProduct({
-          name: "",
-          category: "Sarees",
-          price: "",
-          image_url: PRESET_PRODUCT_IMAGES[0].url,
-          description: "",
-        });
-      }
-    } catch {
-      showToast("Could not save product to database.");
-    } finally {
-      setIsSavingProduct(false);
-    }
-  };
-
-  // Handle Delete Product from Database
-  const handleDeleteProduct = async (productId: string) => {
-    if (!authUser) return;
-    try {
-      const { error } = await supabase.from("products").delete().eq("id", productId);
-      if (error) {
-        showToast("Database error: " + error.message);
-        return;
-      }
-      setProducts((prev) => prev.filter((p) => p.id !== productId));
-      showToast("Product deleted from database");
-    } catch {
-      showToast("Could not delete product");
-    }
-  };
 
   // Handle Sign Out
   const handleSignOut = async () => {
@@ -690,7 +625,7 @@ export default function AccountPage() {
                       {profile?.full_name || "Member"}
                     </h1>
                     <span className="luxury-badge">
-                      ✦ {profile?.membership_tier || "MEMBER"}
+                      {isSuperAdmin ? "👑 SUPER ADMIN" : `✦ ${profile?.membership_tier || "MEMBER"}`}
                     </span>
                   </div>
 
@@ -698,14 +633,36 @@ export default function AccountPage() {
                     {profile?.phone_number ? `${profile.phone_number} • ` : ""}
                     {profile?.email || authUser.email}
                   </p>
-                  <p style={{ fontSize: "12px", color: "#A88B70" }}>
-                    ✦ Verified Member
+                  <p style={{ fontSize: "12px", color: isSuperAdmin ? "#866951" : "#A88B70", fontWeight: isSuperAdmin ? 600 : 400 }}>
+                    {isSuperAdmin ? "👑 Master Authority Administrator" : "✦ Verified Customer Member"}
                   </p>
                 </div>
               </div>
 
-              {/* Sign Out Action */}
-              <div>
+              {/* Header Actions */}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                {isSuperAdmin && (
+                  <Link
+                    href="/admin"
+                    className="avsaraa-btn-primary"
+                    style={{
+                      height: "40px",
+                      padding: "0 18px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      width: "auto",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <span>👑 Admin Portal</span>
+                    <span>→</span>
+                  </Link>
+                )}
                 <button
                   onClick={handleSignOut}
                   className="avsaraa-btn-outline"
@@ -736,9 +693,9 @@ export default function AccountPage() {
               }}
             >
               {[
-                { label: "Status", value: "Active Member" },
+                { label: "Status", value: isSuperAdmin ? "👑 Super Admin" : "Active Member" },
                 { label: "Saved Addresses", value: `${addresses.length} Saved` },
-                { label: "Account Type", value: `✦ ${profile?.membership_tier || "Member"}` },
+                { label: "Account Role", value: isSuperAdmin ? "Master Control" : `✦ ${profile?.membership_tier || "Member"}` },
                 { label: "Studio", value: "Surat (Online Store)" },
               ].map((stat, i) => (
                 <div
@@ -767,6 +724,53 @@ export default function AccountPage() {
                 </div>
               ))}
             </div>
+
+            {/* Super Admin Executive Notice Banner */}
+            {isSuperAdmin && (
+              <div
+                style={{
+                  marginTop: "20px",
+                  backgroundColor: "#261B13",
+                  color: "#FAF7F2",
+                  borderRadius: "16px",
+                  padding: "18px 24px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "14px",
+                  boxShadow: "0 10px 30px rgba(38,27,19,0.18)",
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#D4BEAA", letterSpacing: "0.1em", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>
+                    👑 Master Authority Access
+                  </span>
+                  <p style={{ fontSize: "13px", color: "#E6DACF", margin: 0, lineHeight: 1.5 }}>
+                    You have exclusive administrative rights to add products, modify pricing, inspect inquiries, and oversee customer accounts.
+                  </p>
+                </div>
+                <Link
+                  href="/admin"
+                  style={{
+                    backgroundColor: "#FAF7F2",
+                    color: "#261B13",
+                    padding: "10px 20px",
+                    borderRadius: "10px",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    flexShrink: 0,
+                  }}
+                >
+                  <span>Open Admin Portal</span>
+                  <span>→</span>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 
@@ -795,7 +799,7 @@ export default function AccountPage() {
             {[
               { id: "profile", label: "My Profile" },
               { id: "addresses", label: `Addresses (${addresses.length})` },
-              { id: "products", label: `Products (${products.length})` },
+              ...(isSuperAdmin ? [{ id: "products", label: `Catalog (${products.length})` }] : []),
               { id: "support", label: "Help & Support" },
             ].map((tab) => {
               const isActive = activeTab === tab.id;
@@ -867,7 +871,7 @@ export default function AccountPage() {
               {[
                 { id: "profile", label: "My Profile", icon: "✦" },
                 { id: "addresses", label: `Addresses (${addresses.length})`, icon: "📍" },
-                { id: "products", label: `Manage Products (${products.length})`, icon: "👗" },
+                ...(isSuperAdmin ? [{ id: "products", label: `Catalog (${products.length})`, icon: "👗" }] : []),
                 { id: "support", label: "Help & Support", icon: "💬" },
               ].map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -1234,27 +1238,27 @@ export default function AccountPage() {
               </div>
             )}
 
-            {/* 3. MANAGE PRODUCTS TAB (Authenticated Members Only) */}
-            {activeTab === "products" && (
+            {/* 3. STORE CATALOG TAB (Super Admin Only) */}
+            {isSuperAdmin && activeTab === "products" && (
               <div className="fade-in-up">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
                   <div>
                     <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", display: "block" }}>
-                      AUTHENTICATED PRODUCT DEMO
+                      MASTER AUTHORITY CATALOG
                     </span>
                     <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "24px", color: "#261B13" }}>
-                      Manage Products ({products.length})
+                      Store Products ({products.length})
                     </h3>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowProductModal(true)}
+                  <Link
+                    href="/admin"
                     className="avsaraa-btn-primary"
-                    style={{ height: "40px", padding: "0 20px", fontSize: "12.5px", width: "auto" }}
+                    style={{ height: "40px", padding: "0 20px", fontSize: "12.5px", width: "auto", display: "inline-flex", alignItems: "center", gap: "6px", textDecoration: "none" }}
                   >
-                    + Add Product
-                  </button>
+                    <span>+ Add Products in Admin Portal</span>
+                    <span>→</span>
+                  </Link>
                 </div>
 
                 <div
@@ -1269,7 +1273,7 @@ export default function AccountPage() {
                     lineHeight: 1.6,
                   }}
                 >
-                  ✦ <strong>Demo Mode:</strong> Only signed-in members can add and manage products. All products added here appear immediately on the store homepage under their respective category (Sarees, Dresses, New Arrivals, Occasion Wear).
+                  ✦ <strong>Super Admin Authority:</strong> Only you, as the sole Super Administrator, have permissions to add, edit, or remove catalog items. All product modifications are executed securely through the Super Admin Dashboard.
                 </div>
 
                 {products.length === 0 ? (
@@ -1309,7 +1313,7 @@ export default function AccountPage() {
                         fontWeight: 500,
                       }}
                     >
-                      No Products in Database Yet
+                      No Products in Catalog Yet
                     </h4>
                     <p
                       style={{
@@ -1320,16 +1324,16 @@ export default function AccountPage() {
                         lineHeight: 1.6,
                       }}
                     >
-                      Click the &ldquo;+ Add Product&rdquo; button above to create and save your first handcrafted piece to Supabase.
+                      Use the Super Admin Portal to publish handcrafted luxury pieces to Supabase.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowProductModal(true)}
+                    <Link
+                      href="/admin"
                       className="avsaraa-btn-primary"
-                      style={{ height: "40px", padding: "0 22px", fontSize: "12px", width: "auto" }}
+                      style={{ height: "40px", padding: "0 22px", fontSize: "12px", width: "auto", display: "inline-flex", alignItems: "center", gap: "6px", textDecoration: "none" }}
                     >
-                      + Add Product Now
-                    </button>
+                      <span>Open Admin Portal</span>
+                      <span>→</span>
+                    </Link>
                   </div>
                 ) : (
                   <div
@@ -1414,13 +1418,12 @@ export default function AccountPage() {
                               ₹{prod.price.toLocaleString("en-IN")}
                             </span>
 
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteProduct(prod.id)}
-                              style={{ fontSize: "11.5px", color: "#A83E2D", textDecoration: "underline", cursor: "pointer", background: "none", border: "none" }}
+                            <Link
+                              href="/admin"
+                              style={{ fontSize: "11.5px", color: "#866951", textDecoration: "underline", fontWeight: 600 }}
                             >
-                              Delete
-                            </button>
+                              Manage in Admin →
+                            </Link>
                           </div>
                         </div>
                       </div>
@@ -1699,183 +1702,7 @@ export default function AccountPage() {
         </div>
       )}
 
-      {/* Add Product Modal for Account Dashboard (Strictly Logged-in only) */}
-      {showProductModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(38, 27, 19, 0.65)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "20px",
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "#FAF7F2",
-              border: "1px solid #E6DACF",
-              borderRadius: "22px",
-              padding: "30px 26px",
-              maxWidth: "520px",
-              width: "100%",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              boxShadow: "0 25px 60px rgba(0,0,0,0.25)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-              <div>
-                <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", display: "block" }}>
-                  MEMBER DASHBOARD
-                </span>
-                <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "24px", color: "#261B13" }}>
-                  Add Product
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowProductModal(false)}
-                style={{ fontSize: "22px", color: "#8E7D70", cursor: "pointer", background: "none", border: "none" }}
-              >
-                ✕
-              </button>
-            </div>
 
-            <form onSubmit={handleAddProduct} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                  Product Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Pure Georgette Zari Saree"
-                  value={newProduct.name}
-                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                  style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FFFFFF" }}
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                    Category *
-                  </label>
-                  <select
-                    value={newProduct.category}
-                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value as ProductCategory })}
-                    style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FFFFFF" }}
-                  >
-                    <option value="Sarees">Sarees</option>
-                    <option value="Dresses">Dresses</option>
-                    <option value="New Arrivals">New Arrivals</option>
-                    <option value="Occasion Wear">Occasion Wear</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                    Price (₹) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    placeholder="e.g. 12500"
-                    value={newProduct.price}
-                    onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-                    style={{ width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FFFFFF" }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
-                  Product Photo Choice *
-                </label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
-                  {PRESET_PRODUCT_IMAGES.map((img) => {
-                    const isSelected = newProduct.image_url === img.url;
-                    return (
-                      <div
-                        key={img.url}
-                        onClick={() => setNewProduct({ ...newProduct, image_url: img.url })}
-                        style={{
-                          position: "relative",
-                          height: "75px",
-                          borderRadius: "10px",
-                          overflow: "hidden",
-                          cursor: "pointer",
-                          border: isSelected ? "2px solid #866951" : "1px solid #CFBEAD",
-                          opacity: isSelected ? 1 : 0.65,
-                        }}
-                      >
-                        <Image src={img.url} alt={img.label} fill sizes="80px" style={{ objectFit: "cover" }} />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                  Short Description
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Handcrafted festive drape with intricate border details."
-                  value={newProduct.description}
-                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    border: "1px solid #CFBEAD",
-                    fontSize: "13.5px",
-                    backgroundColor: "#FFFFFF",
-                    fontFamily: "inherit",
-                    resize: "vertical",
-                  }}
-                />
-              </div>
-
-              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
-                <button
-                  type="button"
-                  onClick={() => setShowProductModal(false)}
-                  className="avsaraa-btn-outline"
-                  style={{ flex: 1, height: "44px", fontSize: "13px" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingProduct}
-                  className="avsaraa-btn-primary"
-                  style={{ flex: 1, height: "44px", fontSize: "13px" }}
-                >
-                  {isSavingProduct ? (
-                    <>
-                      <SpinnerIcon size={16} color="#FFFFFF" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    "Save Product →"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Official Footer */}
       <Footer />

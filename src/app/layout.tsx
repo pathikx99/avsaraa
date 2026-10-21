@@ -25,6 +25,10 @@ export const metadata: Metadata = {
   },
 };
 
+import { CartProvider } from "@/context/CartContext";
+import CartDrawer from "@/components/CartDrawer";
+import AuthRequiredModal from "@/components/AuthRequiredModal";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -33,7 +37,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${jakarta.variable}`}>
       <body className={jakarta.className}>
-        {children}
+        <CartProvider>
+          {children}
+          <CartDrawer />
+          <AuthRequiredModal />
+        </CartProvider>
         <Analytics />
       </body>
     </html>
