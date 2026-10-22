@@ -962,7 +962,7 @@ export default function AccountPage() {
                 MEMBER BENEFITS
               </span>
               <p style={{ fontSize: "13px", color: "#6E5B4E", lineHeight: 1.5, marginTop: "6px" }}>
-                Enjoy free delivery on orders above ₹2,999 and fast support on WhatsApp.
+                Enjoy free delivery on orders above ₹2,999 and priority concierge support.
               </p>
             </div>
           </aside>
@@ -1506,26 +1506,24 @@ export default function AccountPage() {
                     Help & Support
                   </h3>
                   <p style={{ fontSize: "14px", color: "#6E5B4E", lineHeight: 1.7, marginBottom: "28px", maxWidth: "520px", margin: "0 auto 28px auto" }}>
-                    Have questions about your order, sizing, or our sarees? Chat with our team directly on WhatsApp or send us a message.
+                    Have questions about your order, sizing, or our sarees? Contact our atelier concierge team directly.
                   </p>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "420px", margin: "0 auto" }}>
-                    <a
-                      href="https://wa.me/912226401234?text=Hello%20Avsaraa%2C%20I%20have%20a%20question."
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Link
+                      href="/contact"
                       className="avsaraa-btn-primary"
                       style={{ height: "50px", fontSize: "13.5px", backgroundColor: "#261B13", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
                     >
-                      <span>Chat on WhatsApp</span>
-                    </a>
-                    <Link
-                      href="/contact"
-                      className="avsaraa-btn-outline"
-                      style={{ height: "48px", fontSize: "13px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                    >
-                      Send us a Message
+                      <span>Contact Atelier Concierge</span>
                     </Link>
+                    <a
+                      href="mailto:hello@avsaraa.in"
+                      className="avsaraa-btn-outline"
+                      style={{ height: "48px", fontSize: "13px", display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}
+                    >
+                      Email Us (hello@avsaraa.in)
+                    </a>
                   </div>
                 </div>
               </div>

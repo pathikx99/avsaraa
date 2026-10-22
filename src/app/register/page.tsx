@@ -165,7 +165,7 @@ export default function RegisterPage() {
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ color: "#C4AB94" }}>✦</span>
-                    <span>Fast customer support on WhatsApp</span>
+                    <span>Priority customer concierge & personal styling</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ color: "#C4AB94" }}>✦</span>

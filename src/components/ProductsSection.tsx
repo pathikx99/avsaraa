@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Product, ProductCategory } from "@/types/product";
-import { ShoppingBagIcon, WhatsAppIcon } from "./Icons";
+import { ShoppingBagIcon } from "./Icons";
 import { useCart } from "@/context/CartContext";
 import type { User } from "@supabase/supabase-js";
 
@@ -80,8 +80,11 @@ export default function ProductsSection({
   const { addToCart } = useCart();
   const [activeCategory, setActiveCategory] = useState<ProductCategory | "ALL">(initialCategory);
   const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
-  const [user, setUser] = useState<User | null>(null);
+  const [, setUser] = useState<User | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"featured" | "price-asc" | "price-desc">("featured");
+  const [addedId, setAddedId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -149,10 +152,6 @@ export default function ProductsSection({
     };
   }, []);
 
-  const filteredProducts = activeCategory === "ALL"
-    ? products
-    : products.filter((p) => p.category === activeCategory);
-
   const categoriesList: (ProductCategory | "ALL")[] = [
     "ALL",
     "Sarees",
@@ -160,6 +159,39 @@ export default function ProductsSection({
     "New Arrivals",
     "Occasion Wear",
   ];
+
+  // Filter & Sort
+  const processedProducts = useMemo(() => {
+    let result = activeCategory === "ALL"
+      ? [...products]
+      : products.filter((p) => p.category === activeCategory);
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q) ||
+          p.description?.toLowerCase().includes(q)
+      );
+    }
+
+    if (sortBy === "price-asc") {
+      result.sort((a, b) => a.price - b.price);
+    } else if (sortBy === "price-desc") {
+      result.sort((a, b) => b.price - a.price);
+    }
+
+    return result;
+  }, [products, activeCategory, searchQuery, sortBy]);
+
+  const handleQuickAdd = (product: Product) => {
+    const success = addToCart(product);
+    if (success) {
+      setAddedId(product.id);
+      setTimeout(() => setAddedId(null), 2000);
+    }
+  };
 
   return (
     <section
@@ -171,7 +203,7 @@ export default function ProductsSection({
         borderBottom: "1px solid #E6DACF",
       }}
     >
-      <div style={{ maxWidth: "1140px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "1240px", margin: "0 auto" }}>
         {/* Section Header (Optional) */}
         {showHeader && (
           <div style={{ textAlign: "center", marginBottom: "40px" }}>
@@ -190,7 +222,7 @@ export default function ProductsSection({
             >
               Handcrafted Pieces
             </h2>
-            <div style={{ width: "48px", height: "1.5px", backgroundColor: "#C4AB94", margin: "0 auto 16px auto" }} />
+            <div className="section-divider" style={{ marginBottom: "16px" }} />
             <p
               style={{
                 fontSize: "15px",
@@ -205,28 +237,9 @@ export default function ProductsSection({
           </div>
         )}
 
-        {/* Categories Bar & Add Product Action */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "16px",
-            marginBottom: "36px",
-            paddingBottom: "16px",
-            borderBottom: "1px solid #EAE0D5",
-          }}
-        >
-          {/* Category Tabs */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              flexWrap: "wrap",
-            }}
-          >
+        {/* 1. Category Tabs Bar (Scrollable on mobile) */}
+        <div style={{ marginBottom: "20px" }}>
+          <div className="category-scroll-strip">
             {categoriesList.map((cat) => {
               const isActive = activeCategory === cat;
               const count = cat === "ALL" ? products.length : products.filter((p) => p.category === cat).length;
@@ -250,6 +263,8 @@ export default function ProductsSection({
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "6px",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
                   }}
                 >
                   <span>{cat}</span>
@@ -266,11 +281,92 @@ export default function ProductsSection({
               );
             })}
           </div>
+        </div>
 
-          {/* Atelier Concierge Inquiries */}
-          <div>
+        {/* 2. Search & Sort Bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "14px",
+            marginBottom: "36px",
+            paddingBottom: "18px",
+            borderBottom: "1px solid #EAE0D5",
+          }}
+        >
+          {/* Search Box */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              backgroundColor: "#FFFFFF",
+              border: "1px solid #CFBEAD",
+              borderRadius: "22px",
+              padding: "0 16px",
+              height: "42px",
+              width: "100%",
+              maxWidth: "360px",
+              boxShadow: "0 2px 8px rgba(38, 27, 19, 0.03)",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8E7D70" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search weaves, silks, drapes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                marginLeft: "10px",
+                fontSize: "13px",
+                color: "#261B13",
+                width: "100%",
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                style={{ fontSize: "14px", color: "#8E7D70", cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Right Controls: Sort & Concierge Link */}
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "12px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
+                Sort:
+              </span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "featured" | "price-asc" | "price-desc")}
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  border: "1px solid #CFBEAD",
+                  borderRadius: "18px",
+                  padding: "6px 14px",
+                  fontSize: "12px",
+                  color: "#261B13",
+                  cursor: "pointer",
+                  outline: "none",
+                  fontFamily: "inherit",
+                }}
+              >
+                <option value="featured">Featured First</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+              </select>
+            </div>
+
             <Link
               href="/contact"
+              className="desktop-only"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -282,13 +378,13 @@ export default function ProductsSection({
                 textUnderlineOffset: "3px",
               }}
             >
-              <span>✦ Custom Tailoring & Inquiries →</span>
+              <span>✦ Custom Blouse & Drape Styling →</span>
             </Link>
           </div>
         </div>
 
-        {/* Products Grid or Empty State */}
-        {filteredProducts.length === 0 ? (
+        {/* 3. Products Grid or Empty State */}
+        {processedProducts.length === 0 ? (
           <div
             style={{
               backgroundColor: "#FFFFFF",
@@ -327,7 +423,7 @@ export default function ProductsSection({
                 fontWeight: 500,
               }}
             >
-              No Products in {activeCategory === "ALL" ? "Collection" : activeCategory} Yet
+              No Pieces Found
             </h3>
             <p
               style={{
@@ -338,11 +434,16 @@ export default function ProductsSection({
                 lineHeight: 1.6,
               }}
             >
-              All handcrafted pieces added to your database will appear here in real time.
+              {searchQuery
+                ? `No results matching "${searchQuery}". Try a different keyword.`
+                : `No pieces currently listed in ${activeCategory}.`}
             </p>
             <button
               type="button"
-              onClick={() => setActiveCategory("ALL")}
+              onClick={() => {
+                setActiveCategory("ALL");
+                setSearchQuery("");
+              }}
               className="avsaraa-btn-outline"
               style={{
                 height: "44px",
@@ -353,21 +454,15 @@ export default function ProductsSection({
                 backgroundColor: "#FFFFFF",
               }}
             >
-              Explore All Pieces →
+              View Full Collection →
             </button>
           </div>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))",
-              gap: "32px",
-            }}
-          >
-            {filteredProducts.map((product) => (
+          <div className="responsive-product-grid">
+            {processedProducts.map((product) => (
               <div
                 key={product.id}
-                className="luxury-hover-card"
+                className="luxury-hover-card product-card-container product-card-shimmer"
                 style={{
                   backgroundColor: "#FFFFFF",
                   borderRadius: "20px",
@@ -381,7 +476,7 @@ export default function ProductsSection({
               >
                 {/* Product Image Frame */}
                 <div
-                  className="luxury-image-zoom-container"
+                  className="luxury-image-zoom-container product-card-image"
                   onClick={() => setSelectedProduct(product)}
                   style={{
                     position: "relative",
@@ -401,6 +496,7 @@ export default function ProductsSection({
 
                   {/* Category Badge */}
                   <div
+                    className="product-card-badge"
                     style={{
                       position: "absolute",
                       top: "14px",
@@ -427,23 +523,24 @@ export default function ProductsSection({
                       e.stopPropagation();
                       setSelectedProduct(product);
                     }}
+                    className="product-card-quickview"
                     style={{
                       position: "absolute",
                       bottom: "14px",
                       right: "14px",
-                      backgroundColor: "rgba(250, 247, 242, 0.92)",
+                      backgroundColor: "rgba(250, 247, 242, 0.94)",
                       backdropFilter: "blur(8px)",
                       WebkitBackdropFilter: "blur(8px)",
                       color: "#261B13",
-                      padding: "6px 14px",
-                      borderRadius: "16px",
+                      padding: "7px 16px",
+                      borderRadius: "18px",
                       fontSize: "11px",
                       fontWeight: 600,
                       letterSpacing: "0.06em",
                       textTransform: "uppercase",
-                      border: "1px solid rgba(196, 171, 148, 0.6)",
+                      border: "1px solid rgba(197, 160, 89, 0.6)",
                       cursor: "pointer",
-                      boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+                      boxShadow: "0 4px 15px rgba(0,0,0,0.12)",
                     }}
                   >
                     Quick View ↗
@@ -451,9 +548,18 @@ export default function ProductsSection({
                 </div>
 
                 {/* Product Info */}
-                <div style={{ padding: "20px 20px 24px 20px", display: "flex", flexDirection: "column", flex: 1 }}>
+                <div
+                  className="product-card-body"
+                  style={{
+                    padding: "20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    flex: 1,
+                  }}
+                >
                   <h3
                     onClick={() => setSelectedProduct(product)}
+                    className="product-card-title"
                     style={{
                       fontFamily: "var(--font-serif), Georgia, serif",
                       fontSize: "19px",
@@ -469,6 +575,7 @@ export default function ProductsSection({
 
                   {product.description && (
                     <p
+                      className="product-card-desc"
                       style={{
                         fontSize: "12.5px",
                         color: "#6E5B4E",
@@ -488,7 +595,7 @@ export default function ProductsSection({
                       borderTop: "1px solid #F0E8DF",
                       display: "flex",
                       flexDirection: "column",
-                      gap: "12px",
+                      gap: "10px",
                     }}
                   >
                     <div
@@ -500,64 +607,66 @@ export default function ProductsSection({
                     >
                       <div>
                         <span
+                          className="product-card-price"
                           style={{
                             display: "block",
                             fontSize: "18px",
                             fontWeight: 700,
                             color: "#261B13",
-                            fontFamily: "var(--font-sans)",
                             lineHeight: 1.1,
                           }}
                         >
                           ₹{product.price.toLocaleString("en-IN")}
                         </span>
-                        <span style={{ fontSize: "10.5px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                        <span
+                          className="desktop-only"
+                          style={{
+                            fontSize: "10.5px",
+                            color: "#8E7D70",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.04em",
+                          }}
+                        >
                           Handcrafted • Free Delivery
                         </span>
                       </div>
 
-                      <a
-                        href={`https://wa.me/919825012345?text=${encodeURIComponent(
-                          `Hello Avsaraa, I am inquiring about "${product.name}" (₹${product.price.toLocaleString("en-IN")}) from the ${product.category} collection.`
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <Link
+                        href={`/contact?inquire=${encodeURIComponent(product.name)}`}
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "5px",
-                          color: "#6E5B4E",
-                          fontSize: "11.5px",
+                          fontSize: "11px",
                           fontWeight: 600,
+                          color: "#866951",
                           textDecoration: "underline",
                           textUnderlineOffset: "3px",
                         }}
                       >
-                        <span>Inquire</span>
-                        <span>↗</span>
-                      </a>
+                        Inquire ↗
+                      </Link>
                     </div>
 
-                    {/* Add to Bag Action Button (Gated to login) */}
+                    {/* Add to Bag Action Button */}
                     <button
                       type="button"
-                      onClick={() => addToCart(product)}
-                      className="avsaraa-btn-primary"
+                      onClick={() => handleQuickAdd(product)}
+                      className="avsaraa-btn-primary product-card-btn btn-shine"
                       style={{
                         height: "40px",
-                        fontSize: "11.5px",
+                        fontSize: "11px",
                         letterSpacing: "0.08em",
                         textTransform: "uppercase",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "8px",
+                        gap: "6px",
                         borderRadius: "20px",
                         width: "100%",
+                        backgroundColor: addedId === product.id ? "#1B6B40" : "#261B13",
+                        transition: "background-color 0.3s ease",
                       }}
                     >
                       <ShoppingBagIcon size={14} color="#FAF7F2" />
-                      <span>Add to Bag</span>
+                      <span>{addedId === product.id ? "Added to Bag ✓" : "Add to Bag"}</span>
                     </button>
                   </div>
                 </div>
@@ -576,14 +685,15 @@ export default function ProductsSection({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(38, 27, 19, 0.7)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
+            backgroundColor: "rgba(38, 27, 19, 0.72)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
-            padding: "20px",
+            padding: "16px",
+            animation: "fadeIn 0.25s ease both",
           }}
           onClick={() => setSelectedProduct(null)}
         >
@@ -593,30 +703,38 @@ export default function ProductsSection({
               backgroundColor: "#FAF7F2",
               border: "1px solid #E6DACF",
               borderRadius: "24px",
-              padding: "28px",
+              padding: "24px",
               maxWidth: "760px",
               width: "100%",
-              maxHeight: "90vh",
+              maxHeight: "92vh",
               overflowY: "auto",
-              boxShadow: "0 25px 60px rgba(0,0,0,0.3)",
+              boxShadow: "0 25px 60px rgba(0,0,0,0.35)",
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
               gap: "28px",
               position: "relative",
+              animation: "fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both",
             }}
           >
             <button
               onClick={() => setSelectedProduct(null)}
+              aria-label="Close modal"
               style={{
                 position: "absolute",
                 top: "16px",
                 right: "18px",
-                fontSize: "22px",
+                fontSize: "20px",
                 color: "#8E7D70",
                 cursor: "pointer",
                 background: "none",
                 border: "none",
                 zIndex: 2,
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
               ✕
@@ -681,32 +799,55 @@ export default function ProductsSection({
                 <p style={{ fontSize: "22px", fontWeight: 700, color: "#261B13", marginBottom: "4px" }}>
                   ₹{selectedProduct.price.toLocaleString("en-IN")}
                 </p>
-                <p style={{ fontSize: "11.5px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "18px" }}>
+                <p
+                  style={{
+                    fontSize: "11.5px",
+                    color: "#8E7D70",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    marginBottom: "18px",
+                  }}
+                >
                   Inclusive of all taxes • Free delivery across India
                 </p>
 
-                <div style={{ width: "40px", height: "1px", backgroundColor: "#C4AB94", marginBottom: "18px" }} />
+                <div
+                  style={{
+                    width: "40px",
+                    height: "1px",
+                    background: "linear-gradient(90deg, #C5A059, transparent)",
+                    marginBottom: "18px",
+                  }}
+                />
 
                 <p style={{ fontSize: "14px", color: "#543E2E", lineHeight: 1.7, marginBottom: "22px" }}>
                   {selectedProduct.description || "Handcrafted pure silk with delicate handwork and timeless elegance."}
                 </p>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "12.5px", color: "#6E5B4E", marginBottom: "24px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    fontSize: "12.5px",
+                    color: "#6E5B4E",
+                    marginBottom: "24px",
+                  }}
+                >
                   <div>✦ <strong>Category:</strong> {selectedProduct.category}</div>
                   <div>✦ <strong>Authenticity:</strong> 100% Handcrafted Indian Silk</div>
-                  <div>✦ <strong>Finishing & Delivery:</strong> Hand-checked at Surat Studio • Delivered Across India</div>
+                  <div>✦ <strong>Finishing & Delivery:</strong> Fall & Pico • Insured Express Dispatch</div>
                 </div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {/* Add to Shopping Bag Button (Gated to login) */}
                 <button
                   type="button"
                   onClick={() => {
                     const added = addToCart(selectedProduct);
                     if (added) setSelectedProduct(null);
                   }}
-                  className="avsaraa-btn-primary"
+                  className="avsaraa-btn-primary btn-shine"
                   style={{
                     height: "48px",
                     fontSize: "13px",
@@ -716,18 +857,18 @@ export default function ProductsSection({
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
+                    borderRadius: "24px",
+                    backgroundColor: "#261B13",
+                    color: "#FAF7F2",
                   }}
                 >
                   <ShoppingBagIcon size={16} color="#FAF7F2" />
                   <span>Add to Shopping Bag</span>
                 </button>
 
-                <a
-                  href={`https://wa.me/919825012345?text=${encodeURIComponent(
-                    `Hello Avsaraa, I would like to inquire about and order "${selectedProduct.name}" (₹${selectedProduct.price.toLocaleString("en-IN")}).`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={`/contact?inquire=${encodeURIComponent(selectedProduct.name)}`}
+                  onClick={() => setSelectedProduct(null)}
                   className="avsaraa-btn-outline"
                   style={{
                     height: "44px",
@@ -738,11 +879,14 @@ export default function ProductsSection({
                     justifyContent: "center",
                     gap: "8px",
                     textDecoration: "none",
+                    borderRadius: "22px",
+                    border: "1px solid #CFBEAD",
+                    color: "#261B13",
                   }}
                 >
-                  <WhatsAppIcon size={18} color="#25D366" />
-                  <span>Inquire on WhatsApp</span>
-                </a>
+                  <span>Inquire with Atelier</span>
+                  <span>→</span>
+                </Link>
 
                 <button
                   type="button"

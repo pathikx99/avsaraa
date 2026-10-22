@@ -8,20 +8,23 @@ import NavigationDrawer from "./NavigationDrawer";
 import { supabase } from "@/lib/supabaseClient";
 import { UserIcon, ShoppingBagIcon } from "./Icons";
 import { useCart } from "@/context/CartContext";
+import { useScrolled } from "./RevealSection";
 import type { User } from "@supabase/supabase-js";
+
+const ANNOUNCEMENTS = [
+  "✦ Free Delivery Across India on Orders Above ₹2,999",
+  "✦ Handcrafted in Surat — Nationwide Online Delivery",
+  "✦ 100% Pure Handloom Silk — Authenticity Guaranteed",
+  "✦ Personal Styling & Custom Blouse Consultations Available",
+  "✦ Festive 2026 Collection Now Available",
+];
 
 export default function Header() {
   const router = useRouter();
   const { totalItems, openCart } = useCart();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [activeAnnouncement, setActiveAnnouncement] = useState(0);
-
-  const announcements = [
-    "✦ Free Delivery Across India on Orders Above ₹2,999",
-    "✦ Handcrafted in Surat • Nationwide Online Delivery",
-    "✦ Chat with Us on WhatsApp for Sizing & Help",
-  ];
+  const scrolled = useScrolled(50);
 
   useEffect(() => {
     // Check initial user
@@ -36,16 +39,10 @@ export default function Header() {
       setUser(session?.user ?? null);
     });
 
-    // Rotate announcements on mobile
-    const interval = setInterval(() => {
-      setActiveAnnouncement((prev) => (prev + 1) % announcements.length);
-    }, 4000);
-
     return () => {
       subscription.unsubscribe();
-      clearInterval(interval);
     };
-  }, [announcements.length]);
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -61,67 +58,34 @@ export default function Header() {
 
   return (
     <>
-      {/* 1. Top Announcement Bar */}
-      <div
-        style={{
-          backgroundColor: "#E6DACF",
-          color: "#261B13",
-          textAlign: "center",
-          padding: "8px 16px",
-          fontSize: "11px",
-          fontWeight: 600,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          borderBottom: "1px solid rgba(196, 171, 148, 0.45)",
-          overflow: "hidden",
-        }}
-      >
-        {/* Desktop: Full Announcement */}
-        <div
-          className="desktop-only"
-          style={{
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "16px",
-            width: "100%",
-          }}
-        >
-          <span>✦ Free Delivery in India Above ₹2,999</span>
-          <span style={{ opacity: 0.35 }}>•</span>
-          <span>Pure Handmade Silks</span>
-          <span style={{ opacity: 0.35 }}>•</span>
-          <span>WhatsApp Help Available</span>
-        </div>
-
-        {/* Mobile: Smooth Rotating Single Message */}
-        <div
-          className="mobile-only"
-          style={{
-            justifyContent: "center",
-            alignItems: "center",
-            width: "100%",
-            height: "16px",
-            transition: "opacity 0.3s ease",
-          }}
-        >
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {announcements[activeAnnouncement]}
-          </span>
+      {/* 1. Premium Marquee Announcement Bar */}
+      <div className="announcement-bar">
+        <div className="announcement-marquee">
+          {/* Duplicate items for seamless loop */}
+          {[...ANNOUNCEMENTS, ...ANNOUNCEMENTS].map((text, i) => (
+            <span key={i} className="announcement-item">
+              <span className="announcement-dot" />
+              {text}
+            </span>
+          ))}
         </div>
       </div>
 
       {/* 2. Main Navigation Bar */}
       <header
+        className={scrolled ? "header-scrolled" : ""}
         style={{
           position: "sticky",
           top: 0,
           zIndex: 80,
-          backgroundColor: "rgba(247, 242, 238, 0.94)",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
+          backgroundColor: scrolled
+            ? "rgba(247, 242, 238, 0.97)"
+            : "rgba(247, 242, 238, 0.94)",
+          backdropFilter: "blur(18px)",
+          WebkitBackdropFilter: "blur(18px)",
           borderBottom: "1px solid #E8DED3",
           padding: "14px 28px",
-          transition: "all 0.25s ease",
+          transition: "all 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
       >
         <div
@@ -148,9 +112,9 @@ export default function Header() {
                 cursor: "pointer",
               }}
             >
-              <span style={{ display: "block", width: "22px", height: "1.8px", backgroundColor: "#261B13", borderRadius: "1px" }} />
-              <span style={{ display: "block", width: "16px", height: "1.8px", backgroundColor: "#261B13", borderRadius: "1px" }} />
-              <span style={{ display: "block", width: "22px", height: "1.8px", backgroundColor: "#261B13", borderRadius: "1px" }} />
+              <span style={{ display: "block", width: "22px", height: "1.8px", backgroundColor: "#261B13", borderRadius: "1px", transition: "all 0.2s ease" }} />
+              <span style={{ display: "block", width: "16px", height: "1.8px", backgroundColor: "#261B13", borderRadius: "1px", transition: "all 0.2s ease" }} />
+              <span style={{ display: "block", width: "22px", height: "1.8px", backgroundColor: "#261B13", borderRadius: "1px", transition: "all 0.2s ease" }} />
             </button>
           </div>
 
@@ -217,7 +181,7 @@ export default function Header() {
                       borderRadius: "20px",
                       border: "1px solid #CFBEAD",
                       backgroundColor: "#FAF7F2",
-                      transition: "all 0.2s ease",
+                      transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
                     }}
                   >
                     <UserIcon size={14} color="#866951" />
@@ -256,7 +220,7 @@ export default function Header() {
                       borderRadius: "20px",
                       border: "1px solid #CFBEAD",
                       backgroundColor: "#FFFFFF",
-                      transition: "all 0.2s ease",
+                      transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
                     }}
                   >
                     Sign In
@@ -273,7 +237,7 @@ export default function Header() {
                       padding: "6px 16px",
                       borderRadius: "20px",
                       border: "1px solid #261B13",
-                      transition: "all 0.2s ease",
+                      transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
                     }}
                   >
                     Register
@@ -312,17 +276,17 @@ export default function Header() {
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                transition: "transform 0.15s ease",
+                transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
               }}
             >
               <ShoppingBagIcon size={19} color="#261B13" />
               <span
                 style={{
                   position: "absolute",
-                  top: "2px",
-                  right: "2px",
-                  minWidth: "15px",
-                  height: "15px",
+                  top: "0px",
+                  right: "0px",
+                  minWidth: "17px",
+                  height: "17px",
                   padding: "0 4px",
                   backgroundColor: totalItems > 0 ? "#866951" : "#CFBEAD",
                   color: "#FAF7F2",
@@ -332,7 +296,9 @@ export default function Header() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                  transition: "all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  transform: totalItems > 0 ? "scale(1)" : "scale(0.85)",
                 }}
               >
                 {totalItems > 99 ? "99+" : totalItems}

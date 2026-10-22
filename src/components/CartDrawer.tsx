@@ -4,7 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { ShoppingBagIcon, WhatsAppIcon } from "./Icons";
+import { ShoppingBagIcon } from "./Icons";
 
 export default function CartDrawer() {
   const {
@@ -24,25 +24,6 @@ export default function CartDrawer() {
   const freeDeliveryThreshold = 2999;
   const isFreeDelivery = subtotal >= freeDeliveryThreshold;
   const amountRemaining = Math.max(0, freeDeliveryThreshold - subtotal);
-
-  // Build a WhatsApp message for seamless order placement with concierge
-  const generateWhatsAppCheckoutLink = () => {
-    const itemsSummary = cartItems
-      .map(
-        (item, index) =>
-          `${index + 1}. ${item.product.name} (x${item.quantity}) - ₹${(
-            item.product.price * item.quantity
-          ).toLocaleString("en-IN")}`
-      )
-      .join("\n");
-
-    const message = `Hello Avsaraa Concierge, I would like to place an order for the following items:\n\n${itemsSummary}\n\nTotal: ₹${subtotal.toLocaleString(
-      "en-IN"
-    )}\nCustomer Email: ${user?.email || "Member"}\n\nPlease advise on delivery and payment details.`;
-
-    return `https://wa.me/919825012345?text=${encodeURIComponent(message)}`;
-  };
-
   return (
     <div
       style={{
@@ -447,11 +428,10 @@ export default function CartDrawer() {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <a
-                href={generateWhatsAppCheckoutLink()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="avsaraa-btn-primary"
+              <Link
+                href="/contact"
+                onClick={closeCart}
+                className="avsaraa-btn-primary btn-shine"
                 style={{
                   height: "48px",
                   fontSize: "13px",
@@ -462,11 +442,14 @@ export default function CartDrawer() {
                   justifyContent: "center",
                   gap: "8px",
                   textDecoration: "none",
+                  borderRadius: "24px",
+                  backgroundColor: "#261B13",
+                  color: "#FAF7F2",
                 }}
               >
-                <WhatsAppIcon size={18} color="#25D366" />
-                <span>Checkout via WhatsApp Concierge</span>
-              </a>
+                <ShoppingBagIcon size={16} color="#FAF7F2" />
+                <span>Proceed to Secure Checkout</span>
+              </Link>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <button

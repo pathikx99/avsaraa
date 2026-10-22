@@ -142,14 +142,16 @@ export default function Footer() {
 
           <form
             onSubmit={handleSubscribe}
+            className="newsletter-input"
             style={{
               display: "flex",
               maxWidth: "500px",
               background: "#FFFFFF",
               border: "1px solid #CFBEAD",
-              borderRadius: "8px",
+              borderRadius: "12px",
               overflow: "hidden",
               boxShadow: "0 4px 15px rgba(38,27,19,0.04)",
+              transition: "all 0.3s ease",
             }}
           >
             <input
@@ -278,7 +280,7 @@ export default function Footer() {
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
               <li><Link href="/contact">Contact Us</Link></li>
-              <li><a href="https://wa.me/919825012345">WhatsApp Help</a></li>
+              <li><Link href="/contact">Concierge Support</Link></li>
               <li><a href="mailto:hello@avsaraa.in">hello@avsaraa.in</a></li>
             </ul>
           </div>
@@ -350,7 +352,7 @@ export default function Footer() {
           >
             Wear the moment.
           </p>
-          <div style={{ width: "36px", height: "1px", backgroundColor: "#C4AB94", margin: "0 auto 24px auto" }} />
+          <div className="section-divider" style={{ margin: "0 auto 24px auto" }} />
 
           <div
             style={{

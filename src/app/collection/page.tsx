@@ -8,12 +8,13 @@ import ProductsSection from "@/components/ProductsSection";
 
 function CollectionContent() {
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#FAF7F2" }}>
+    <div className="page-enter" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#FAF7F2" }}>
       <Header />
 
       <main style={{ flex: 1 }}>
         {/* Editorial Collection Hero Banner */}
         <section
+          className="collection-hero-pattern"
           style={{
             backgroundColor: "#261B13",
             color: "#FAF7F2",

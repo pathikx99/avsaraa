@@ -29,7 +29,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
           width: "220px",
           height: "220px",
           pointerEvents: "none",
-          opacity: 0.5,
+          opacity: 0.4,
           zIndex: 0,
         }}
       >
@@ -42,7 +42,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
         />
       </div>
 
-      <div style={{ maxWidth: "1100px", margin: "0 auto", position: "relative", zIndex: 1 }}>
+      <div style={{ maxWidth: "1140px", margin: "0 auto", position: "relative", zIndex: 1 }}>
         {/* Section Header */}
         {showHeader && (
           <div style={{ textAlign: "center", marginBottom: "56px" }}>
@@ -59,22 +59,64 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
                 marginBottom: "16px",
               }}
             >
-              About Avsaraa
+              The Legacy of Avsaraa
             </h2>
-            <div style={{ width: "48px", height: "1.5px", backgroundColor: "#C4AB94", margin: "0 auto 20px auto" }} />
+            <div className="section-divider" style={{ marginBottom: "20px" }} />
             <p
               style={{
-                fontSize: "15px",
+                fontSize: "15.5px",
                 color: "#6E5B4E",
                 maxWidth: "680px",
                 margin: "0 auto",
                 lineHeight: 1.8,
               }}
             >
-              Avsaraa is based in Surat, the textile heart of India. We craft and curate authentic ethnic wear, festive ensembles, and handloom sarees, bringing timeless craftsmanship directly to your doorstep through our online store with delivery across India.
+              Avsaraa is rooted in Surat, the textile heart of India. We craft and curate authentic ethnic wear, festive ensembles, and handloom sarees, bringing timeless Indian craftsmanship directly to your doorstep with insured delivery across India.
             </p>
           </div>
         )}
+
+        {/* Gilded Stats Bar */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "16px",
+            marginBottom: "54px",
+          }}
+        >
+          {[
+            { stat: "64+ Hours", label: "Artisan Loom Time Per Drape" },
+            { stat: "100%", label: "Certified Pure Silk Guarantee" },
+            { stat: "3 Hubs", label: "Varanasi, Chanderi & Surat Clusters" },
+            { stat: "12,000+", label: "Patrons Across India & Abroad" },
+          ].map((item, idx) => (
+            <div
+              key={idx}
+              className="trust-pillar-card"
+              style={{
+                textAlign: "center",
+                padding: "20px 16px",
+              }}
+            >
+              <span
+                style={{
+                  display: "block",
+                  fontFamily: "var(--font-serif), Georgia, serif",
+                  fontSize: "28px",
+                  fontWeight: 600,
+                  color: "#261B13",
+                  marginBottom: "4px",
+                }}
+              >
+                {item.stat}
+              </span>
+              <span style={{ fontSize: "11.5px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
+                {item.label}
+              </span>
+            </div>
+          ))}
+        </div>
 
         {/* 2-Column Minimal Layout */}
         <div
@@ -98,7 +140,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
             <div
               style={{
                 position: "relative",
-                height: "clamp(320px, 40vw, 420px)",
+                height: "clamp(340px, 42vw, 440px)",
                 borderRadius: "18px",
                 overflow: "hidden",
               }}
@@ -118,6 +160,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
                   left: "16px",
                   backgroundColor: "rgba(38, 27, 19, 0.88)",
                   backdropFilter: "blur(6px)",
+                  WebkitBackdropFilter: "blur(6px)",
                   color: "#FAF7F2",
                   padding: "6px 14px",
                   borderRadius: "20px",
@@ -125,30 +168,31 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
                   fontWeight: 600,
+                  border: "1px solid rgba(197, 160, 89, 0.35)",
                 }}
               >
-                ✦ Surat, India • Online Store
+                ✦ Surat, India • Handloom Atelier
               </div>
             </div>
           </div>
 
-          {/* Right: 3 Simple Points */}
+          {/* Right: 3 Pillars */}
           <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
             {[
               {
                 icon: <LoomWeaveIcon size={22} color="#866951" />,
-                title: "Master Weavers",
-                desc: "We work directly with traditional weaving families in Varanasi, Chanderi, and Bengal to bring you pure, authentic silks.",
+                title: "Master Weavers of India",
+                desc: "We partner directly with multigenerational weaving families across Varanasi, Chanderi, and Bengal. No synthetic blends, no power-loom shortcuts.",
               },
               {
                 icon: <SilkSpoolIcon size={22} color="#866951" />,
-                title: "Matching Sets",
-                desc: "We thoughtfully pair blouses, sarees, and dupattas so your festive outfit is complete and easy to wear.",
+                title: "Artisanal Blouse & Drape Matching",
+                desc: "Every drape comes with carefully coordinated blouse fabric and trims, ensuring effortless sophistication for weddings and festive pujas.",
               },
               {
                 icon: <NeedleThreadIcon size={22} color="#866951" />,
-                title: "Finishing & Quality",
-                desc: "Every drape is checked and finished by hand at our Surat studio, then securely shipped to your doorstep anywhere in India.",
+                title: "Hand Inspection & Finishing in Surat",
+                desc: "Each piece is hand-inspected in our Surat studio for zari consistency, finished with fall & pico, and dispatched in our signature protective keepsake box.",
               },
             ].map((pillar, i) => (
               <div

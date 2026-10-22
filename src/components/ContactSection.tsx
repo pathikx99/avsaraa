@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { PhoneIcon, MailIcon, ClockIcon, WhatsAppIcon, SpinnerIcon } from "./Icons";
+import { PhoneIcon, MailIcon, ClockIcon, SpinnerIcon } from "./Icons";
 
 interface ContactSectionProps {
   showHeader?: boolean;
@@ -294,11 +294,9 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
               </div>
             </div>
 
-            {/* WhatsApp CTA */}
+            {/* Call Studio CTA */}
             <a
-              href="https://wa.me/919825012345?text=Hello%20Avsaraa%2C%20I%20have%20a%20question%20about%20ordering%20online."
-              target="_blank"
-              rel="noopener noreferrer"
+              href="tel:+919825012345"
               style={{
                 width: "100%",
                 height: "50px",
@@ -313,10 +311,11 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
                 justifyContent: "center",
                 gap: "10px",
                 boxShadow: "0 6px 18px -4px rgba(38, 27, 19, 0.35)",
+                textDecoration: "none",
               }}
             >
-              <WhatsAppIcon size={18} color="#25D366" />
-              <span>Chat with Us on WhatsApp</span>
+              <PhoneIcon size={18} color="#C5A059" />
+              <span>Call Studio (+91 98250 12345)</span>
             </a>
           </div>
 
