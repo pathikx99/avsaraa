@@ -56,10 +56,10 @@ const DEFAULT_SUPER_ADMIN: AdminUser = {
 };
 
 export default function AdminDashboardPage() {
-  // Navigation tabs - Products is the primary store control
+  // Navigation tabs - Customer Accounts is the primary view for Auth & Admin management
   const [activeTab, setActiveTab] = useState<
-    "products" | "customers" | "inquiries" | "super_admin" | "sql_guide"
-  >("products");
+    "customers" | "super_admin" | "sql_guide" | "products" | "inquiries"
+  >("customers");
 
   // Authentication & Security State
   const [sessionUser, setSessionUser] = useState<User | null>(null);
@@ -124,12 +124,14 @@ export default function AdminDashboardPage() {
     full_name: string;
     email: string;
     phone_number: string;
+    status: string;
     membership_tier: string;
     reward_points: string;
   }>({
     full_name: "",
     email: "",
     phone_number: "",
+    status: "Active",
     membership_tier: "Standard",
     reward_points: "100",
   });
@@ -557,6 +559,7 @@ export default function AdminDashboardPage() {
       full_name: "",
       email: "",
       phone_number: "",
+      status: "Active",
       membership_tier: "Standard",
       reward_points: "100",
     });
@@ -569,6 +572,7 @@ export default function AdminDashboardPage() {
       full_name: customer.full_name,
       email: customer.email || "",
       phone_number: customer.phone_number || "",
+      status: customer.status || "Active",
       membership_tier: customer.membership_tier,
       reward_points: String(customer.reward_points || 0),
     });
@@ -1515,30 +1519,7 @@ CREATE POLICY "Super admin can delete subscribers"
           }}
         >
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {/* Tab 1: Products */}
-            <button
-              onClick={() => {
-                setActiveTab("products");
-                setSearchQuery("");
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 18px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: activeTab === "products" ? "#261B13" : "#866951",
-                borderBottom: activeTab === "products" ? "3px solid #866951" : "3px solid transparent",
-                marginBottom: "-2px",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <ShoppingBagIcon size={18} color={activeTab === "products" ? "#866951" : "#AC9885"} />
-              <span>Products & Catalog ({products.length})</span>
-            </button>
-
-            {/* Tab 2: Customer Profiles */}
+            {/* Tab 1: Customer Accounts */}
             <button
               onClick={() => {
                 setActiveTab("customers");
@@ -1561,30 +1542,7 @@ CREATE POLICY "Super admin can delete subscribers"
               <span>Customer Accounts ({customerProfiles.length})</span>
             </button>
 
-            {/* Tab 3: Inquiries & Newsletter */}
-            <button
-              onClick={() => {
-                setActiveTab("inquiries");
-                setSearchQuery("");
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 18px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: activeTab === "inquiries" ? "#261B13" : "#866951",
-                borderBottom: activeTab === "inquiries" ? "3px solid #866951" : "3px solid transparent",
-                marginBottom: "-2px",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <MailIcon size={18} color={activeTab === "inquiries" ? "#866951" : "#AC9885"} />
-              <span>Inquiries & Leads ({inquiries.length + subscribers.length})</span>
-            </button>
-
-            {/* Tab 4: Super Admin Master Profile */}
+            {/* Tab 2: Super Admin Master Profile */}
             <button
               onClick={() => setActiveTab("super_admin")}
               style={{
@@ -1601,10 +1559,10 @@ CREATE POLICY "Super admin can delete subscribers"
               }}
             >
               <ShieldCheckIcon size={18} color={activeTab === "super_admin" ? "#6F42C1" : "#AC9885"} />
-              <span>Super Admin Master</span>
+              <span>Super Admin Authority</span>
             </button>
 
-            {/* Tab 5: SQL Migration Guide */}
+            {/* Tab 3: SQL & Security Governance */}
             <button
               onClick={() => setActiveTab("sql_guide")}
               style={{
@@ -1621,33 +1579,12 @@ CREATE POLICY "Super admin can delete subscribers"
               }}
             >
               <DatabaseIcon size={18} color={activeTab === "sql_guide" ? "#866951" : "#AC9885"} />
-              <span>SQL & RLS Setup</span>
+              <span>Security & Migration Setup</span>
             </button>
           </div>
 
           {/* Tab Action Buttons */}
           <div>
-            {activeTab === "products" && (
-              <button
-                onClick={openAddProductModal}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "10px 18px",
-                  backgroundColor: "#261B13",
-                  color: "#F7F2EE",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  boxShadow: "0 4px 14px rgba(38,27,19,0.15)",
-                }}
-              >
-                <PlusIcon size={16} color="#C4AB94" />
-                <span>Add Luxury Product</span>
-              </button>
-            )}
-
             {activeTab === "customers" && (
               <button
                 onClick={openAddCustomerModal}
@@ -1664,7 +1601,7 @@ CREATE POLICY "Super admin can delete subscribers"
                   boxShadow: "0 4px 14px rgba(38,27,19,0.15)",
                 }}
               >
-                <PlusIcon size={16} color="#C4AB94" />
+                <PlusIcon size={16} color="#F7F2EE" />
                 <span>Add Customer Account</span>
               </button>
             )}
@@ -1962,6 +1899,7 @@ CREATE POLICY "Super admin can delete subscribers"
                   <tr style={{ backgroundColor: "#FAF7F2", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Customer Name</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Contact Info</th>
+                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Status</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Membership Tier</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Reward Points</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Joined Date</th>
@@ -1971,7 +1909,7 @@ CREATE POLICY "Super admin can delete subscribers"
                 <tbody>
                   {filteredCustomers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "#866951" }}>
+                      <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#866951" }}>
                         No customer accounts found matching your query.
                       </td>
                     </tr>
@@ -1984,6 +1922,13 @@ CREATE POLICY "Super admin can delete subscribers"
                         Standard: { bg: "#FAF7F2", text: "#543E2E", border: "#E8DED3" },
                       };
                       const colors = tierBadgeColors[customer.membership_tier] || tierBadgeColors.Standard;
+
+                      const statusColors: Record<string, { bg: string; text: string; border: string }> = {
+                        Active: { bg: "#EBF8F2", text: "#0F7A50", border: "#B5E8D2" },
+                        Suspended: { bg: "#FEF2F2", text: "#B91C1C", border: "#FCA5A5" },
+                        Inactive: { bg: "#F3F4F6", text: "#4B5563", border: "#E5E7EB" },
+                      };
+                      const st = statusColors[customer.status || "Active"] || statusColors.Active;
 
                       return (
                         <tr
@@ -2022,6 +1967,23 @@ CREATE POLICY "Super admin can delete subscribers"
                           <td style={{ padding: "16px 18px", color: "#543E2E" }}>
                             <div>{customer.email || "—"}</div>
                             <div style={{ fontSize: "11px", color: "#866951" }}>{customer.phone_number || "—"}</div>
+                          </td>
+
+                          <td style={{ padding: "16px 18px" }}>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "3px 9px",
+                                borderRadius: "14px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                backgroundColor: st.bg,
+                                color: st.text,
+                                border: `1px solid ${st.border}`,
+                              }}
+                            >
+                              ● {customer.status || "Active"}
+                            </span>
                           </td>
 
                           <td style={{ padding: "16px 18px" }}>
@@ -3411,7 +3373,30 @@ CREATE POLICY "Super admin can delete subscribers"
                   />
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#866951", marginBottom: "6px" }}>
+                      Account Status
+                    </label>
+                    <select
+                      value={customerForm.status}
+                      onChange={(e) => setCustomerForm({ ...customerForm, status: e.target.value })}
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        borderRadius: "8px",
+                        border: "1px solid #CFBEAD",
+                        backgroundColor: "#FCFAF7",
+                        fontSize: "14px",
+                        color: "#261B13",
+                      }}
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Suspended">Suspended</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+
                   <div>
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#866951", marginBottom: "6px" }}>
                       Club Tier

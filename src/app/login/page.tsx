@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import LoginForm from "@/components/LoginForm";
@@ -179,7 +179,9 @@ export default function LoginPage() {
               backgroundColor: "#FAF7F2",
             }}
           >
-            <LoginForm />
+            <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#866951" }}>Loading...</div>}>
+              <LoginForm />
+            </Suspense>
           </div>
         </div>
       </div>

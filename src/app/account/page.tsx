@@ -7,8 +7,8 @@ import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabaseClient";
-import { Product, ProductCategory } from "@/types/product";
-import { SpinnerIcon } from "@/components/Icons";
+import { Product } from "@/types/product";
+import { normalizePhoneNumber } from "@/lib/phoneUtils";
 
 const PRESET_PRODUCT_IMAGES = [
   { label: "Banarasi Silk Saree", url: "/images/banarasi_silk_saree.jpg" },
@@ -247,12 +247,47 @@ export default function AccountPage() {
       return;
     }
 
+    const trimmedPhone = editPhoneNumber.trim();
+
+    // Validate phone number format & uniqueness if provided
+    if (trimmedPhone) {
+      const phoneValidation = normalizePhoneNumber(trimmedPhone);
+      if (!phoneValidation.isValid) {
+        showToast(phoneValidation.error || "Please enter a valid mobile number.");
+        return;
+      }
+
+      setIsSavingProfile(true);
+      try {
+        const valRes = await fetch("/api/auth/validate-phone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phoneNumber: trimmedPhone,
+            currentUserId: authUser.id,
+          }),
+        });
+
+        const valData = await valRes.json();
+        if (!valRes.ok || !valData.available) {
+          showToast(
+            valData.error ||
+              "This phone number is already linked to another account. Please use a different phone number."
+          );
+          setIsSavingProfile(false);
+          return;
+        }
+      } catch (err) {
+        console.error("Phone validation check error:", err);
+      }
+    }
+
     setIsSavingProfile(true);
     try {
       const updatedData = {
         id: authUser.id,
         full_name: editFullName.trim(),
-        phone_number: editPhoneNumber.trim() || null,
+        phone_number: trimmedPhone ? normalizePhoneNumber(trimmedPhone).normalized : null,
         email: profile?.email || authUser.email || "",
         updated_at: new Date().toISOString(),
       };
@@ -260,6 +295,13 @@ export default function AccountPage() {
       const { error } = await supabase.from("profiles").upsert(updatedData);
 
       if (error) {
+        if (error.message.includes("unique") || error.code === "23505") {
+          showToast(
+            "This phone number is already registered to another account. Please enter a different number."
+          );
+          setIsSavingProfile(false);
+          return;
+        }
         console.warn("Profile update note:", error.message);
       }
 
@@ -268,13 +310,13 @@ export default function AccountPage() {
           ? {
               ...prev,
               full_name: editFullName.trim(),
-              phone_number: editPhoneNumber.trim() || null,
+              phone_number: trimmedPhone ? normalizePhoneNumber(trimmedPhone).normalized : null,
             }
           : null
       );
 
       setIsEditingProfile(false);
-      showToast("Profile details saved to database");
+      showToast("Profile details saved successfully");
     } catch (err) {
       console.error("Failed to save profile:", err);
       showToast("Could not update profile. Please try again.");
@@ -417,12 +459,14 @@ export default function AccountPage() {
   // Handle Sign Out
   const handleSignOut = async () => {
     try {
+      await fetch("/api/auth/logout", { method: "POST" });
       await supabase.auth.signOut();
       setAuthUser(null);
       setProfile(null);
       setAddresses([]);
       showToast("Signed out safely");
       router.replace("/login");
+      router.refresh();
     } catch {
       router.replace("/login");
     }

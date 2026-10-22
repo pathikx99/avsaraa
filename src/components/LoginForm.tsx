@@ -3,10 +3,16 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AvsaraaLogo from "./AvsaraaLogo";
 import { supabase } from "@/lib/supabaseClient";
-import { BackArrowIcon, PhoneIcon, MailIcon, ChevronDownIcon, FlourishDivider, SpinnerIcon } from "./Icons";
+import {
+  BackArrowIcon,
+  MailIcon,
+  GoogleIcon,
+  SpinnerIcon,
+  FlourishDivider,
+} from "./Icons";
 
 interface LoginFormProps {
   onNavigateToRegister?: () => void;
@@ -19,93 +25,36 @@ export default function LoginForm({
   onBack,
 }: LoginFormProps) {
   const router = useRouter();
-  const [authMode, setAuthMode] = useState<"phone" | "email">("phone");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [countryCode, setCountryCode] = useState("+91");
-  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams?.get("redirectTo") || "/account";
+  const urlError = searchParams?.get("error");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState(["", "", "", ""]);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const countries = [
-    { code: "+91", country: "India", flag: "🇮🇳" },
-    { code: "+1", country: "USA", flag: "🇺🇸" },
-    { code: "+44", country: "UK", flag: "🇬🇧" },
-    { code: "+971", country: "UAE", flag: "🇦🇪" },
-    { code: "+65", country: "Singapore", flag: "🇸🇬" },
-  ];
-
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneNumber || phoneNumber.length < 8) {
-      showToast("Please enter a valid mobile number");
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: `${countryCode}${phoneNumber}`,
-      });
-      if (error) {
-        showToast(error.message);
-      } else {
-        setOtpSent(true);
-        showToast(`OTP sent to ${countryCode} ${phoneNumber}`);
-      }
-    } catch {
-      showToast("Could not send SMS. Please use Email Sign In.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const enteredOtp = otpCode.join("");
-    if (enteredOtp.length < 4) {
-      showToast("Please enter the 4-digit OTP");
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: `${countryCode}${phoneNumber}`,
-        token: enteredOtp,
-        type: "sms",
-      });
-      if (error) {
-        showToast(error.message);
-        setIsLoading(false);
-        return;
-      }
-      showToast("Welcome back to Avsaraa!");
-      setTimeout(() => {
-        router.push("/account");
-        router.refresh();
-      }, 500);
-    } catch {
-      showToast("Invalid verification code");
-      setIsLoading(false);
-    }
-  };
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(
+    urlError ? decodeURIComponent(urlError) : null
+  );
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      showToast("Please enter your email and password");
+      showToast("Please enter your email and password.");
       return;
     }
 
     const cleanEmail = email.trim().toLowerCase();
+
+    // Check if Super Admin is attempting to sign in
     if (cleanEmail === "admin@avsaraa.com") {
-      showToast("Super Admin must sign in on the /admin route only.");
-      return;
+      showToast("Super Admin account detected. Redirecting to Admin Portal...");
+      // Allow sign-in then route directly to /admin
     }
 
     setIsLoading(true);
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
@@ -113,25 +62,28 @@ export default function LoginForm({
       });
 
       if (error) {
-        showToast(error.message);
-        setIsLoading(false);
-        return;
-      }
-
-      if (
-        data.user?.email?.toLowerCase().trim() === "admin@avsaraa.com" ||
-        data.user?.app_metadata?.role === "super_admin" ||
-        data.user?.app_metadata?.role === "admin"
-      ) {
-        await supabase.auth.signOut();
-        showToast("Super Admin must sign in on the /admin route only.");
+        if (error.message.includes("Invalid login credentials")) {
+          showToast("Incorrect email or password. Please try again.");
+        } else if (error.message.includes("Email not confirmed")) {
+          showToast("Please verify your email address before signing in. Check your inbox.");
+        } else {
+          showToast(error.message);
+        }
         setIsLoading(false);
         return;
       }
 
       showToast("Welcome back to Avsaraa!");
+
+      const isSuperAdmin =
+        data.user?.email?.toLowerCase().trim() === "admin@avsaraa.com" ||
+        data.user?.app_metadata?.role === "super_admin" ||
+        data.user?.app_metadata?.role === "admin";
+
+      const targetDestination = isSuperAdmin ? "/admin" : redirectTo;
+
       setTimeout(() => {
-        router.push("/account");
+        router.push(targetDestination);
         router.refresh();
       }, 500);
     } catch (err: unknown) {
@@ -141,21 +93,38 @@ export default function LoginForm({
     }
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3200);
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      const redirectUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+        redirectTo
+      )}`;
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
+      });
+
+      if (error) {
+        showToast(error.message);
+        setIsGoogleLoading(false);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Google sign-in failed";
+      showToast(msg);
+      setIsGoogleLoading(false);
+    }
   };
 
-  const handleOtpChange = (index: number, val: string) => {
-    if (!/^\d*$/.test(val)) return;
-    const newOtp = [...otpCode];
-    newOtp[index] = val.slice(-1);
-    setOtpCode(newOtp);
-
-    if (val && index < 3) {
-      const nextInput = document.getElementById(`login-otp-${index + 1}`);
-      nextInput?.focus();
-    }
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3600);
   };
 
   return (
@@ -179,7 +148,7 @@ export default function LoginForm({
             transform: "translateX(-50%)",
             background: "#261B13",
             color: "#FAF6F0",
-            padding: "10px 20px",
+            padding: "10px 22px",
             borderRadius: "10px",
             fontSize: "13px",
             zIndex: 1000,
@@ -193,7 +162,7 @@ export default function LoginForm({
         </div>
       )}
 
-      {/* Top Header: Simple Bare Back Arrow */}
+      {/* Top Header: Bare Back Arrow */}
       <div
         style={{
           position: "absolute",
@@ -203,7 +172,16 @@ export default function LoginForm({
         }}
       >
         <button
-          onClick={onBack || (() => { if (typeof window !== "undefined" && window.history.length > 1) { window.history.back(); } else { router.push("/"); } })}
+          onClick={
+            onBack ||
+            (() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                window.history.back();
+              } else {
+                router.push("/");
+              }
+            })
+          }
           aria-label="Back"
           style={{
             width: "36px",
@@ -225,7 +203,7 @@ export default function LoginForm({
       <div
         style={{
           position: "relative",
-          height: "320px",
+          height: "280px",
           overflow: "hidden",
         }}
       >
@@ -281,8 +259,8 @@ export default function LoginForm({
           style={{
             position: "absolute",
             right: "18px",
-            top: "115px",
-            width: "130px",
+            top: "95px",
+            width: "135px",
             textAlign: "center",
             zIndex: 10,
           }}
@@ -290,7 +268,7 @@ export default function LoginForm({
           <p
             style={{
               fontFamily: "var(--font-serif), 'Cormorant Garamond', Georgia, serif",
-              fontSize: "20px",
+              fontSize: "19px",
               fontStyle: "italic",
               fontWeight: 500,
               color: "#544337",
@@ -317,7 +295,7 @@ export default function LoginForm({
           backgroundColor: "#FCFAF7",
           borderTopLeftRadius: "34px",
           borderTopRightRadius: "34px",
-          padding: "28px 24px 40px 24px",
+          padding: "28px 24px 36px 24px",
           marginTop: "-26px",
           zIndex: 20,
           boxShadow: "0 -8px 25px rgba(38, 27, 19, 0.05)",
@@ -332,10 +310,10 @@ export default function LoginForm({
             position: "absolute",
             right: "-20px",
             bottom: "-20px",
-            width: "150px",
-            height: "150px",
+            width: "140px",
+            height: "140px",
             pointerEvents: "none",
-            opacity: 0.65,
+            opacity: 0.6,
             zIndex: 0,
           }}
         >
@@ -343,8 +321,12 @@ export default function LoginForm({
             src="/images/botanical_flowers.jpg"
             alt=""
             fill
-            sizes="150px"
-            style={{ objectFit: "contain", transform: "rotate(-25deg)", mixBlendMode: "multiply" }}
+            sizes="140px"
+            style={{
+              objectFit: "contain",
+              transform: "rotate(-25deg)",
+              mixBlendMode: "multiply",
+            }}
           />
         </div>
 
@@ -354,232 +336,92 @@ export default function LoginForm({
             <h1
               style={{
                 fontFamily: "var(--font-serif), 'Cormorant Garamond', Georgia, serif",
-                fontSize: "32px",
+                fontSize: "30px",
                 fontWeight: 600,
                 color: "#261B13",
                 lineHeight: 1.1,
                 marginBottom: "6px",
               }}
             >
-              Login
+              Sign In
             </h1>
             <p
               style={{
-                fontSize: "14px",
+                fontSize: "13.5px",
                 color: "#7E6E62",
                 lineHeight: 1.45,
                 fontWeight: 400,
               }}
             >
-              Welcome back!
+              Welcome back to Avsaraa.
               <br />
-              Sign in to your account with Avsaraa.
+              Sign in with your email or Google account.
             </p>
           </div>
 
-          {/* FORM: OTP Flow or Mobile Input */}
-          {otpSent ? (
-            <form onSubmit={handleVerifyOtp} className="fade-in">
-              <div style={{ marginBottom: "16px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                  <span style={{ fontSize: "13px", color: "#6C594C" }}>
-                    Enter OTP sent to <strong>{countryCode} {phoneNumber}</strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setOtpSent(false)}
-                    style={{ fontSize: "12.5px", color: "#866951", textDecoration: "underline" }}
-                  >
-                    Edit
-                  </button>
-                </div>
-
-                {/* 4-digit OTP Inputs */}
-                <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-                  {otpCode.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      id={`login-otp-${idx}`}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      style={{
-                        width: "52px",
-                        height: "54px",
-                        textAlign: "center",
-                        fontSize: "22px",
-                        fontWeight: 600,
-                        color: "#261B13",
-                        background: "#FFFFFF",
-                        border: "1.5px solid #E8DED3",
-                        borderRadius: "12px",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="avsaraa-btn-primary"
-                style={{ height: "52px", marginTop: "12px" }}
-              >
-                {isLoading ? <SpinnerIcon size={18} color="#FFFFFF" /> : "Verify & Sign In →"}
-              </button>
-
-              <div style={{ textAlign: "center", marginTop: "14px" }}>
-                <button
-                  type="button"
-                  onClick={() => showToast("A fresh OTP has been sent")}
-                  style={{ fontSize: "12.5px", color: "#866951", textDecoration: "underline" }}
-                >
-                  Resend OTP in 30s
-                </button>
-              </div>
-            </form>
-          ) : authMode === "phone" ? (
-            /* Phone Number Input Flow */
-            <form onSubmit={handleSendOtp} className="fade-in">
-              <div
-                className="avsaraa-input-group"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "0 14px",
-                  marginBottom: "14px",
-                  height: "52px",
-                }}
-              >
-                {/* Phone Receiver Icon */}
-                <span style={{ color: "#786556", display: "flex", alignItems: "center" }}>
-                  <PhoneIcon size={18} />
+          {/* Google OAuth Button */}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={isGoogleLoading || isLoading}
+            className="avsaraa-btn-outline"
+            style={{
+              height: "50px",
+              marginBottom: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "10px",
+              width: "100%",
+            }}
+          >
+            {isGoogleLoading ? (
+              <SpinnerIcon size={18} color="#261B13" />
+            ) : (
+              <>
+                <GoogleIcon size={18} />
+                <span style={{ fontWeight: 500, fontSize: "14px" }}>
+                  Continue with Google
                 </span>
+              </>
+            )}
+          </button>
 
-                {/* Country Code Selector */}
-                <div style={{ position: "relative" }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowCountryPicker(!showCountryPicker)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      color: "#261B13",
-                      padding: "4px 2px",
-                    }}
-                  >
-                    <span>{countryCode}</span>
-                    <ChevronDownIcon size={12} color="#786556" />
-                  </button>
+          {/* OR Divider */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              margin: "12px 0 16px 0",
+              gap: "12px",
+            }}
+          >
+            <div style={{ flex: 1, height: "1px", backgroundColor: "#E6DBD0" }} />
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "#9C8A7B",
+                letterSpacing: "0.08em",
+              }}
+            >
+              OR WITH EMAIL
+            </span>
+            <div style={{ flex: 1, height: "1px", backgroundColor: "#E6DBD0" }} />
+          </div>
 
-                  {/* Dropdown Menu */}
-                  {showCountryPicker && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "38px",
-                        left: "-10px",
-                        width: "160px",
-                        background: "#FFFFFF",
-                        borderRadius: "12px",
-                        boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
-                        border: "1px solid #E8DFD5",
-                        zIndex: 90,
-                        overflow: "hidden",
-                      }}
-                    >
-                      {countries.map((c) => (
-                        <button
-                          key={c.code}
-                          type="button"
-                          onClick={() => {
-                            setCountryCode(c.code);
-                            setShowCountryPicker(false);
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            width: "100%",
-                            padding: "8px 12px",
-                            fontSize: "12.5px",
-                            textAlign: "left",
-                            color: "#261B13",
-                            borderBottom: "1px solid #F5EFE9",
-                          }}
-                        >
-                          <span>{c.flag}</span>
-                          <span>{c.code}</span>
-                          <span style={{ color: "#8E7D70", fontSize: "11px", marginLeft: "auto" }}>
-                            {c.country}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Vertical separator */}
-                <div
-                  style={{
-                    width: "1px",
-                    height: "22px",
-                    backgroundColor: "#E2D7CB",
-                    margin: "0 2px",
-                  }}
-                />
-
-                {/* Phone Input */}
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel-national"
-                  placeholder="Enter your mobile number"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                  style={{
-                    flex: 1,
-                    fontSize: "14px",
-                    color: "#261B13",
-                  }}
-                  required
-                />
-              </div>
-
-              {/* Action Button: Send OTP */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="avsaraa-btn-primary"
-                style={{ height: "52px" }}
-              >
-                {isLoading ? (
-                  <SpinnerIcon size={18} color="#FFFFFF" />
-                ) : (
-                  <>
-                    <span>Send OTP</span>
-                    <span>→</span>
-                  </>
-                )}
-              </button>
-            </form>
-          ) : (
-            /* Email Sign In */
-            <form onSubmit={handleEmailLogin} className="fade-in">
+          {/* Email & Password Form */}
+          <form onSubmit={handleEmailLogin} className="fade-in">
+            {/* Email Field */}
+            <div style={{ marginBottom: "12px" }}>
               <div
                 className="avsaraa-input-group"
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "10px",
-                  marginBottom: "12px",
                   height: "52px",
+                  padding: "0 14px",
                 }}
               >
                 <MailIcon size={18} color="#786556" />
@@ -593,23 +435,33 @@ export default function LoginForm({
                   required
                 />
               </div>
+            </div>
 
+            {/* Password Field */}
+            <div style={{ marginBottom: "8px" }}>
               <div
                 className="avsaraa-input-group"
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "10px",
-                  marginBottom: "14px",
                   height: "52px",
+                  padding: "0 14px",
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#786556" strokeWidth="1.6">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#786556"
+                  strokeWidth="1.6"
+                >
                   <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
@@ -617,71 +469,66 @@ export default function LoginForm({
                   style={{ flex: 1, fontSize: "14px", color: "#261B13" }}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#866951",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    padding: "4px",
+                  }}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
               </div>
+            </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="avsaraa-btn-primary"
-                style={{ height: "52px" }}
-              >
-                {isLoading ? <SpinnerIcon size={18} color="#FFFFFF" /> : "Sign In with Email →"}
-              </button>
-            </form>
-          )}
-
-          {/* OR Divider */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              margin: "18px 0 14px 0",
-              gap: "12px",
-            }}
-          >
-            <div style={{ flex: 1, height: "1px", backgroundColor: "#E6DBD0" }} />
-            <span
+            {/* Forgot Password Link */}
+            <div
               style={{
-                fontSize: "11px",
-                fontWeight: 600,
-                color: "#9C8A7B",
-                letterSpacing: "0.08em",
+                display: "flex",
+                justifyContent: "flex-end",
+                marginBottom: "18px",
               }}
             >
-              OR
-            </span>
-            <div style={{ flex: 1, height: "1px", backgroundColor: "#E6DBD0" }} />
-          </div>
+              <Link
+                href="/forgot-password"
+                style={{
+                  fontSize: "12.5px",
+                  color: "#866951",
+                  textDecoration: "underline",
+                  textUnderlineOffset: "3px",
+                  fontWeight: 500,
+                }}
+              >
+                Forgot Password?
+              </Link>
+            </div>
 
-          {/* Secondary Button: Continue with Email */}
-          <button
-            type="button"
-            onClick={() => {
-              setOtpSent(false);
-              setAuthMode(authMode === "phone" ? "email" : "phone");
-            }}
-            className="avsaraa-btn-outline"
-            style={{ height: "52px" }}
-          >
-            {authMode === "phone" ? (
-              <>
-                <MailIcon size={17} color="#5C473A" />
-                <span>Continue with Email</span>
-              </>
-            ) : (
-              <>
-                <PhoneIcon size={17} color="#5C473A" />
-                <span>Continue with Phone Number</span>
-              </>
-            )}
-          </button>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isLoading || isGoogleLoading}
+              className="avsaraa-btn-primary"
+              style={{ height: "52px", width: "100%" }}
+            >
+              {isLoading ? (
+                <SpinnerIcon size={18} color="#FFFFFF" />
+              ) : (
+                "Sign In with Email →"
+              )}
+            </button>
+          </form>
         </div>
 
         {/* Footer: Create an Account */}
         <div
           style={{
             textAlign: "center",
-            marginTop: "24px",
+            marginTop: "22px",
             fontSize: "13.5px",
             color: "#6D5A4D",
             position: "relative",

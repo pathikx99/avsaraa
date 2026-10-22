@@ -77,6 +77,7 @@ DROP POLICY IF EXISTS "Admins can delete admin users" ON public.admin_users;
 DROP POLICY IF EXISTS "Only admins can delete admin users" ON public.admin_users;
 
 -- ==============================================================================
+-- ==============================================================================
 -- 2. PROFILES (Extends Supabase auth.users for Login & Register)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -85,6 +86,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     phone_number TEXT,
     email TEXT UNIQUE,
     avatar_url TEXT,
+    status TEXT DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Suspended')),
     membership_tier TEXT DEFAULT 'Standard' CHECK (membership_tier IN ('Standard', 'Privilege', 'Atelier Circle', 'VIP')),
     reward_points INTEGER DEFAULT 0 CHECK (reward_points >= 0),
     preferred_currency TEXT DEFAULT 'INR',
@@ -94,10 +96,17 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+-- Partial unique index to enforce that no two accounts can share a phone number
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_phone_number_unique 
+ON public.profiles (phone_number) 
+WHERE phone_number IS NOT NULL AND phone_number <> '';
+
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
-CREATE POLICY "Public profiles are viewable by everyone" 
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view their own profile or admin can view all" ON public.profiles;
+CREATE POLICY "Users can view their own profile or admin can view all" 
     ON public.profiles FOR SELECT 
-    USING (true);
+    USING (auth.uid() = id OR public.is_admin());
 
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Super admin can update any profile" ON public.profiles;
@@ -118,21 +127,70 @@ CREATE POLICY "Super admin can delete profiles"
     ON public.profiles FOR DELETE 
     USING (public.is_admin());
 
--- AUTOMATIC PROFILE CREATION TRIGGER
+-- AUTOMATIC PROFILE CREATION TRIGGER (Handles Email & Google OAuth)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+    extracted_name TEXT;
+    extracted_phone TEXT;
+    extracted_avatar TEXT;
 BEGIN
-    INSERT INTO public.profiles (id, full_name, email, phone_number)
+    extracted_name := COALESCE(
+        new.raw_user_meta_data->>'full_name',
+        new.raw_user_meta_data->>'name',
+        NULLIF(CONCAT_WS(' ', new.raw_user_meta_data->>'first_name', new.raw_user_meta_data->>'last_name'), ''),
+        SPLIT_PART(new.email, '@', 1),
+        'Avsaraa Member'
+    );
+
+    extracted_phone := NULLIF(TRIM(COALESCE(
+        new.phone,
+        new.raw_user_meta_data->>'phone_number',
+        new.raw_user_meta_data->>'phone'
+    )), '');
+
+    extracted_avatar := COALESCE(
+        new.raw_user_meta_data->>'avatar_url',
+        new.raw_user_meta_data->>'picture'
+    );
+
+    INSERT INTO public.profiles (
+        id, 
+        full_name, 
+        email, 
+        phone_number, 
+        avatar_url,
+        status,
+        membership_tier,
+        reward_points,
+        created_at,
+        updated_at
+    )
     VALUES (
         new.id,
-        COALESCE(new.raw_user_meta_data->>'full_name', 'Avsaraa Member'),
+        extracted_name,
         new.email,
-        new.phone
+        extracted_phone,
+        extracted_avatar,
+        'Active',
+        'Standard',
+        100,
+        NOW(),
+        NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
-        full_name = EXCLUDED.full_name,
-        email = EXCLUDED.email,
+        full_name = CASE 
+            WHEN public.profiles.full_name = 'Avsaraa Member' OR public.profiles.full_name IS NULL 
+            THEN EXCLUDED.full_name 
+            ELSE public.profiles.full_name 
+        END,
+        email = COALESCE(EXCLUDED.email, public.profiles.email),
+        avatar_url = COALESCE(public.profiles.avatar_url, EXCLUDED.avatar_url),
+        phone_number = COALESCE(public.profiles.phone_number, EXCLUDED.phone_number),
         updated_at = NOW();
+
+    RETURN new;
+EXCEPTION WHEN OTHERS THEN
     RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -141,6 +199,36 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Helper function to check if a phone number already exists
+CREATE OR REPLACE FUNCTION public.check_phone_exists(phone_to_check TEXT, current_user_id UUID DEFAULT NULL)
+RETURNS BOOLEAN AS $$
+BEGIN
+    IF phone_to_check IS NULL OR TRIM(phone_to_check) = '' THEN
+        RETURN FALSE;
+    END IF;
+    RETURN EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE phone_number = TRIM(phone_to_check)
+          AND (current_user_id IS NULL OR id != current_user_id)
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+-- Helper function to check if an email already exists
+CREATE OR REPLACE FUNCTION public.check_email_exists(email_to_check TEXT, current_user_id UUID DEFAULT NULL)
+RETURNS BOOLEAN AS $$
+BEGIN
+    IF email_to_check IS NULL OR TRIM(email_to_check) = '' THEN
+        RETURN FALSE;
+    END IF;
+    RETURN EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE LOWER(email) = LOWER(TRIM(email_to_check))
+          AND (current_user_id IS NULL OR id != current_user_id)
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- ==============================================================================
 -- 3. USER ADDRESSES (User Account Delivery Locations)

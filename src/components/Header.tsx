@@ -48,9 +48,14 @@ export default function Header() {
   }, [announcements.length]);
 
   const handleSignOut = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Fallback
+    }
     await supabase.auth.signOut();
     setUser(null);
-    router.push("/");
+    router.push("/login");
     router.refresh();
   };
 

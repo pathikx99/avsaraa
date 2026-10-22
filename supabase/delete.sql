@@ -67,6 +67,8 @@ DROP TABLE IF EXISTS public.profiles CASCADE;
 DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP FUNCTION IF EXISTS public.handle_updated_at() CASCADE;
+DROP FUNCTION IF EXISTS public.check_phone_exists(TEXT, UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.check_email_exists(TEXT, UUID) CASCADE;
 
 COMMIT;
 

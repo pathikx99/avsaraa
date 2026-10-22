@@ -25,6 +25,7 @@ export interface CustomerProfile {
   email: string | null;
   phone_number: string | null;
   avatar_url?: string | null;
+  status?: "Active" | "Inactive" | "Suspended";
   membership_tier: string;
   reward_points?: number;
   preferred_currency?: string;

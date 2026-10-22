@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     if (!type || type === "customers") {
       const { data, error } = await supabaseAdmin
         .from("profiles")
-        .select("id, full_name, email, phone_number, avatar_url, membership_tier, reward_points, preferred_currency, created_at, updated_at")
+        .select("id, full_name, email, phone_number, avatar_url, status, membership_tier, reward_points, preferred_currency, created_at, updated_at")
         .order("created_at", { ascending: false });
 
       if (!error && data) {
@@ -102,6 +102,25 @@ export async function POST(request: Request) {
 
       const tier = VALID_MEMBERSHIP_TIERS.includes(membership_tier) ? membership_tier : "Standard";
       const pts = Math.max(0, Math.min(1000000, Number(reward_points) || 0));
+      const customerStatus = VALID_STATUSES.includes(payload.status) ? payload.status : "Active";
+
+      let cleanPhone: string | null = null;
+      if (phone_number && String(phone_number).trim()) {
+        cleanPhone = String(phone_number).trim();
+        // Check if phone number is already linked to another profile
+        const { data: phoneConflict } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("phone_number", cleanPhone)
+          .limit(1);
+
+        if (phoneConflict && phoneConflict.length > 0) {
+          return NextResponse.json(
+            { success: false, error: "This mobile number is already linked to another account." },
+            { status: 409 }
+          );
+        }
+      }
 
       const { data, error } = await supabaseAdmin
         .from("profiles")
@@ -109,7 +128,8 @@ export async function POST(request: Request) {
           id: id || crypto.randomUUID(),
           full_name: full_name.trim(),
           email: email ? email.trim().toLowerCase() : null,
-          phone_number: phone_number ? String(phone_number).trim().slice(0, 20) : null,
+          phone_number: cleanPhone,
+          status: customerStatus,
           membership_tier: tier,
           reward_points: pts,
           updated_at: new Date().toISOString(),
@@ -208,7 +228,26 @@ export async function PUT(request: Request) {
         updateData.email = updates.email ? String(updates.email).trim().toLowerCase() : null;
       }
       if (updates.phone_number !== undefined) {
-        updateData.phone_number = updates.phone_number ? String(updates.phone_number).trim().slice(0, 20) : null;
+        const cleanPhone = updates.phone_number ? String(updates.phone_number).trim().slice(0, 20) : null;
+        if (cleanPhone) {
+          const { data: phoneConflict } = await supabaseAdmin
+            .from("profiles")
+            .select("id")
+            .eq("phone_number", cleanPhone)
+            .neq("id", id)
+            .limit(1);
+
+          if (phoneConflict && phoneConflict.length > 0) {
+            return NextResponse.json(
+              { success: false, error: "This mobile number is already linked to another account." },
+              { status: 409 }
+            );
+          }
+        }
+        updateData.phone_number = cleanPhone;
+      }
+      if (updates.status !== undefined && VALID_STATUSES.includes(updates.status)) {
+        updateData.status = updates.status;
       }
       if (updates.membership_tier !== undefined && VALID_MEMBERSHIP_TIERS.includes(updates.membership_tier)) {
         updateData.membership_tier = updates.membership_tier;
