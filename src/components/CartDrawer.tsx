@@ -208,7 +208,7 @@ export default function CartDrawer() {
                 Explore our handcrafted pure silk sarees and festive wear to add pieces to your collection.
               </p>
               <Link
-                href="/#products"
+                href="/collection"
                 onClick={closeCart}
                 className="avsaraa-btn-primary"
                 style={{

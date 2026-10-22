@@ -98,15 +98,33 @@ export default function LoginForm({
       showToast("Please enter your email and password");
       return;
     }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail === "admin@avsaraa.com") {
+      showToast("Super Admin must sign in on the /admin route only.");
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
         password: password,
       });
 
       if (error) {
         showToast(error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (
+        data.user?.email?.toLowerCase().trim() === "admin@avsaraa.com" ||
+        data.user?.app_metadata?.role === "super_admin" ||
+        data.user?.app_metadata?.role === "admin"
+      ) {
+        await supabase.auth.signOut();
+        showToast("Super Admin must sign in on the /admin route only.");
         setIsLoading(false);
         return;
       }

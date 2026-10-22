@@ -126,7 +126,7 @@ export default function AboutPage() {
             </p>
             <div style={{ display: "flex", gap: "14px", justifyContent: "center", flexWrap: "wrap" }}>
               <Link
-                href="/#products"
+                href="/collection"
                 className="avsaraa-btn-primary"
                 style={{
                   height: "46px",

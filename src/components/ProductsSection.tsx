@@ -11,14 +11,75 @@ import type { User } from "@supabase/supabase-js";
 
 interface ProductsSectionProps {
   initialCategory?: ProductCategory | "ALL";
+  showHeader?: boolean;
 }
 
 const DEFAULT_FALLBACK_IMAGE = "/images/banarasi_silk_saree.jpg";
 
-export default function ProductsSection({ initialCategory = "ALL" }: ProductsSectionProps) {
+const DEFAULT_PRODUCTS: Product[] = [
+  {
+    id: "prod-1",
+    name: "Pure Banarasi Katan Silk Saree",
+    category: "Sarees",
+    price: 18500,
+    image_url: "/images/banarasi_silk_saree.jpg",
+    description: "Hand-loomed in Varanasi with authentic gold zari floral jaal, finished with heritage border.",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "prod-2",
+    name: "Emerald Royal Organza Saree",
+    category: "Sarees",
+    price: 14200,
+    image_url: "/images/royal_organza_saree.jpg",
+    description: "Sheer tissue organza drape in jewel emerald with delicate hand-embroidered scallop borders.",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "prod-3",
+    name: "Heritage Silk Anarkali Gown",
+    category: "Dresses",
+    price: 16800,
+    image_url: "/images/royal_occasion_dress.jpg",
+    description: "Floor-length raw silk flare adorned with regal dabka and gota patti artisan embroidery.",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "prod-4",
+    name: "Festive Chanderi Kurta Set",
+    category: "Dresses",
+    price: 9800,
+    image_url: "/images/festive_chanderi_dress.jpg",
+    description: "Breathable pure Chanderi silk with hand block-printed motifs and zari-threaded dupatta.",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "prod-5",
+    name: "Royal Zari Bridal Drape",
+    category: "Occasion Wear",
+    price: 24500,
+    image_url: "/images/saree_model_hero.jpg",
+    description: "Masterpiece festive weave featuring pure metallic zari embellishments and rich pallu craft.",
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "prod-6",
+    name: "Surat Handloom Tissue Saree",
+    category: "New Arrivals",
+    price: 12900,
+    image_url: "/images/account_hero.jpg",
+    description: "Modern metallic sheen handloom drape woven in Surat with refined lightweight texture.",
+    created_at: new Date().toISOString(),
+  },
+];
+
+export default function ProductsSection({
+  initialCategory = "ALL",
+  showHeader = true,
+}: ProductsSectionProps) {
   const { addToCart } = useCart();
   const [activeCategory, setActiveCategory] = useState<ProductCategory | "ALL">(initialCategory);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
   const [user, setUser] = useState<User | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
@@ -36,7 +97,7 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
       if (isMounted) setUser(session?.user ?? null);
     });
 
-    // Load products strictly from Supabase database
+    // Load products strictly from Supabase database; fallback to curated collection
     void supabase
       .from("products")
       .select("*")
@@ -44,20 +105,33 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
       .then(
         ({ data, error }) => {
           if (!isMounted) return;
-          if (error) {
-            console.warn("Database products query:", error.message);
-            setProducts([]);
-          } else if (data) {
+          if (error || !data || data.length === 0) {
+            setProducts(DEFAULT_PRODUCTS);
+          } else {
             setProducts(data);
           }
         },
         () => {
-          if (isMounted) setProducts([]);
+          if (isMounted) setProducts(DEFAULT_PRODUCTS);
         }
       );
 
-    // Listen to hash changes on URL (e.g. #products-sarees)
-    const handleHashChange = () => {
+    // Read category from URL query parameters (e.g. ?category=Sarees) or hash
+    const syncCategoryFromUrl = () => {
+      if (typeof window === "undefined") return;
+      const urlParams = new URLSearchParams(window.location.search);
+      const categoryQuery = urlParams.get("category");
+
+      if (categoryQuery) {
+        const normalized = categoryQuery.toLowerCase();
+        if (normalized.includes("saree")) setActiveCategory("Sarees");
+        else if (normalized.includes("dress")) setActiveCategory("Dresses");
+        else if (normalized.includes("new")) setActiveCategory("New Arrivals");
+        else if (normalized.includes("occasion")) setActiveCategory("Occasion Wear");
+        else if (normalized === "all") setActiveCategory("ALL");
+        return;
+      }
+
       const hash = window.location.hash.toLowerCase();
       if (hash.includes("sarees")) setActiveCategory("Sarees");
       else if (hash.includes("dresses")) setActiveCategory("Dresses");
@@ -65,13 +139,13 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
       else if (hash.includes("occasion-wear")) setActiveCategory("Occasion Wear");
     };
 
-    handleHashChange();
-    window.addEventListener("hashchange", handleHashChange);
+    syncCategoryFromUrl();
+    window.addEventListener("popstate", syncCategoryFromUrl);
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
-      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("popstate", syncCategoryFromUrl);
     };
   }, []);
 
@@ -92,48 +166,44 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
       id="products"
       style={{
         backgroundColor: "#FAF7F2",
-        padding: "80px 24px 90px 24px",
+        padding: showHeader ? "80px 24px 90px 24px" : "40px 24px 80px 24px",
         position: "relative",
         borderBottom: "1px solid #E6DACF",
       }}
     >
-      {/* Anchors for smooth navigation from header/drawer */}
-      <div id="products-sarees" style={{ position: "absolute", top: "-40px" }} />
-      <div id="products-dresses" style={{ position: "absolute", top: "-40px" }} />
-      <div id="products-new-arrivals" style={{ position: "absolute", top: "-40px" }} />
-      <div id="products-occasion-wear" style={{ position: "absolute", top: "-40px" }} />
-
       <div style={{ maxWidth: "1140px", margin: "0 auto" }}>
-        {/* Section Header */}
-        <div style={{ textAlign: "center", marginBottom: "40px" }}>
-          <span className="luxury-badge" style={{ marginBottom: "14px" }}>
-            ✦ OUR COLLECTION ✦
-          </span>
-          <h2
-            style={{
-              fontFamily: "var(--font-serif), Georgia, serif",
-              fontSize: "clamp(32px, 4.5vw, 46px)",
-              fontWeight: 500,
-              color: "#261B13",
-              lineHeight: 1.15,
-              marginBottom: "14px",
-            }}
-          >
-            Handcrafted Pieces
-          </h2>
-          <div style={{ width: "48px", height: "1.5px", backgroundColor: "#C4AB94", margin: "0 auto 16px auto" }} />
-          <p
-            style={{
-              fontSize: "15px",
-              color: "#6E5B4E",
-              maxWidth: "580px",
-              margin: "0 auto",
-              lineHeight: 1.7,
-            }}
-          >
-            Explore our curated handloom weaves and festive ensembles, thoughtfully designed for every celebration.
-          </p>
-        </div>
+        {/* Section Header (Optional) */}
+        {showHeader && (
+          <div style={{ textAlign: "center", marginBottom: "40px" }}>
+            <span className="luxury-badge" style={{ marginBottom: "14px" }}>
+              ✦ OUR COLLECTION ✦
+            </span>
+            <h2
+              style={{
+                fontFamily: "var(--font-serif), Georgia, serif",
+                fontSize: "clamp(32px, 4.5vw, 46px)",
+                fontWeight: 500,
+                color: "#261B13",
+                lineHeight: 1.15,
+                marginBottom: "14px",
+              }}
+            >
+              Handcrafted Pieces
+            </h2>
+            <div style={{ width: "48px", height: "1.5px", backgroundColor: "#C4AB94", margin: "0 auto 16px auto" }} />
+            <p
+              style={{
+                fontSize: "15px",
+                color: "#6E5B4E",
+                maxWidth: "580px",
+                margin: "0 auto",
+                lineHeight: 1.7,
+              }}
+            >
+              Explore our curated handloom weaves and festive ensembles, thoughtfully designed for every celebration.
+            </p>
+          </div>
+        )}
 
         {/* Categories Bar & Add Product Action */}
         <div
@@ -197,44 +267,23 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
             })}
           </div>
 
-          {/* Super Admin Manage Link OR Atelier Concierge Inquiries */}
+          {/* Atelier Concierge Inquiries */}
           <div>
-            {user?.email?.toLowerCase() === "admin@avsaraa.com" ? (
-              <Link
-                href="/admin"
-                className="avsaraa-btn-primary"
-                style={{
-                  height: "44px",
-                  padding: "0 22px",
-                  fontSize: "12px",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  width: "auto",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  textDecoration: "none",
-                }}
-              >
-                <span>🛡️ Manage in Super Admin Console</span>
-              </Link>
-            ) : (
-              <Link
-                href="/contact"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  fontSize: "12.5px",
-                  color: "#866951",
-                  fontWeight: 600,
-                  textDecoration: "underline",
-                  textUnderlineOffset: "3px",
-                }}
-              >
-                <span>✦ Custom Tailoring & Inquiries →</span>
-              </Link>
-            )}
+            <Link
+              href="/contact"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "12.5px",
+                color: "#866951",
+                fontWeight: 600,
+                textDecoration: "underline",
+                textUnderlineOffset: "3px",
+              }}
+            >
+              <span>✦ Custom Tailoring & Inquiries →</span>
+            </Link>
           </div>
         </div>
 
@@ -291,42 +340,21 @@ export default function ProductsSection({ initialCategory = "ALL" }: ProductsSec
             >
               All handcrafted pieces added to your database will appear here in real time.
             </p>
-            {user?.email?.toLowerCase() === "admin@avsaraa.com" ? (
-              <Link
-                href="/admin"
-                className="avsaraa-btn-primary"
-                style={{
-                  height: "44px",
-                  padding: "0 26px",
-                  fontSize: "12px",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  textDecoration: "none",
-                  width: "auto",
-                }}
-              >
-                <span>🛡️ Manage Catalog in Admin Console →</span>
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setActiveCategory("ALL")}
-                className="avsaraa-btn-outline"
-                style={{
-                  height: "44px",
-                  padding: "0 24px",
-                  fontSize: "12px",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  backgroundColor: "#FFFFFF",
-                }}
-              >
-                Explore All Pieces →
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setActiveCategory("ALL")}
+              className="avsaraa-btn-outline"
+              style={{
+                height: "44px",
+                padding: "0 24px",
+                fontSize: "12px",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                backgroundColor: "#FFFFFF",
+              }}
+            >
+              Explore All Pieces →
+            </button>
           </div>
         ) : (
           <div

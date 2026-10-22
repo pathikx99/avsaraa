@@ -233,49 +233,49 @@ export default function AdminDashboardPage() {
             user.app_metadata?.role === "admin" ||
             user.user_metadata?.role === "super_admin";
 
-          setIsAuthorizedAdmin(isSuperAdmin || process.env.NODE_ENV === "development");
-        } else if (process.env.NODE_ENV === "development") {
-          setIsAuthorizedAdmin(true);
+          setIsAuthorizedAdmin(isSuperAdmin);
+
+          if (isSuperAdmin) {
+            // Fetch data securely for authenticated admin
+            const headers = await getAuthHeaders();
+
+            const [usersRes, productsRes, inqRes] = await Promise.all([
+              fetch("/api/admin/users", { headers }),
+              fetch("/api/admin/products", { headers }),
+              fetch("/api/admin/inquiries", { headers }),
+            ]);
+
+            if (!active) return;
+
+            if (usersRes.ok) {
+              const usersJson = await usersRes.json();
+              if (usersJson.success) {
+                if (usersJson.adminUsers && usersJson.adminUsers.length > 0) {
+                  setSuperAdmin(usersJson.adminUsers[0]);
+                }
+                if (usersJson.customerProfiles) {
+                  setCustomerProfiles(usersJson.customerProfiles);
+                }
+              }
+            }
+
+            if (productsRes.ok) {
+              const productsJson = await productsRes.json();
+              if (productsJson.success && productsJson.products) {
+                setProducts(productsJson.products);
+              }
+            }
+
+            if (inqRes.ok) {
+              const inqJson = await inqRes.json();
+              if (inqJson.success) {
+                setInquiries(inqJson.inquiries || []);
+                setSubscribers(inqJson.subscribers || []);
+              }
+            }
+          }
         } else {
           setIsAuthorizedAdmin(false);
-        }
-
-        // Fetch data
-        const headers = await getAuthHeaders();
-
-        const [usersRes, productsRes, inqRes] = await Promise.all([
-          fetch("/api/admin/users", { headers }),
-          fetch("/api/admin/products", { headers }),
-          fetch("/api/admin/inquiries", { headers }),
-        ]);
-
-        if (!active) return;
-
-        if (usersRes.ok) {
-          const usersJson = await usersRes.json();
-          if (usersJson.success) {
-            if (usersJson.adminUsers && usersJson.adminUsers.length > 0) {
-              setSuperAdmin(usersJson.adminUsers[0]);
-            }
-            if (usersJson.customerProfiles) {
-              setCustomerProfiles(usersJson.customerProfiles);
-            }
-          }
-        }
-
-        if (productsRes.ok) {
-          const productsJson = await productsRes.json();
-          if (productsJson.success && productsJson.products) {
-            setProducts(productsJson.products);
-          }
-        }
-
-        if (inqRes.ok) {
-          const inqJson = await inqRes.json();
-          if (inqJson.success) {
-            setInquiries(inqJson.inquiries || []);
-            setSubscribers(inqJson.subscribers || []);
-          }
         }
       } catch (err) {
         console.warn("Initial load error:", err);
@@ -294,8 +294,18 @@ export default function AdminDashboardPage() {
       const user = session?.user ?? null;
       setSessionUser(user);
       if (user) {
-        setIsAuthorizedAdmin(true);
-        void fetchData();
+        const email = user.email?.toLowerCase().trim() || "";
+        const isSuperAdmin =
+          email === "admin@avsaraa.com" ||
+          user.app_metadata?.role === "super_admin" ||
+          user.app_metadata?.role === "admin" ||
+          user.user_metadata?.role === "super_admin";
+        setIsAuthorizedAdmin(isSuperAdmin);
+        if (isSuperAdmin) {
+          void fetchData();
+        }
+      } else {
+        setIsAuthorizedAdmin(false);
       }
     });
 
@@ -305,7 +315,7 @@ export default function AdminDashboardPage() {
     };
   }, [fetchData, getAuthHeaders]);
 
-  // Admin Login Handler for the Security Gate
+  // Admin Login Handler for the Security Gate (Login on /admin route only)
   const handleAdminGateLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authGateEmail || !authGatePassword) {
@@ -328,20 +338,24 @@ export default function AdminDashboardPage() {
       }
 
       if (data?.user) {
-        const email = data.user.email?.toLowerCase().trim();
-        if (
-          email !== "admin@avsaraa.com" &&
-          data.user.app_metadata?.role !== "super_admin" &&
-          data.user.app_metadata?.role !== "admin"
-        ) {
+        const email = data.user.email?.toLowerCase().trim() || "";
+        const isSuperAdmin =
+          email === "admin@avsaraa.com" ||
+          data.user.app_metadata?.role === "super_admin" ||
+          data.user.app_metadata?.role === "admin" ||
+          data.user.user_metadata?.role === "super_admin";
+
+        if (!isSuperAdmin) {
           setAuthGateError("Access Denied: Only the Super Admin is authorized to access this console.");
           await supabase.auth.signOut();
+          setSessionUser(null);
+          setIsAuthorizedAdmin(false);
           return;
         }
 
         setSessionUser(data.user);
         setIsAuthorizedAdmin(true);
-        showToast("Super Admin Authenticated. Full Control Granted.");
+        showToast("Super Admin Authenticated. Master Console Unlocked.");
         void fetchData();
       }
     } catch (err: unknown) {
@@ -967,9 +981,28 @@ CREATE POLICY "Super admin can delete subscribers"
           >
             Super Admin Security Gate
           </h2>
-          <p style={{ fontSize: "13px", color: "#866951", lineHeight: "1.5", marginBottom: "24px" }}>
+          <p style={{ fontSize: "13px", color: "#866951", lineHeight: "1.5", marginBottom: "20px" }}>
             Restricted Master Access. Only the single Super Administrator possesses authority over the Avsaraa platform.
           </p>
+
+          {sessionUser && (
+            <div
+              style={{
+                backgroundColor: "#FFFBEB",
+                border: "1px solid #FDE68A",
+                color: "#92400E",
+                padding: "12px 14px",
+                borderRadius: "10px",
+                fontSize: "12px",
+                marginBottom: "16px",
+                textAlign: "left",
+                lineHeight: "1.5",
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: "3px" }}>Customer Session Detected</div>
+              You are signed in as <strong>{sessionUser.email}</strong>. Administrative routes require Super Admin authentication. Sign in with your Super Admin credentials below.
+            </div>
+          )}
 
           {authGateError && (
             <div
@@ -1076,7 +1109,17 @@ CREATE POLICY "Super admin can delete subscribers"
             </button>
           </form>
 
-          <div style={{ marginTop: "20px", borderTop: "1px solid #E8DED3", paddingTop: "16px" }}>
+          <div
+            style={{
+              marginTop: "20px",
+              borderTop: "1px solid #E8DED3",
+              paddingTop: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "10px",
+            }}
+          >
             <Link
               href="/"
               style={{
@@ -1087,6 +1130,22 @@ CREATE POLICY "Super admin can delete subscribers"
             >
               ← Return to Boutique Storefront
             </Link>
+            {sessionUser && (
+              <button
+                type="button"
+                onClick={handleAdminSignOut}
+                style={{
+                  fontSize: "12px",
+                  color: "#B91C1C",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+              >
+                Sign Out
+              </button>
+            )}
           </div>
         </div>
       </div>

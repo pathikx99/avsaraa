@@ -25,10 +25,11 @@ export default function NavigationDrawer({
   if (!isOpen) return null;
 
   const categories = [
-    { label: "SAREES", href: "/#products-sarees" },
-    { label: "DRESSES", href: "/#products-dresses" },
-    { label: "NEW ARRIVALS", href: "/#products-new-arrivals" },
-    { label: "OCCASION WEAR", href: "/#products-occasion-wear" },
+    { label: "ALL PIECES", href: "/collection" },
+    { label: "SAREES", href: "/collection?category=Sarees" },
+    { label: "DRESSES", href: "/collection?category=Dresses" },
+    { label: "NEW ARRIVALS", href: "/collection?category=New%20Arrivals" },
+    { label: "OCCASION WEAR", href: "/collection?category=Occasion%20Wear" },
   ];
 
   return (
@@ -176,7 +177,7 @@ export default function NavigationDrawer({
           )}
 
           <Link
-            href="/#wishlist"
+            href="/wishlist"
             onClick={onClose}
             style={{
               display: "flex",
@@ -264,26 +265,6 @@ export default function NavigationDrawer({
           >
             <span>Contact Us</span>
             <span style={{ color: "#AC9885", fontSize: "16px" }}>›</span>
-          </Link>
-
-          <Link
-            href="/admin"
-            onClick={onClose}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "14px 0",
-              borderBottom: "1px solid #EFE6DC",
-              fontSize: "13.5px",
-              color: "#866951",
-              fontWeight: 600,
-            }}
-          >
-            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span>🛡️ Admin Console</span>
-            </span>
-            <span style={{ color: "#866951", fontSize: "16px" }}>›</span>
           </Link>
         </div>
 

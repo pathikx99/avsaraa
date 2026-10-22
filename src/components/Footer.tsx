@@ -251,8 +251,10 @@ export default function Footer() {
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
               <li><Link href="/" className="luxury-nav-link">Home</Link></li>
+              <li><Link href="/collection" className="luxury-nav-link">Collection</Link></li>
               <li><Link href="/about" className="luxury-nav-link">About Us</Link></li>
               <li><Link href="/contact" className="luxury-nav-link">Contact Us</Link></li>
+              <li><Link href="/wishlist" className="luxury-nav-link">Wishlist</Link></li>
               {user && <li><Link href="/account" className="luxury-nav-link">My Account</Link></li>}
             </ul>
           </div>

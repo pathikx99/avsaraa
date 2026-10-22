@@ -167,7 +167,7 @@ export default function Header() {
             <Link href="/" className="luxury-nav-link">
               Home
             </Link>
-            <Link href="/#products" className="luxury-nav-link">
+            <Link href="/collection" className="luxury-nav-link">
               Collection
             </Link>
             <Link href="/about" className="luxury-nav-link">
@@ -175,10 +175,6 @@ export default function Header() {
             </Link>
             <Link href="/contact" className="luxury-nav-link">
               Contact
-            </Link>
-            <Link href="/admin" className="luxury-nav-link" style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-              <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#866951" }} />
-              <span>Admin</span>
             </Link>
             {user && (
               <Link href="/account" className="luxury-nav-link">
