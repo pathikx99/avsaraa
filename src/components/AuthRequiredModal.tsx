@@ -5,10 +5,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 
+import { HeartIcon } from "./Icons";
+
 export default function AuthRequiredModal() {
-  const { isAuthModalOpen, closeAuthModal, pendingProduct } = useCart();
+  const { isAuthModalOpen, closeAuthModal, pendingProduct, authModalReason } = useCart();
 
   if (!isAuthModalOpen) return null;
+
+  const isWishlist = authModalReason === "wishlist";
 
   return (
     <div
@@ -69,8 +73,8 @@ export default function AuthRequiredModal() {
             width: "56px",
             height: "56px",
             borderRadius: "50%",
-            backgroundColor: "#F2EBE3",
-            border: "1px solid #DFD0C2",
+            backgroundColor: isWishlist ? "rgba(197, 160, 89, 0.14)" : "#F2EBE3",
+            border: isWishlist ? "1px solid rgba(197, 160, 89, 0.4)" : "1px solid #DFD0C2",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -80,14 +84,14 @@ export default function AuthRequiredModal() {
             boxShadow: "0 6px 18px rgba(134,105,81,0.12)",
           }}
         >
-          🛍️
+          {isWishlist ? <HeartIcon size={24} color="#866951" /> : "🛍️"}
         </div>
 
         <span
           className="luxury-badge"
           style={{ marginBottom: "10px", display: "inline-block" }}
         >
-          ✦ MEMBER SIGN IN REQUIRED ✦
+          {isWishlist ? "✦ ATELIER WISHLIST ACCESS ✦" : "✦ MEMBER SIGN IN REQUIRED ✦"}
         </span>
 
         <h3
@@ -100,7 +104,7 @@ export default function AuthRequiredModal() {
             lineHeight: 1.25,
           }}
         >
-          Sign In to Add to Bag
+          {isWishlist ? "Sign In to Save Heirlooms" : "Sign In to Add to Bag"}
         </h3>
 
         <p
@@ -113,7 +117,9 @@ export default function AuthRequiredModal() {
             margin: "0 auto 20px auto",
           }}
         >
-          You are welcome to browse and view all our handcrafted sarees and luxury ensembles freely. To add items to your shopping bag and place an order, please sign in.
+          {isWishlist
+            ? "You are welcome to explore all our handcrafted sarees freely. To save pieces to your personal wishlist and curate your bridal trousseau, please sign in."
+            : "You are welcome to browse and view all our handcrafted sarees and luxury ensembles freely. To add items to your shopping bag and place an order, please sign in."}
         </p>
 
         {/* Selected Product Preview */}
@@ -188,7 +194,7 @@ export default function AuthRequiredModal() {
               textDecoration: "none",
             }}
           >
-            <span>Sign In to Your Account</span>
+            <span>{isWishlist ? "Sign In to Save Heirlooms" : "Sign In to Your Account"}</span>
             <span>→</span>
           </Link>
 

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isSuperAdminUser } from "@/lib/adminConstants";
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -54,10 +55,7 @@ export async function middleware(request: NextRequest) {
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const hasRedirectTo = request.nextUrl.searchParams.has("redirectTo");
   if (isAuthPage && user && !hasRedirectTo) {
-    const isSuperAdmin =
-      user.email?.toLowerCase().trim() === "admin@avsaraa.com" ||
-      user.app_metadata?.role === "super_admin" ||
-      user.app_metadata?.role === "admin";
+    const isSuperAdmin = isSuperAdminUser(user);
 
     // If admin is signed in, redirect to /admin, otherwise /account
     const destination = isSuperAdmin ? "/admin" : "/account";

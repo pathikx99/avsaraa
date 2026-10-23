@@ -185,6 +185,77 @@ VALUES
 ON CONFLICT (email) DO UPDATE SET
     status = 'Subscribed';
 
+-- ==============================================================================
+-- 5. REAL PATRON REVIEWS (With Photos & Video Media)
+-- ==============================================================================
+DELETE FROM public.product_reviews WHERE customer_email IN (
+    'ananya.singhania@example.com',
+    'radhika.varma@example.com',
+    'gayatri.deshmukh@example.com'
+);
+
+INSERT INTO public.product_reviews (
+    product_id,
+    product_name,
+    customer_name,
+    customer_email,
+    customer_city,
+    rating,
+    title,
+    comment,
+    photos,
+    videos,
+    verified_purchase,
+    helpful_count,
+    status
+)
+VALUES
+    (
+        'prod-1',
+        'Royal Banarasi Katan Silk Saree',
+        'Ananya Singhania',
+        'ananya.singhania@example.com',
+        'New Delhi',
+        5,
+        'Breathtaking Wedding Drape — Absolute Masterpiece',
+        'Wore this royal crimson Banarasi saree for our wedding reception. The handwoven real zari sheen and drape weight felt like true royal couture. Guests could not stop asking about the weavers from Surat.',
+        ARRAY['/images/patron_review_bride.jpg'],
+        ARRAY['https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'],
+        true,
+        28,
+        'published'
+    ),
+    (
+        'prod-2',
+        'Emerald Organza Embroidered Saree',
+        'Radhika Varma',
+        'radhika.varma@example.com',
+        'Mumbai',
+        5,
+        'The Gold Zari Glow in Ambient Candlelight is Unreal',
+        'Received endless compliments at our Diwali family gathering! The organza holds its pleats like a sculpture while remaining weightless. Pure heirloom quality from the Avsaraa atelier.',
+        ARRAY['/images/patron_review_emerald.jpg'],
+        ARRAY[]::TEXT[],
+        true,
+        19,
+        'published'
+    ),
+    (
+        'prod-4',
+        'Festive Chanderi Foil Print Dress',
+        'Dr. Gayatri Deshmukh',
+        'gayatri.deshmukh@example.com',
+        'Pune',
+        5,
+        'Atelier Packaging & Craftsmanship Surpassed Every Expectation',
+        'From the handcrafted keepsake box to the master drape instructions included, Avsaraa defines quiet Indian luxury. Arrived in 48 hours to Pune with royal crest seals.',
+        ARRAY['/images/saree_model_hero.jpg'],
+        ARRAY[]::TEXT[],
+        true,
+        14,
+        'published'
+    );
+
 COMMIT;
 
 -- Verification of seeded counts
@@ -194,4 +265,6 @@ SELECT 'Products' AS entity, COUNT(*) FROM public.products
 UNION ALL
 SELECT 'Inquiries' AS entity, COUNT(*) FROM public.contact_inquiries
 UNION ALL
-SELECT 'Subscribers' AS entity, COUNT(*) FROM public.newsletter_subscribers;
+SELECT 'Subscribers' AS entity, COUNT(*) FROM public.newsletter_subscribers
+UNION ALL
+SELECT 'Reviews' AS entity, COUNT(*) FROM public.product_reviews;

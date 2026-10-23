@@ -9,6 +9,7 @@ import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabaseClient";
 import { Product } from "@/types/product";
 import { normalizePhoneNumber } from "@/lib/phoneUtils";
+import { isSuperAdminEmail } from "@/lib/adminConstants";
 
 const PRESET_PRODUCT_IMAGES = [
   { label: "Banarasi Silk Saree", url: "/images/banarasi_silk_saree.jpg" },
@@ -95,7 +96,7 @@ export default function AccountPage() {
     try {
       // 0. Verify Super Admin Authority
       const normalizedEmail = (userEmail || "").toLowerCase().trim();
-      let adminCheck = normalizedEmail === "admin@avsaraa.com";
+      let adminCheck = isSuperAdminEmail(normalizedEmail);
 
       if (!adminCheck) {
         const { data: adminRecord } = await supabase

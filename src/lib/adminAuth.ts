@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import type { User } from "@supabase/supabase-js";
 import { AdminUser } from "@/types/admin";
+import { ADMIN_EMAIL, isSuperAdminUser } from "@/lib/adminConstants";
 
 export interface AdminAuthResult {
   authorized: boolean;
@@ -10,6 +11,16 @@ export interface AdminAuthResult {
   error?: string;
   user?: User;
   adminProfile?: AdminUser;
+}
+
+/**
+ * Returns server-side admin credentials configured from environment variables.
+ */
+export function getAdminServerCredentials() {
+  return {
+    email: (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase().trim(),
+    password: process.env.ADMIN_PASSWORD || "",
+  };
 }
 
 /**
@@ -102,13 +113,8 @@ export async function authenticateAdminRequest(): Promise<AdminAuthResult> {
       };
     }
 
-    // Check user metadata or default super admin email convention
-    const hasSuperAdminMeta =
-      user.app_metadata?.role === "super_admin" ||
-      user.app_metadata?.role === "admin" ||
-      user.user_metadata?.role === "super_admin" ||
-      user.user_metadata?.role === "admin" ||
-      userEmail === "admin@avsaraa.com";
+    // Check user metadata or default super admin email convention via env
+    const hasSuperAdminMeta = isSuperAdminUser(user);
 
     if (hasSuperAdminMeta) {
       return {

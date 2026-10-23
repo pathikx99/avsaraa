@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AvsaraaLogo from "./AvsaraaLogo";
 import { supabase } from "@/lib/supabaseClient";
+import { isSuperAdminEmail, isSuperAdminUser } from "@/lib/adminConstants";
 import {
   BackArrowIcon,
   MailIcon,
@@ -48,7 +49,7 @@ export default function LoginForm({
     const cleanEmail = email.trim().toLowerCase();
 
     // Check if Super Admin is attempting to sign in
-    if (cleanEmail === "admin@avsaraa.com") {
+    if (isSuperAdminEmail(cleanEmail)) {
       showToast("Super Admin account detected. Redirecting to Admin Portal...");
       // Allow sign-in then route directly to /admin
     }
@@ -75,10 +76,7 @@ export default function LoginForm({
 
       showToast("Welcome back to Avsaraa!");
 
-      const isSuperAdmin =
-        data.user?.email?.toLowerCase().trim() === "admin@avsaraa.com" ||
-        data.user?.app_metadata?.role === "super_admin" ||
-        data.user?.app_metadata?.role === "admin";
+      const isSuperAdmin = isSuperAdminUser(data.user);
 
       const targetDestination = isSuperAdmin ? "/admin" : redirectTo;
 

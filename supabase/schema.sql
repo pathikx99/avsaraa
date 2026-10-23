@@ -387,6 +387,87 @@ CREATE POLICY "Super admin can delete subscribers"
     USING (public.is_admin());
 
 -- ==============================================================================
+-- 7. WISHLISTS (Authenticated Patron Saved Heirlooms)
+-- Users can save heirlooms to their persistent account wishlist.
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.wishlists (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL,
+    product_data JSONB, -- cached product snapshot for instant loading
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    UNIQUE (user_id, product_id)
+);
+
+ALTER TABLE public.wishlists ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own wishlist" ON public.wishlists;
+CREATE POLICY "Users can view their own wishlist" 
+    ON public.wishlists FOR SELECT 
+    USING (auth.uid() = user_id OR public.is_admin());
+
+DROP POLICY IF EXISTS "Users can insert their own wishlist" ON public.wishlists;
+CREATE POLICY "Users can insert their own wishlist" 
+    ON public.wishlists FOR INSERT 
+    WITH CHECK (auth.uid() = user_id OR public.is_admin());
+
+DROP POLICY IF EXISTS "Users can delete their own wishlist" ON public.wishlists;
+CREATE POLICY "Users can delete their own wishlist" 
+    ON public.wishlists FOR DELETE 
+    USING (auth.uid() = user_id OR public.is_admin());
+
+-- ==============================================================================
+-- 8. PRODUCT REVIEWS & TESTIMONIALS (With Customer Photos & Videos)
+-- Real patron reviews including photo/video media.
+-- Reviews can be managed, moderated, and DELETED by Super Admin.
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.product_reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id TEXT NOT NULL,
+    product_name TEXT,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    customer_name TEXT NOT NULL,
+    customer_email TEXT,
+    customer_city TEXT,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    title TEXT,
+    comment TEXT NOT NULL,
+    photos TEXT[] DEFAULT '{}',
+    videos TEXT[] DEFAULT '{}',
+    verified_purchase BOOLEAN DEFAULT false,
+    helpful_count INTEGER DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'pending', 'hidden', 'flagged')),
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.product_reviews ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can view published reviews
+DROP POLICY IF EXISTS "Anyone can view published reviews" ON public.product_reviews;
+CREATE POLICY "Anyone can view published reviews" 
+    ON public.product_reviews FOR SELECT 
+    USING (status = 'published' OR public.is_admin());
+
+-- Customers or patrons can submit reviews
+DROP POLICY IF EXISTS "Anyone can submit a review" ON public.product_reviews;
+CREATE POLICY "Anyone can submit a review" 
+    ON public.product_reviews FOR INSERT 
+    WITH CHECK (true);
+
+-- Super admin can update review status (e.g. approve, verify, flag)
+DROP POLICY IF EXISTS "Super admin can update reviews" ON public.product_reviews;
+CREATE POLICY "Super admin can update reviews" 
+    ON public.product_reviews FOR UPDATE 
+    USING (public.is_admin());
+
+-- Super admin can DELETE reviews
+DROP POLICY IF EXISTS "Super admin can delete reviews" ON public.product_reviews;
+CREATE POLICY "Super admin can delete reviews" 
+    ON public.product_reviews FOR DELETE 
+    USING (public.is_admin());
+
+-- ==============================================================================
 -- INDEXES FOR MAXIMUM QUERY PERFORMANCE
 -- ==============================================================================
 CREATE INDEX IF NOT EXISTS idx_admin_users_email ON public.admin_users(email);
@@ -397,3 +478,9 @@ CREATE INDEX IF NOT EXISTS idx_inquiries_email ON public.contact_inquiries(email
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category);
 CREATE INDEX IF NOT EXISTS idx_products_user ON public.products(user_id);
 CREATE INDEX IF NOT EXISTS idx_products_created ON public.products(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wishlists_user ON public.wishlists(user_id);
+CREATE INDEX IF NOT EXISTS idx_wishlists_product ON public.wishlists(product_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_product ON public.product_reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_status ON public.product_reviews(status);
+CREATE INDEX IF NOT EXISTS idx_reviews_rating ON public.product_reviews(rating DESC);
+CREATE INDEX IF NOT EXISTS idx_reviews_created ON public.product_reviews(created_at DESC);

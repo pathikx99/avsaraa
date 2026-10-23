@@ -10,7 +10,7 @@ import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/context/CartContext";
 
 export default function WishlistPage() {
-  const { wishlist, removeFromWishlist, clearWishlist } = useWishlist();
+  const { wishlist, removeFromWishlist, clearWishlist, user, isLoaded } = useWishlist();
   const { addToCart } = useCart();
   const [addedId, setAddedId] = useState<string | null>(null);
 
@@ -109,7 +109,119 @@ export default function WishlistPage() {
 
         {/* Wishlist Content */}
         <section style={{ padding: "60px 24px 80px 24px", maxWidth: "1240px", margin: "0 auto" }}>
-          {wishlist.length === 0 ? (
+          {!user && isLoaded ? (
+            <div
+              style={{
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #E8DED3",
+                borderRadius: "24px",
+                padding: "60px 32px",
+                boxShadow: "0 10px 30px rgba(38, 27, 19, 0.04)",
+                textAlign: "center",
+                maxWidth: "600px",
+                margin: "0 auto",
+              }}
+            >
+              <div
+                style={{
+                  width: "64px",
+                  height: "64px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(197, 160, 89, 0.12)",
+                  border: "1px solid rgba(197, 160, 89, 0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 20px auto",
+                }}
+              >
+                <HeartIcon size={26} color="#866951" />
+              </div>
+
+              <span className="luxury-badge" style={{ marginBottom: "12px", display: "inline-block" }}>
+                ✦ ATELIER WISHLIST ACCESS ✦
+              </span>
+
+              <h2
+                style={{
+                  fontFamily: "var(--font-serif), Georgia, serif",
+                  fontSize: "28px",
+                  fontWeight: 600,
+                  color: "#261B13",
+                  marginBottom: "10px",
+                }}
+              >
+                Sign In to View Saved Heirlooms
+              </h2>
+
+              <p
+                style={{
+                  fontSize: "14.5px",
+                  color: "#6E5B4E",
+                  lineHeight: 1.7,
+                  maxWidth: "460px",
+                  margin: "0 auto 28px auto",
+                }}
+              >
+                Please sign in to your Avsaraa account to view your saved sarees, manage your bridal trousseau selections, and proceed with private drape consultations.
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "340px", margin: "0 auto" }}>
+                <Link
+                  href="/login?redirect=/wishlist"
+                  className="avsaraa-btn-primary btn-shine"
+                  style={{
+                    height: "48px",
+                    fontSize: "12.5px",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    textDecoration: "none",
+                    borderRadius: "24px",
+                  }}
+                >
+                  <span>Sign In to Your Account</span>
+                  <span>→</span>
+                </Link>
+
+                <Link
+                  href="/register"
+                  className="avsaraa-btn-outline"
+                  style={{
+                    height: "46px",
+                    fontSize: "12.5px",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textDecoration: "none",
+                    borderRadius: "24px",
+                    backgroundColor: "#FFFFFF",
+                  }}
+                >
+                  <span>Create New Account</span>
+                </Link>
+
+                <Link
+                  href="/collection"
+                  style={{
+                    marginTop: "8px",
+                    fontSize: "12.5px",
+                    color: "#866951",
+                    textDecoration: "underline",
+                    textUnderlineOffset: "3px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Explore The Atelier Collection →
+                </Link>
+              </div>
+            </div>
+          ) : wishlist.length === 0 ? (
             <div
               style={{
                 backgroundColor: "#FFFFFF",

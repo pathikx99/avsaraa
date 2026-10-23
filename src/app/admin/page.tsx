@@ -20,9 +20,14 @@ import {
   SpinnerIcon,
   CheckIcon,
   MailIcon,
+  VideoCameraIcon,
+  CameraIcon,
+  StarIcon,
 } from "@/components/Icons";
-import { AdminUser, CustomerProfile, ContactInquiry, NewsletterSubscriber } from "@/types/admin";
+import { AdminUser, CustomerProfile, ContactInquiry, NewsletterSubscriber, ProductReview } from "@/types/admin";
 import { Product, ProductCategory } from "@/types/product";
+import { ADMIN_EMAIL, isSuperAdminUser } from "@/lib/adminConstants";
+import { DEFAULT_PATRON_REVIEWS } from "@/lib/defaultReviews";
 
 const PRESET_PRODUCT_IMAGES = [
   { label: "Banarasi Silk Saree", url: "/images/banarasi_silk_saree.jpg" },
@@ -37,7 +42,7 @@ const PRESET_PRODUCT_IMAGES = [
 const DEFAULT_SUPER_ADMIN: AdminUser = {
   id: "adm-001",
   full_name: "Kratos Lord",
-  email: "admin@avsaraa.com",
+  email: ADMIN_EMAIL,
   role: "Super Admin",
   department: "Executive Leadership",
   phone_number: "+91 98765 43210",
@@ -58,7 +63,7 @@ const DEFAULT_SUPER_ADMIN: AdminUser = {
 export default function AdminDashboardPage() {
   // Navigation tabs - Customer Accounts is the primary view for Auth & Admin management
   const [activeTab, setActiveTab] = useState<
-    "customers" | "super_admin" | "sql_guide" | "products" | "inquiries"
+    "customers" | "reviews" | "super_admin" | "sql_guide" | "products" | "inquiries"
   >("customers");
 
   // Authentication & Security State
@@ -74,6 +79,7 @@ export default function AdminDashboardPage() {
   const [superAdmin, setSuperAdmin] = useState<AdminUser>(DEFAULT_SUPER_ADMIN);
   const [customerProfiles, setCustomerProfiles] = useState<CustomerProfile[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [reviews, setReviews] = useState<ProductReview[]>(DEFAULT_PATRON_REVIEWS);
   const [inquiries, setInquiries] = useState<ContactInquiry[]>([]);
   const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,6 +89,11 @@ export default function AdminDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [inquiryStatusFilter, setInquiryStatusFilter] = useState<string>("ALL");
+  const [reviewFilter, setReviewFilter] = useState<"ALL" | "WITH_MEDIA" | "5_STAR" | "FLAGGED">("ALL");
+
+  // Reviews Modals & Actions
+  const [isDeletingReviewId, setIsDeletingReviewId] = useState<string | null>(null);
+  const [previewMediaModal, setPreviewMediaModal] = useState<{ type: "photo" | "video"; url: string; title?: string } | null>(null);
 
   // Modals state for Products
   const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -208,6 +219,15 @@ export default function AdminDashboardPage() {
           setSubscribers(inqJson.subscribers || []);
         }
       }
+
+      // 4. Fetch Customer Reviews (photos & videos)
+      const reviewsRes = await fetch("/api/admin/reviews", { headers });
+      if (reviewsRes.ok) {
+        const reviewsJson = await reviewsRes.json();
+        if (reviewsJson.success && reviewsJson.reviews) {
+          setReviews(reviewsJson.reviews);
+        }
+      }
     } catch (err) {
       console.warn("API load error:", err);
     } finally {
@@ -228,12 +248,7 @@ export default function AdminDashboardPage() {
         setSessionUser(user);
 
         if (user) {
-          const email = user.email?.toLowerCase().trim() || "";
-          const isSuperAdmin =
-            email === "admin@avsaraa.com" ||
-            user.app_metadata?.role === "super_admin" ||
-            user.app_metadata?.role === "admin" ||
-            user.user_metadata?.role === "super_admin";
+          const isSuperAdmin = isSuperAdminUser(user);
 
           setIsAuthorizedAdmin(isSuperAdmin);
 
@@ -241,10 +256,11 @@ export default function AdminDashboardPage() {
             // Fetch data securely for authenticated admin
             const headers = await getAuthHeaders();
 
-            const [usersRes, productsRes, inqRes] = await Promise.all([
+            const [usersRes, productsRes, inqRes, reviewsRes] = await Promise.all([
               fetch("/api/admin/users", { headers }),
               fetch("/api/admin/products", { headers }),
               fetch("/api/admin/inquiries", { headers }),
+              fetch("/api/admin/reviews", { headers }),
             ]);
 
             if (!active) return;
@@ -275,6 +291,13 @@ export default function AdminDashboardPage() {
                 setSubscribers(inqJson.subscribers || []);
               }
             }
+
+            if (reviewsRes.ok) {
+              const reviewsJson = await reviewsRes.json();
+              if (reviewsJson.success && reviewsJson.reviews) {
+                setReviews(reviewsJson.reviews);
+              }
+            }
           }
         } else {
           setIsAuthorizedAdmin(false);
@@ -296,12 +319,7 @@ export default function AdminDashboardPage() {
       const user = session?.user ?? null;
       setSessionUser(user);
       if (user) {
-        const email = user.email?.toLowerCase().trim() || "";
-        const isSuperAdmin =
-          email === "admin@avsaraa.com" ||
-          user.app_metadata?.role === "super_admin" ||
-          user.app_metadata?.role === "admin" ||
-          user.user_metadata?.role === "super_admin";
+        const isSuperAdmin = isSuperAdminUser(user);
         setIsAuthorizedAdmin(isSuperAdmin);
         if (isSuperAdmin) {
           void fetchData();
@@ -329,23 +347,61 @@ export default function AdminDashboardPage() {
     setAuthGateError(null);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      let signInResult = await supabase.auth.signInWithPassword({
         email: authGateEmail.trim().toLowerCase(),
         password: authGatePassword,
       });
 
-      if (error) {
-        setAuthGateError(error.message);
+      // If Supabase sign-in fails, attempt sync against environment admin credentials
+      if (signInResult.error) {
+        try {
+          const syncRes = await fetch("/api/admin/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: authGateEmail.trim().toLowerCase(),
+              password: authGatePassword,
+            }),
+          });
+          const syncJson = await syncRes.json();
+          if (syncJson.success) {
+            // Retry sign-in with newly provisioned/synced credentials
+            signInResult = await supabase.auth.signInWithPassword({
+              email: authGateEmail.trim().toLowerCase(),
+              password: authGatePassword,
+            });
+
+            if (signInResult.error) {
+              // Environment authentication succeeded; authorize session user
+              const mockAdminUser: User = {
+                id: "admin-env-user",
+                email: authGateEmail.trim().toLowerCase(),
+                app_metadata: { role: "super_admin" },
+                user_metadata: { role: "super_admin", full_name: "Kratos Lord" },
+                aud: "authenticated",
+                created_at: new Date().toISOString(),
+              } as User;
+
+              setSessionUser(mockAdminUser);
+              setIsAuthorizedAdmin(true);
+              showToast("Super Admin Authenticated. Master Console Unlocked.");
+              void fetchData();
+              return;
+            }
+          }
+        } catch {
+          // Fall through to original error
+        }
+      }
+
+      if (signInResult.error) {
+        setAuthGateError(signInResult.error.message);
         return;
       }
 
-      if (data?.user) {
-        const email = data.user.email?.toLowerCase().trim() || "";
-        const isSuperAdmin =
-          email === "admin@avsaraa.com" ||
-          data.user.app_metadata?.role === "super_admin" ||
-          data.user.app_metadata?.role === "admin" ||
-          data.user.user_metadata?.role === "super_admin";
+      const user = signInResult.data?.user;
+      if (user) {
+        const isSuperAdmin = isSuperAdminUser(user);
 
         if (!isSuperAdmin) {
           setAuthGateError("Access Denied: Only the Super Admin is authorized to access this console.");
@@ -355,7 +411,7 @@ export default function AdminDashboardPage() {
           return;
         }
 
-        setSessionUser(data.user);
+        setSessionUser(user);
         setIsAuthorizedAdmin(true);
         showToast("Super Admin Authenticated. Master Console Unlocked.");
         void fetchData();
@@ -750,8 +806,94 @@ export default function AdminDashboardPage() {
   };
 
   // ---------------------------------------------------------------------------
+  // Customer Review Management Handlers
+  // ---------------------------------------------------------------------------
+  const handleDeleteReview = async (reviewId: string) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to permanently delete this customer review? All patron photos and video drapes will be removed."
+      )
+    ) {
+      return;
+    }
+
+    setIsDeletingReviewId(reviewId);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/reviews?id=${reviewId}`, {
+        method: "DELETE",
+        headers,
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+        showToast("Customer review deleted permanently.", "success");
+      } else {
+        throw new Error(json.error || "Failed to delete review");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Deletion failed";
+      showToast(msg, "error");
+    } finally {
+      setIsDeletingReviewId(null);
+    }
+  };
+
+  const handleToggleReviewStatus = async (review: ProductReview) => {
+    const nextStatus = review.status === "published" ? "hidden" : "published";
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/reviews", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          id: review.id,
+          status: nextStatus,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setReviews((prev) =>
+          prev.map((r) => (r.id === review.id ? { ...r, status: nextStatus } : r))
+        );
+        showToast(`Review marked as ${nextStatus}.`, "success");
+      } else {
+        throw new Error(json.error || "Failed to update review status");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Status update failed";
+      showToast(msg, "error");
+    }
+  };
+
+  // ---------------------------------------------------------------------------
   // Filtered Lists
   // ---------------------------------------------------------------------------
+  const filteredReviews = useMemo(() => {
+    return reviews.filter((r) => {
+      const query = searchQuery.toLowerCase().trim();
+      const matchSearch =
+        !query ||
+        r.customer_name.toLowerCase().includes(query) ||
+        (r.title && r.title.toLowerCase().includes(query)) ||
+        r.comment.toLowerCase().includes(query) ||
+        (r.product_name && r.product_name.toLowerCase().includes(query)) ||
+        (r.customer_city && r.customer_city.toLowerCase().includes(query));
+
+      let matchFilter = true;
+      if (reviewFilter === "WITH_MEDIA") {
+        matchFilter =
+          Boolean(r.photos && r.photos.length > 0) ||
+          Boolean(r.videos && r.videos.length > 0);
+      } else if (reviewFilter === "5_STAR") {
+        matchFilter = r.rating === 5;
+      } else if (reviewFilter === "FLAGGED") {
+        matchFilter = r.status === "flagged" || r.status === "hidden";
+      }
+
+      return matchSearch && matchFilter;
+    });
+  }, [reviews, searchQuery, reviewFilter]);
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       const matchSearch =
@@ -827,7 +969,7 @@ BEGIN
             )
             OR (auth.jwt()->'app_metadata'->>'role') = 'super_admin'
             OR (auth.jwt()->'app_metadata'->>'role') = 'admin'
-            OR LOWER(auth.jwt()->>'email') = 'admin@avsaraa.com'
+            OR LOWER(auth.jwt()->>'email') = '${ADMIN_EMAIL}'
         )
     );
 END;
@@ -844,11 +986,11 @@ CREATE POLICY "Super admin can update admin users"
     USING (public.is_admin());
 
 -- Cleanup secondary admins and seed ONLY the single Super Admin
-DELETE FROM public.admin_users WHERE email != 'admin@avsaraa.com';
+DELETE FROM public.admin_users WHERE email != '${ADMIN_EMAIL}';
 
 INSERT INTO public.admin_users (full_name, email, role, department, phone_number, status, permissions, notes)
 VALUES 
-    ('Kratos Lord', 'admin@avsaraa.com', 'Super Admin', 'Executive Leadership', '+91 98765 43210', 'Active', ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'], 'Founding Super Administrator with full system control and supreme authority.')
+    ('Kratos Lord', '${ADMIN_EMAIL}', 'Super Admin', 'Executive Leadership', '+91 98765 43210', 'Active', ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'], 'Founding Super Administrator with full system control and supreme authority.')
 ON CONFLICT (email) DO UPDATE SET
     role = 'Super Admin',
     status = 'Active';
@@ -919,7 +1061,54 @@ CREATE POLICY "Super admin can view subscribers"
 DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
 CREATE POLICY "Super admin can delete subscribers" 
     ON public.newsletter_subscribers FOR DELETE 
-    USING (public.is_admin());`;
+    USING (public.is_admin());
+
+-- 4. WISHLISTS & SAVED HEIRLOOMS
+CREATE TABLE IF NOT EXISTS public.wishlists (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL,
+    product_data JSONB,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    UNIQUE (user_id, product_id)
+);
+ALTER TABLE public.wishlists ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view their own wishlist" ON public.wishlists;
+CREATE POLICY "Users can view their own wishlist" ON public.wishlists FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
+DROP POLICY IF EXISTS "Users can insert their own wishlist" ON public.wishlists;
+CREATE POLICY "Users can insert their own wishlist" ON public.wishlists FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_admin());
+DROP POLICY IF EXISTS "Users can delete their own wishlist" ON public.wishlists;
+CREATE POLICY "Users can delete their own wishlist" ON public.wishlists FOR DELETE USING (auth.uid() = user_id OR public.is_admin());
+
+-- 5. PRODUCT REVIEWS & PATRON MEDIA (Photos & Videos)
+CREATE TABLE IF NOT EXISTS public.product_reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id TEXT NOT NULL,
+    product_name TEXT,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    customer_name TEXT NOT NULL,
+    customer_email TEXT,
+    customer_city TEXT,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    title TEXT,
+    comment TEXT NOT NULL,
+    photos TEXT[] DEFAULT '{}',
+    videos TEXT[] DEFAULT '{}',
+    verified_purchase BOOLEAN DEFAULT false,
+    helpful_count INTEGER DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'pending', 'hidden', 'flagged')),
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+ALTER TABLE public.product_reviews ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view published reviews" ON public.product_reviews;
+CREATE POLICY "Anyone can view published reviews" ON public.product_reviews FOR SELECT USING (status = 'published' OR public.is_admin());
+DROP POLICY IF EXISTS "Anyone can submit a review" ON public.product_reviews;
+CREATE POLICY "Anyone can submit a review" ON public.product_reviews FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Super admin can update reviews" ON public.product_reviews;
+CREATE POLICY "Super admin can update reviews" ON public.product_reviews FOR UPDATE USING (public.is_admin());
+DROP POLICY IF EXISTS "Super admin can delete reviews" ON public.product_reviews;
+CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DELETE USING (public.is_admin());`;
 
     navigator.clipboard.writeText(sql);
     setCopiedSql(true);
@@ -1045,7 +1234,7 @@ CREATE POLICY "Super admin can delete subscribers"
                 required
                 value={authGateEmail}
                 onChange={(e) => setAuthGateEmail(e.target.value)}
-                placeholder="admin@avsaraa.com"
+                placeholder={ADMIN_EMAIL}
                 style={{
                   width: "100%",
                   padding: "12px 14px",
@@ -1542,7 +1731,30 @@ CREATE POLICY "Super admin can delete subscribers"
               <span>Customer Accounts ({customerProfiles.length})</span>
             </button>
 
-            {/* Tab 2: Super Admin Master Profile */}
+            {/* Tab 2: Patron Reviews & Media */}
+            <button
+              onClick={() => {
+                setActiveTab("reviews");
+                setSearchQuery("");
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "12px 18px",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: activeTab === "reviews" ? "#C5A059" : "#866951",
+                borderBottom: activeTab === "reviews" ? "3px solid #C5A059" : "3px solid transparent",
+                marginBottom: "-2px",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <StarIcon size={18} color={activeTab === "reviews" ? "#C5A059" : "#AC9885"} />
+              <span>Patron Reviews & Media ({reviews.length})</span>
+            </button>
+
+            {/* Tab 3: Super Admin Master Profile */}
             <button
               onClick={() => setActiveTab("super_admin")}
               style={{
@@ -1604,6 +1816,45 @@ CREATE POLICY "Super admin can delete subscribers"
                 <PlusIcon size={16} color="#F7F2EE" />
                 <span>Add Customer Account</span>
               </button>
+            )}
+
+            {activeTab === "reviews" && (
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "8px 14px",
+                    backgroundColor: "#FAF6F0",
+                    border: "1px solid #E8DED3",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#866951",
+                  }}
+                >
+                  <CameraIcon size={14} color="#866951" />
+                  <span>{reviews.reduce((acc, r) => acc + (r.photos?.length || 0), 0)} Photos</span>
+                </span>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "8px 14px",
+                    backgroundColor: "#FAF6F0",
+                    border: "1px solid #E8DED3",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#866951",
+                  }}
+                >
+                  <VideoCameraIcon size={14} color="#866951" />
+                  <span>{reviews.reduce((acc, r) => acc + (r.videos?.length || 0), 0)} Videos</span>
+                </span>
+              </div>
             )}
 
             {activeTab === "super_admin" && (
@@ -2302,6 +2553,509 @@ CREATE POLICY "Super admin can delete subscribers"
         )}
 
         {/* ================================================================= */}
+        {/* VIEW 2: PATRON REVIEWS & MEDIA MANAGEMENT (PHOTOS & VIDEOS)       */}
+        {/* ================================================================= */}
+        {activeTab === "reviews" && (
+          <div>
+            {/* Header Controls Bar */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "20px",
+                flexWrap: "wrap",
+                gap: "12px",
+              }}
+            >
+              {/* Filter Pills */}
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "#866951",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginRight: "4px",
+                  }}
+                >
+                  Filter:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setReviewFilter("ALL")}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "20px",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    backgroundColor: reviewFilter === "ALL" ? "#261B13" : "#FAF6F0",
+                    color: reviewFilter === "ALL" ? "#F7F2EE" : "#866951",
+                    border: "1px solid",
+                    borderColor: reviewFilter === "ALL" ? "#261B13" : "#E8DED3",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  All Reviews ({reviews.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewFilter("WITH_MEDIA")}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "20px",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    backgroundColor: reviewFilter === "WITH_MEDIA" ? "#261B13" : "#FAF6F0",
+                    color: reviewFilter === "WITH_MEDIA" ? "#F7F2EE" : "#866951",
+                    border: "1px solid",
+                    borderColor: reviewFilter === "WITH_MEDIA" ? "#261B13" : "#E8DED3",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <CameraIcon size={13} />
+                  <span>
+                    With Photos & Videos (
+                    {
+                      reviews.filter(
+                        (r) =>
+                          (r.photos?.length || 0) > 0 ||
+                          (r.videos?.length || 0) > 0
+                      ).length
+                    }
+                    )
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewFilter("5_STAR")}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "20px",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    backgroundColor: reviewFilter === "5_STAR" ? "#261B13" : "#FAF6F0",
+                    color: reviewFilter === "5_STAR" ? "#F7F2EE" : "#866951",
+                    border: "1px solid",
+                    borderColor: reviewFilter === "5_STAR" ? "#261B13" : "#E8DED3",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  <StarIcon size={13} color="#C5A059" />
+                  <span>5-Star Heirlooms ({reviews.filter((r) => r.rating === 5).length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewFilter("FLAGGED")}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "20px",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    backgroundColor: reviewFilter === "FLAGGED" ? "#261B13" : "#FAF6F0",
+                    color: reviewFilter === "FLAGGED" ? "#F7F2EE" : "#866951",
+                    border: "1px solid",
+                    borderColor: reviewFilter === "FLAGGED" ? "#261B13" : "#E8DED3",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  Hidden ({reviews.filter((r) => r.status === "hidden" || r.status === "flagged").length})
+                </button>
+              </div>
+
+              {/* Authority Badge */}
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "12px",
+                  color: "#866951",
+                  backgroundColor: "#FFFFFF",
+                  padding: "6px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid #E8DED3",
+                }}
+              >
+                <ShieldCheckIcon size={14} color="#6F42C1" />
+                <span>Super Admin Review Moderation & Deletion Authority</span>
+              </div>
+            </div>
+
+            {/* Reviews List */}
+            {filteredReviews.length === 0 ? (
+              <div
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  border: "1px solid #E8DED3",
+                  borderRadius: "14px",
+                  padding: "48px 24px",
+                  textAlign: "center",
+                  color: "#866951",
+                }}
+              >
+                <div style={{ fontSize: "36px", marginBottom: "12px" }}>✦</div>
+                <h3 style={{ fontSize: "16px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
+                  No Patron Reviews Found
+                </h3>
+                <p style={{ fontSize: "13px" }}>
+                  No customer reviews match your active filter. Change filter criteria or reset search.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {filteredReviews.map((review) => (
+                  <div
+                    key={review.id}
+                    style={{
+                      backgroundColor: "#FFFFFF",
+                      border: "1px solid #E8DED3",
+                      borderRadius: "14px",
+                      padding: "24px",
+                      boxShadow: "0 4px 18px rgba(38,27,19,0.03)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "16px",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {/* Header Row */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "12px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                        <div
+                          style={{
+                            width: "44px",
+                            height: "44px",
+                            borderRadius: "50%",
+                            background: "linear-gradient(135deg, #FAF6F0, #EAE0D5)",
+                            border: "1px solid #C5A059",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "16px",
+                            fontWeight: 700,
+                            color: "#866951",
+                            fontFamily: "var(--font-playfair), serif",
+                          }}
+                        >
+                          {review.customer_name ? review.customer_name.charAt(0).toUpperCase() : "P"}
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "15px", fontWeight: 700, color: "#261B13" }}>
+                              {review.customer_name}
+                            </span>
+                            {review.verified_purchase && (
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  padding: "2px 8px",
+                                  borderRadius: "12px",
+                                  fontSize: "11px",
+                                  fontWeight: 600,
+                                  backgroundColor: "#EBF8F2",
+                                  color: "#0F7A50",
+                                  border: "1px solid #A7F3D0",
+                                }}
+                              >
+                                <CheckIcon size={10} color="#0F7A50" />
+                                Verified Patron
+                              </span>
+                            )}
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                borderRadius: "12px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                backgroundColor: review.status === "published" ? "#FAF7F2" : "#FEE2E2",
+                                color: review.status === "published" ? "#866951" : "#DC2626",
+                                border: "1px solid",
+                                borderColor: review.status === "published" ? "#E8DED3" : "#FCA5A5",
+                              }}
+                            >
+                              ● {review.status.toUpperCase()}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: "10px", fontSize: "12px", color: "#866951", marginTop: "3px" }}>
+                            {review.customer_city && <span>{review.customer_city}</span>}
+                            {review.customer_email && <span>• {review.customer_email}</span>}
+                            <span>
+                              •{" "}
+                              {new Date(review.created_at).toLocaleDateString("en-IN", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Admin Actions */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleReviewStatus(review)}
+                          title="Toggle review visibility"
+                          style={{
+                            padding: "7px 12px",
+                            borderRadius: "8px",
+                            border: "1px solid #CFBEAD",
+                            backgroundColor: "#FAF7F2",
+                            color: "#261B13",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {review.status === "published" ? "Hide from Store" : "Publish to Store"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDeletingReviewId === review.id}
+                          onClick={() => handleDeleteReview(review.id)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "7px 14px",
+                            borderRadius: "8px",
+                            border: "1px solid #FCA5A5",
+                            backgroundColor: "#FFF5F5",
+                            color: "#DC2626",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            cursor: isDeletingReviewId === review.id ? "not-allowed" : "pointer",
+                            transition: "all 0.2s ease",
+                          }}
+                        >
+                          {isDeletingReviewId === review.id ? (
+                            <SpinnerIcon size={13} color="#DC2626" />
+                          ) : (
+                            <TrashIcon size={13} color="#DC2626" />
+                          )}
+                          <span>Delete Review</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Rating & Product Tag */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ display: "flex", gap: "2px" }}>
+                          {[...Array(5)].map((_, i) => (
+                            <StarIcon key={i} size={15} color="#C5A059" filled={i < review.rating} />
+                          ))}
+                        </div>
+                        {review.title && (
+                          <h4 style={{ fontSize: "15px", fontWeight: 700, color: "#261B13", margin: 0 }}>
+                            {review.title}
+                          </h4>
+                        )}
+                      </div>
+                      {review.product_name && (
+                        <div
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "4px 10px",
+                            borderRadius: "6px",
+                            backgroundColor: "#FAF7F2",
+                            border: "1px solid #E8DED3",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            color: "#866951",
+                          }}
+                        >
+                          <ShoppingBagIcon size={12} color="#866951" />
+                          <span>{review.product_name}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Review Comment */}
+                    <p style={{ fontSize: "14px", color: "#3B2E25", lineHeight: "1.65", margin: 0 }}>
+                      &ldquo;{review.comment}&rdquo;
+                    </p>
+
+                    {/* Real Customer Photos */}
+                    {review.photos && review.photos.length > 0 && (
+                      <div style={{ paddingTop: "6px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#866951",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            marginBottom: "8px",
+                          }}
+                        >
+                          <CameraIcon size={13} color="#866951" />
+                          <span>Patron Photos ({review.photos.length})</span>
+                        </div>
+                        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                          {review.photos.map((photoUrl, photoIdx) => (
+                            <div
+                              key={photoIdx}
+                              onClick={() =>
+                                setPreviewMediaModal({
+                                  type: "photo",
+                                  url: photoUrl,
+                                  title: `${review.customer_name}'s Saree Photo`,
+                                })
+                              }
+                              style={{
+                                position: "relative",
+                                width: "90px",
+                                height: "90px",
+                                borderRadius: "8px",
+                                overflow: "hidden",
+                                border: "1px solid #E8DED3",
+                                cursor: "pointer",
+                                boxShadow: "0 2px 8px rgba(38,27,19,0.06)",
+                              }}
+                            >
+                              <Image
+                                src={photoUrl}
+                                alt={`Customer photo ${photoIdx + 1}`}
+                                fill
+                                sizes="90px"
+                                style={{ objectFit: "cover" }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Real Customer Video Reviews */}
+                    {review.videos && review.videos.length > 0 && (
+                      <div style={{ paddingTop: "6px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#866951",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            marginBottom: "8px",
+                          }}
+                        >
+                          <VideoCameraIcon size={13} color="#866951" />
+                          <span>Real Patron Video Drape & Unboxing ({review.videos.length})</span>
+                        </div>
+                        <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
+                          {review.videos.map((videoUrl, vidIdx) => (
+                            <div
+                              key={vidIdx}
+                              style={{
+                                position: "relative",
+                                width: "100%",
+                                maxWidth: "340px",
+                                borderRadius: "10px",
+                                overflow: "hidden",
+                                border: "1px solid #CFBEAD",
+                                backgroundColor: "#1C140E",
+                                boxShadow: "0 4px 14px rgba(38,27,19,0.1)",
+                              }}
+                            >
+                              <video
+                                src={videoUrl}
+                                controls
+                                preload="metadata"
+                                style={{
+                                  width: "100%",
+                                  height: "200px",
+                                  objectFit: "cover",
+                                  display: "block",
+                                }}
+                              />
+                              <div
+                                style={{
+                                  padding: "6px 10px",
+                                  backgroundColor: "#FAF7F2",
+                                  borderTop: "1px solid #E8DED3",
+                                  fontSize: "11px",
+                                  color: "#866951",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <span>Clip {vidIdx + 1}: Live Patron Review Drape</span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPreviewMediaModal({
+                                      type: "video",
+                                      url: videoUrl,
+                                      title: `${review.customer_name}'s Video Drape Review`,
+                                    })
+                                  }
+                                  style={{
+                                    fontSize: "11px",
+                                    color: "#866951",
+                                    fontWeight: 600,
+                                    textDecoration: "underline",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Cinema View ↗
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ================================================================= */}
         {/* VIEW 4: SUPER ADMIN MASTER PROFILE & SECURITY                     */}
         {/* ================================================================= */}
         {activeTab === "super_admin" && (
@@ -2579,7 +3333,7 @@ BEGIN
             )
             OR (auth.jwt()->'app_metadata'->>'role') = 'super_admin'
             OR (auth.jwt()->'app_metadata'->>'role') = 'admin'
-            OR LOWER(auth.jwt()->>'email') = 'admin@avsaraa.com'
+            OR LOWER(auth.jwt()->>'email') = '${ADMIN_EMAIL}'
         )
     );
 END;
@@ -2596,11 +3350,11 @@ CREATE POLICY "Super admin can update admin users"
     USING (public.is_admin());
 
 -- Cleanup secondary admins and seed ONLY the single Super Admin
-DELETE FROM public.admin_users WHERE email != 'admin@avsaraa.com';
+DELETE FROM public.admin_users WHERE email != '${ADMIN_EMAIL}';
 
 INSERT INTO public.admin_users (full_name, email, role, department, phone_number, status, permissions, notes)
 VALUES 
-    ('Kratos Lord', 'admin@avsaraa.com', 'Super Admin', 'Executive Leadership', '+91 98765 43210', 'Active', ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'], 'Founding Super Administrator with full system control and supreme authority.')
+    ('Kratos Lord', '${ADMIN_EMAIL}', 'Super Admin', 'Executive Leadership', '+91 98765 43210', 'Active', ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'], 'Founding Super Administrator with full system control and supreme authority.')
 ON CONFLICT (email) DO UPDATE SET
     role = 'Super Admin',
     status = 'Active';
@@ -2671,7 +3425,54 @@ CREATE POLICY "Super admin can view subscribers"
 DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
 CREATE POLICY "Super admin can delete subscribers" 
     ON public.newsletter_subscribers FOR DELETE 
-    USING (public.is_admin());`}
+    USING (public.is_admin());
+
+-- 4. WISHLISTS & SAVED HEIRLOOMS
+CREATE TABLE IF NOT EXISTS public.wishlists (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL,
+    product_data JSONB,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    UNIQUE (user_id, product_id)
+);
+ALTER TABLE public.wishlists ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view their own wishlist" ON public.wishlists;
+CREATE POLICY "Users can view their own wishlist" ON public.wishlists FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
+DROP POLICY IF EXISTS "Users can insert their own wishlist" ON public.wishlists;
+CREATE POLICY "Users can insert their own wishlist" ON public.wishlists FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_admin());
+DROP POLICY IF EXISTS "Users can delete their own wishlist" ON public.wishlists;
+CREATE POLICY "Users can delete their own wishlist" ON public.wishlists FOR DELETE USING (auth.uid() = user_id OR public.is_admin());
+
+-- 5. PRODUCT REVIEWS & PATRON MEDIA (Photos & Videos)
+CREATE TABLE IF NOT EXISTS public.product_reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id TEXT NOT NULL,
+    product_name TEXT,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    customer_name TEXT NOT NULL,
+    customer_email TEXT,
+    customer_city TEXT,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    title TEXT,
+    comment TEXT NOT NULL,
+    photos TEXT[] DEFAULT '{}',
+    videos TEXT[] DEFAULT '{}',
+    verified_purchase BOOLEAN DEFAULT false,
+    helpful_count INTEGER DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'pending', 'hidden', 'flagged')),
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+ALTER TABLE public.product_reviews ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can view published reviews" ON public.product_reviews;
+CREATE POLICY "Anyone can view published reviews" ON public.product_reviews FOR SELECT USING (status = 'published' OR public.is_admin());
+DROP POLICY IF EXISTS "Anyone can submit a review" ON public.product_reviews;
+CREATE POLICY "Anyone can submit a review" ON public.product_reviews FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Super admin can update reviews" ON public.product_reviews;
+CREATE POLICY "Super admin can update reviews" ON public.product_reviews FOR UPDATE USING (public.is_admin());
+DROP POLICY IF EXISTS "Super admin can delete reviews" ON public.product_reviews;
+CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DELETE USING (public.is_admin());`}
             </pre>
           </div>
         )}
@@ -3799,6 +4600,147 @@ CREATE POLICY "Super admin can delete subscribers"
                 }}
               >
                 Delete Inquiry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 9: PATRON MEDIA PREVIEW (PHOTO / VIDEO ENLARGED)                */}
+      {/* ===================================================================== */}
+      {previewMediaModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: "rgba(18, 12, 8, 0.85)",
+            backdropFilter: "blur(10px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "24px",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPreviewMediaModal(null);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#1C140E",
+              borderRadius: "16px",
+              border: "1px solid #C5A059",
+              width: "100%",
+              maxWidth: previewMediaModal.type === "video" ? "720px" : "600px",
+              overflow: "hidden",
+              boxShadow: "0 24px 60px rgba(0, 0, 0, 0.5)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "16px 20px",
+                borderBottom: "1px solid rgba(197, 160, 89, 0.2)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {previewMediaModal.type === "video" ? (
+                  <VideoCameraIcon size={18} color="#C5A059" />
+                ) : (
+                  <CameraIcon size={18} color="#C5A059" />
+                )}
+                <span
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "#F7F2EE",
+                    fontFamily: "var(--font-playfair), serif",
+                  }}
+                >
+                  {previewMediaModal.title || "Customer Heirloom Media"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewMediaModal(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#CFBEAD",
+                  cursor: "pointer",
+                  padding: "4px",
+                }}
+              >
+                <CloseIcon size={20} />
+              </button>
+            </div>
+
+            <div
+              style={{
+                padding: "16px",
+                display: "flex",
+                justifyContent: "center",
+                backgroundColor: "#0F0A07",
+              }}
+            >
+              {previewMediaModal.type === "video" ? (
+                <video
+                  src={previewMediaModal.url}
+                  controls
+                  autoPlay
+                  style={{
+                    width: "100%",
+                    maxHeight: "70vh",
+                    borderRadius: "8px",
+                    outline: "none",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    position: "relative",
+                    width: "100%",
+                    height: "500px",
+                    maxHeight: "70vh",
+                  }}
+                >
+                  <Image
+                    src={previewMediaModal.url}
+                    alt={previewMediaModal.title || "Customer Photo"}
+                    fill
+                    style={{ objectFit: "contain" }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                padding: "12px 20px",
+                display: "flex",
+                justifyContent: "flex-end",
+                backgroundColor: "#1C140E",
+                borderTop: "1px solid rgba(197, 160, 89, 0.2)",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPreviewMediaModal(null)}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: "8px",
+                  backgroundColor: "#C5A059",
+                  color: "#1C140E",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Close Preview
               </button>
             </div>
           </div>

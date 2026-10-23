@@ -16,6 +16,7 @@ interface CartContextType {
   subtotal: number;
   isCartOpen: boolean;
   isAuthModalOpen: boolean;
+  authModalReason: "cart" | "wishlist";
   pendingProduct: Product | null;
   toastMessage: string | null;
   user: User | null;
@@ -26,7 +27,7 @@ interface CartContextType {
   setIsCartOpen: (open: boolean) => void;
   openCart: () => void;
   closeCart: () => void;
-  openAuthModal: (product?: Product) => void;
+  openAuthModal: (product?: Product, reason?: "cart" | "wishlist") => void;
   closeAuthModal: () => void;
   showToast: (msg: string) => void;
 }
@@ -38,6 +39,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalReason, setAuthModalReason] = useState<"cart" | "wishlist">("cart");
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -232,11 +234,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIsCartOpen(false);
   }, []);
 
-  const openAuthModal = useCallback((product?: Product) => {
+  const openAuthModal = useCallback((product?: Product, reason: "cart" | "wishlist" = "cart") => {
+    setAuthModalReason(reason);
     if (product) {
       setPendingProduct(product);
       try {
-        sessionStorage.setItem("avsaraa_pending_product", JSON.stringify(product));
+        if (reason === "wishlist") {
+          sessionStorage.setItem("avsaraa_pending_wishlist_product", JSON.stringify(product));
+        } else {
+          sessionStorage.setItem("avsaraa_pending_product", JSON.stringify(product));
+        }
       } catch {
         // ignore
       }
@@ -247,6 +254,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const closeAuthModal = useCallback(() => {
     setIsAuthModalOpen(false);
     setPendingProduct(null);
+    setAuthModalReason("cart");
   }, []);
 
   const value = useMemo(
@@ -256,6 +264,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       subtotal,
       isCartOpen,
       isAuthModalOpen,
+      authModalReason,
       pendingProduct,
       toastMessage,
       user,
@@ -276,6 +285,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       subtotal,
       isCartOpen,
       isAuthModalOpen,
+      authModalReason,
       pendingProduct,
       toastMessage,
       user,

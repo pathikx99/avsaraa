@@ -52,3 +52,6 @@ export interface NewsletterSubscriber {
   source?: string;
   created_at: string;
 }
+
+export type { ProductReview, ReviewStatus } from "./review";
+export type { WishlistItem } from "./wishlist";
