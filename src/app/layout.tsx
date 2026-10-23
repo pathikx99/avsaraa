@@ -26,8 +26,10 @@ export const metadata: Metadata = {
 };
 
 import { CartProvider } from "@/context/CartContext";
+import { WishlistProvider } from "@/context/WishlistContext";
 import CartDrawer from "@/components/CartDrawer";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
+import MobileBottomNav from "@/components/MobileBottomNav";
 
 export default function RootLayout({
   children,
@@ -38,12 +40,16 @@ export default function RootLayout({
     <html lang="en" className={`${cormorant.variable} ${jakarta.variable}`}>
       <body className={jakarta.className}>
         <CartProvider>
-          {children}
-          <CartDrawer />
-          <AuthRequiredModal />
+          <WishlistProvider>
+            {children}
+            <CartDrawer />
+            <AuthRequiredModal />
+            <MobileBottomNav />
+          </WishlistProvider>
         </CartProvider>
         <Analytics />
       </body>
     </html>
   );
 }
+

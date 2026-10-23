@@ -5,9 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Product, ProductCategory } from "@/types/product";
-import { ShoppingBagIcon } from "./Icons";
+import { ShoppingBagIcon, HeartIcon } from "./Icons";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
 import type { User } from "@supabase/supabase-js";
+
 
 interface ProductsSectionProps {
   initialCategory?: ProductCategory | "ALL";
@@ -78,6 +80,7 @@ export default function ProductsSection({
   showHeader = true,
 }: ProductsSectionProps) {
   const { addToCart } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [activeCategory, setActiveCategory] = useState<ProductCategory | "ALL">(initialCategory);
   const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
   const [, setUser] = useState<User | null>(null);
@@ -119,11 +122,16 @@ export default function ProductsSection({
         }
       );
 
-    // Read category from URL query parameters (e.g. ?category=Sarees) or hash
+    // Read category and search from URL query parameters (e.g. ?category=Sarees&search=Banarasi)
     const syncCategoryFromUrl = () => {
       if (typeof window === "undefined") return;
       const urlParams = new URLSearchParams(window.location.search);
       const categoryQuery = urlParams.get("category");
+      const searchParam = urlParams.get("search");
+
+      if (searchParam) {
+        setSearchQuery(searchParam);
+      }
 
       if (categoryQuery) {
         const normalized = categoryQuery.toLowerCase();
@@ -144,6 +152,7 @@ export default function ProductsSection({
 
     syncCategoryFromUrl();
     window.addEventListener("popstate", syncCategoryFromUrl);
+
 
     return () => {
       isMounted = false;
@@ -516,7 +525,42 @@ export default function ProductsSection({
                     {product.category}
                   </div>
 
+                  {/* Wishlist Heart Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleWishlist(product);
+                    }}
+                    aria-label={isInWishlist(product.id) ? "Remove from saved heirlooms" : "Save to wishlist"}
+                    style={{
+                      position: "absolute",
+                      top: "12px",
+                      right: "12px",
+                      width: "34px",
+                      height: "34px",
+                      borderRadius: "50%",
+                      backgroundColor: "rgba(250, 247, 242, 0.94)",
+                      backdropFilter: "blur(8px)",
+                      WebkitBackdropFilter: "blur(8px)",
+                      border: "1px solid rgba(197, 160, 89, 0.45)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      zIndex: 3,
+                      boxShadow: "0 3px 10px rgba(0,0,0,0.1)",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <HeartIcon
+                      size={16}
+                      color={isInWishlist(product.id) ? "#B83A4B" : "#866951"}
+                    />
+                  </button>
+
                   {/* Quick View Button on Image */}
+
                   <button
                     type="button"
                     onClick={(e) => {

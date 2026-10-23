@@ -102,8 +102,9 @@ a {
 
 .reveal {
   opacity: 0;
-  transform: translateY(32px);
-  transition: opacity 0.7s var(--ease-out-expo), transform 0.7s var(--ease-out-expo);
+  transform: translateY(22px);
+  transition: opacity 0.65s var(--ease-out-expo), transform 0.65s var(--ease-out-expo);
+  will-change: opacity, transform;
 }
 
 .reveal.revealed {
@@ -113,8 +114,9 @@ a {
 
 .reveal-left {
   opacity: 0;
-  transform: translateX(-40px);
-  transition: opacity 0.7s var(--ease-out-expo), transform 0.7s var(--ease-out-expo);
+  transform: translateX(-28px);
+  transition: opacity 0.65s var(--ease-out-expo), transform 0.65s var(--ease-out-expo);
+  will-change: opacity, transform;
 }
 
 .reveal-left.revealed {
@@ -124,8 +126,9 @@ a {
 
 .reveal-right {
   opacity: 0;
-  transform: translateX(40px);
-  transition: opacity 0.7s var(--ease-out-expo), transform 0.7s var(--ease-out-expo);
+  transform: translateX(28px);
+  transition: opacity 0.65s var(--ease-out-expo), transform 0.65s var(--ease-out-expo);
+  will-change: opacity, transform;
 }
 
 .reveal-right.revealed {
@@ -135,14 +138,28 @@ a {
 
 .reveal-scale {
   opacity: 0;
-  transform: scale(0.92);
-  transition: opacity 0.7s var(--ease-out-expo), transform 0.7s var(--ease-out-expo);
+  transform: scale(0.95);
+  transition: opacity 0.65s var(--ease-out-expo), transform 0.65s var(--ease-out-expo);
+  will-change: opacity, transform;
 }
 
 .reveal-scale.revealed {
   opacity: 1;
   transform: scale(1);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal-left,
+  .reveal-right,
+  .reveal-scale,
+  .reveal-stagger > * {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
 
 /* Stagger children with delay */
 .reveal-stagger > * {
@@ -1060,3 +1077,39 @@ a {
     transform: scale(0.97);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   LUXURY NAV & MOBILE ELEVATIONS
+   ═══════════════════════════════════════════════════════════════ */
+
+.luxury-nav-link.active {
+  color: #261B13 !important;
+  font-weight: 700 !important;
+}
+
+.luxury-nav-link.active::after {
+  width: 100% !important;
+  background: linear-gradient(90deg, #ECC880, #D4AF37, #9E7836) !important;
+}
+
+.logo-hover-glow {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), filter 0.3s ease;
+}
+
+.logo-hover-glow:hover {
+  transform: scale(1.02);
+  filter: drop-shadow(0 4px 12px rgba(197, 160, 89, 0.3));
+}
+
+@media (max-width: 899px) {
+  body {
+    padding-bottom: 70px;
+  }
+}
+
+@media (min-width: 900px) {
+  .mobile-bottom-bar {
+    display: none !important;
+  }
+}
+

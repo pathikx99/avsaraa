@@ -4,14 +4,30 @@ import React, { useEffect, useRef, useState } from "react";
 
 /**
  * Hook for scroll-triggered reveal animations.
+ * Uses a generous rootMargin and low threshold so elements animate smoothly
+ * as they approach the viewport, eliminating blank page gaps.
  */
-export function useScrollReveal(threshold = 0.15) {
+export function useScrollReveal(threshold = 0.02) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+
+    // Fallback if IntersectionObserver is unsupported
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      setIsRevealed(true);
+      return;
+    }
+
+    // Check if element is already within viewport on mount
+    const rect = el.getBoundingClientRect();
+    const isAlreadyVisible = rect.top < window.innerHeight + 100 && rect.bottom > 0;
+    if (isAlreadyVisible) {
+      setIsRevealed(true);
+      return;
+    }
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -20,7 +36,7 @@ export function useScrollReveal(threshold = 0.15) {
           observer.unobserve(el);
         }
       },
-      { threshold, rootMargin: "0px 0px -40px 0px" }
+      { threshold, rootMargin: "120px 0px 80px 0px" }
     );
 
     observer.observe(el);
@@ -33,7 +49,7 @@ export function useScrollReveal(threshold = 0.15) {
 /**
  * Hook for header scroll detection.
  */
-export function useScrolled(threshold = 40) {
+export function useScrolled(threshold = 30) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -56,7 +72,7 @@ export function RevealSection({
   className = "reveal",
   style,
   as: Tag = "div",
-  threshold = 0.12,
+  threshold = 0.02,
   delay = 0,
 }: {
   children: React.ReactNode;
@@ -72,7 +88,10 @@ export function RevealSection({
     <Tag
       ref={ref}
       className={`${className} ${isRevealed ? "revealed" : ""}`}
-      style={{ ...style, transitionDelay: delay ? `${delay}s` : undefined }}
+      style={{
+        ...style,
+        transitionDelay: delay ? `${delay}s` : undefined,
+      }}
     >
       {children}
     </Tag>
@@ -80,3 +99,4 @@ export function RevealSection({
 }
 
 export default RevealSection;
+

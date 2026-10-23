@@ -6,9 +6,19 @@ import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
 import { Product } from "@/types/product";
-import { ShoppingBagIcon } from "@/components/Icons";
+import {
+  ShoppingBagIcon,
+  HeartIcon,
+  LoomWeaveIcon,
+  NeedleThreadIcon,
+  DiamondCrownIcon,
+  DeliveryVanIcon,
+  WhatsAppIcon,
+} from "@/components/Icons";
 import { RevealSection } from "@/components/RevealSection";
+
 
 const CURATED_SPOTLIGHT: Product[] = [
   {
@@ -124,8 +134,10 @@ const PATRON_REVIEWS = [
 
 export default function HomePage() {
   const { addToCart } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
+
 
   const handleQuickAdd = (product: Product) => {
     const success = addToCart(product);
@@ -534,59 +546,149 @@ export default function HomePage() {
         style={{
           backgroundColor: "#FFFFFF",
           borderBottom: "1px solid #E8DED3",
-          padding: "36px 24px",
+          padding: "38px 24px",
+          position: "relative",
         }}
       >
         <div
           style={{
-            maxWidth: "1200px",
+            maxWidth: "1220px",
             margin: "0 auto",
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: "20px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+            gap: "22px",
           }}
         >
           <div className="trust-pillar-card">
-            <div style={{ fontSize: "20px", marginBottom: "8px", color: "#C5A059" }}>🏛️</div>
-            <h4 style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(197, 160, 89, 0.12)",
+                border: "1px solid rgba(197, 160, 89, 0.35)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "14px",
+              }}
+            >
+              <LoomWeaveIcon size={22} color="#866951" />
+            </div>
+            <h4
+              style={{
+                fontFamily: "var(--font-serif), Georgia, serif",
+                fontSize: "17px",
+                fontWeight: 600,
+                color: "#261B13",
+                marginBottom: "6px",
+              }}
+            >
               100% Handloom Certified
             </h4>
-            <p style={{ fontSize: "12.5px", color: "#6E5B4E", lineHeight: 1.5 }}>
+            <p style={{ fontSize: "12.5px", color: "#6E5B4E", lineHeight: 1.6 }}>
               Authentic weaves sourced directly from master craft clusters in Varanasi & Surat.
             </p>
           </div>
 
           <div className="trust-pillar-card">
-            <div style={{ fontSize: "20px", marginBottom: "8px", color: "#C5A059" }}>✂️</div>
-            <h4 style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(197, 160, 89, 0.12)",
+                border: "1px solid rgba(197, 160, 89, 0.35)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "14px",
+              }}
+            >
+              <NeedleThreadIcon size={22} color="#866951" />
+            </div>
+            <h4
+              style={{
+                fontFamily: "var(--font-serif), Georgia, serif",
+                fontSize: "17px",
+                fontWeight: 600,
+                color: "#261B13",
+                marginBottom: "6px",
+              }}
+            >
               Bespoke Blouse Tailoring
             </h4>
-            <p style={{ fontSize: "12.5px", color: "#6E5B4E", lineHeight: 1.5 }}>
+            <p style={{ fontSize: "12.5px", color: "#6E5B4E", lineHeight: 1.6 }}>
               Custom designer blouse stitching and fall-pico finishing included on request.
             </p>
           </div>
 
           <div className="trust-pillar-card">
-            <div style={{ fontSize: "20px", marginBottom: "8px", color: "#C5A059" }}>📹</div>
-            <h4 style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(197, 160, 89, 0.12)",
+                border: "1px solid rgba(197, 160, 89, 0.35)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "14px",
+              }}
+            >
+              <DiamondCrownIcon size={22} color="#866951" />
+            </div>
+            <h4
+              style={{
+                fontFamily: "var(--font-serif), Georgia, serif",
+                fontSize: "17px",
+                fontWeight: 600,
+                color: "#261B13",
+                marginBottom: "6px",
+              }}
+            >
               Live Video Call Previews
             </h4>
-            <p style={{ fontSize: "12.5px", color: "#6E5B4E", lineHeight: 1.5 }}>
+            <p style={{ fontSize: "12.5px", color: "#6E5B4E", lineHeight: 1.6 }}>
               Schedule a private 1-on-1 drape consultation with our studio before you order.
             </p>
           </div>
 
           <div className="trust-pillar-card">
-            <div style={{ fontSize: "20px", marginBottom: "8px", color: "#C5A059" }}>🚚</div>
-            <h4 style={{ fontSize: "14.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(197, 160, 89, 0.12)",
+                border: "1px solid rgba(197, 160, 89, 0.35)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "14px",
+              }}
+            >
+              <DeliveryVanIcon size={22} color="#866951" />
+            </div>
+            <h4
+              style={{
+                fontFamily: "var(--font-serif), Georgia, serif",
+                fontSize: "17px",
+                fontWeight: 600,
+                color: "#261B13",
+                marginBottom: "6px",
+              }}
+            >
               Free Insured Delivery
             </h4>
-            <p style={{ fontSize: "12.5px", color: "#6E5B4E", lineHeight: 1.5 }}>
+            <p style={{ fontSize: "12.5px", color: "#6E5B4E", lineHeight: 1.6 }}>
               Express pan-India shipping in tamper-proof luxury presentation boxes.
             </p>
           </div>
         </div>
       </section>
+
 
       {/* 4. The Weaves of Avsaraa (Curated Craft Categories) */}
       <RevealSection
@@ -816,6 +918,41 @@ export default function HomePage() {
                   >
                     {product.category}
                   </div>
+
+                  {/* Wishlist Heart Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleWishlist(product);
+                    }}
+                    aria-label={isInWishlist(product.id) ? "Remove from saved heirlooms" : "Save to wish list"}
+                    style={{
+                      position: "absolute",
+                      top: "12px",
+                      right: "12px",
+                      width: "34px",
+                      height: "34px",
+                      borderRadius: "50%",
+                      backgroundColor: "rgba(250, 247, 242, 0.94)",
+                      backdropFilter: "blur(8px)",
+                      WebkitBackdropFilter: "blur(8px)",
+                      border: "1px solid rgba(197, 160, 89, 0.45)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      zIndex: 3,
+                      boxShadow: "0 3px 10px rgba(0,0,0,0.1)",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <HeartIcon
+                      size={16}
+                      color={isInWishlist(product.id) ? "#B83A4B" : "#866951"}
+                    />
+                  </button>
+
 
                   {/* Desktop Quick View Button */}
                   <button

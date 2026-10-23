@@ -1,19 +1,43 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { HeartIcon } from "@/components/Icons";
+import { HeartIcon, ShoppingBagIcon, TrashIcon } from "@/components/Icons";
+import { useWishlist } from "@/context/WishlistContext";
+import { useCart } from "@/context/CartContext";
 
 export default function WishlistPage() {
+  const { wishlist, removeFromWishlist, clearWishlist } = useWishlist();
+  const { addToCart } = useCart();
+  const [addedId, setAddedId] = useState<string | null>(null);
+
+  const handleMoveToBag = (product: any) => {
+    const success = addToCart(product);
+    if (success) {
+      setAddedId(product.id);
+      setTimeout(() => setAddedId(null), 2000);
+    }
+  };
+
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#FAF7F2" }}>
+    <div
+      className="page-enter"
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: "#FAF7F2",
+      }}
+    >
       <Header />
 
       <main style={{ flex: 1 }}>
         {/* Editorial Breadcrumb & Header Banner */}
         <section
+          className="collection-hero-pattern"
           style={{
             backgroundColor: "#261B13",
             color: "#FAF7F2",
@@ -67,7 +91,7 @@ export default function WishlistPage() {
               color: "#FAF7F2",
             }}
           >
-            My Wishlist
+            Saved Heirlooms
           </h1>
 
           <p
@@ -79,80 +103,305 @@ export default function WishlistPage() {
               lineHeight: 1.7,
             }}
           >
-            Save your favorite handcrafted sarees and bridal ensembles as you curate your personal wardrobe.
+            Your personally curated collection of handcrafted Banarasi silks, royal organzas, and defining festive ensembles.
           </p>
         </section>
 
-        {/* Empty Wishlist State */}
-        <section style={{ padding: "80px 24px", maxWidth: "680px", margin: "0 auto", textAlign: "center" }}>
-          <div
-            style={{
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #E8DED3",
-              borderRadius: "24px",
-              padding: "50px 32px",
-              boxShadow: "0 10px 30px rgba(38, 27, 19, 0.04)",
-            }}
-          >
+        {/* Wishlist Content */}
+        <section style={{ padding: "60px 24px 80px 24px", maxWidth: "1240px", margin: "0 auto" }}>
+          {wishlist.length === 0 ? (
             <div
               style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
-                backgroundColor: "#FAF7F2",
-                border: "1px solid #E6DACF",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 20px auto",
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #E8DED3",
+                borderRadius: "24px",
+                padding: "60px 32px",
+                boxShadow: "0 10px 30px rgba(38, 27, 19, 0.04)",
+                textAlign: "center",
+                maxWidth: "600px",
+                margin: "0 auto",
               }}
             >
-              <HeartIcon size={26} color="#866951" />
+              <div
+                style={{
+                  width: "64px",
+                  height: "64px",
+                  borderRadius: "50%",
+                  backgroundColor: "#FAF7F2",
+                  border: "1px solid #E6DACF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 20px auto",
+                }}
+              >
+                <HeartIcon size={26} color="#866951" />
+              </div>
+
+              <h2
+                style={{
+                  fontFamily: "var(--font-serif), Georgia, serif",
+                  fontSize: "26px",
+                  fontWeight: 600,
+                  color: "#261B13",
+                  marginBottom: "10px",
+                }}
+              >
+                Your Wishlist is Empty
+              </h2>
+
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "#6E5B4E",
+                  lineHeight: 1.7,
+                  maxWidth: "420px",
+                  margin: "0 auto 28px auto",
+                }}
+              >
+                Discover our handcrafted pure silk drapes, organza sarees, and festive silhouettes to save your defining favorites.
+              </p>
+
+              <Link
+                href="/collection"
+                className="avsaraa-btn-primary btn-shine"
+                style={{
+                  height: "50px",
+                  padding: "0 34px",
+                  fontSize: "12.5px",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  textDecoration: "none",
+                  borderRadius: "25px",
+                }}
+              >
+                <span>Explore The Atelier</span>
+                <span>→</span>
+              </Link>
             </div>
+          ) : (
+            <div>
+              {/* Top Bar: Count & Clear */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "32px",
+                  paddingBottom: "16px",
+                  borderBottom: "1px solid #EAE0D5",
+                }}
+              >
+                <span style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
+                  {wishlist.length} {wishlist.length === 1 ? "Piece Saved" : "Pieces Saved"}
+                </span>
 
-            <h3
-              style={{
-                fontFamily: "var(--font-serif), Georgia, serif",
-                fontSize: "24px",
-                fontWeight: 600,
-                color: "#261B13",
-                marginBottom: "10px",
-              }}
-            >
-              Your Wishlist is Empty
-            </h3>
+                <button
+                  type="button"
+                  onClick={clearWishlist}
+                  style={{
+                    fontSize: "12px",
+                    color: "#8E7D70",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    textUnderlineOffset: "3px",
+                  }}
+                >
+                  Clear All
+                </button>
+              </div>
 
-            <p
-              style={{
-                fontSize: "14px",
-                color: "#6E5B4E",
-                lineHeight: 1.7,
-                maxWidth: "420px",
-                margin: "0 auto 28px auto",
-              }}
-            >
-              Discover our handcrafted pure silk drapes, organza sarees, and festive silhouettes to save your favorites.
-            </p>
+              {/* Responsive Product Grid */}
+              <div className="responsive-product-grid">
+                {wishlist.map((product) => (
+                  <div
+                    key={product.id}
+                    className="luxury-hover-card product-card-container"
+                    style={{
+                      backgroundColor: "#FFFFFF",
+                      borderRadius: "20px",
+                      overflow: "hidden",
+                      border: "1px solid #E8DED3",
+                      boxShadow: "0 8px 24px -10px rgba(38,27,19,0.06)",
+                      display: "flex",
+                      flexDirection: "column",
+                      position: "relative",
+                    }}
+                  >
+                    {/* Image Frame */}
+                    <div
+                      className="luxury-image-zoom-container product-card-image"
+                      style={{
+                        position: "relative",
+                        width: "100%",
+                        height: "360px",
+                        backgroundColor: "#F2EBE3",
+                      }}
+                    >
+                      <Image
+                        src={product.image_url || "/images/banarasi_silk_saree.jpg"}
+                        alt={product.name}
+                        fill
+                        sizes="(min-width: 900px) 25vw, 50vw"
+                        style={{ objectFit: "cover", objectPosition: "center 20%" }}
+                      />
 
-            <Link
-              href="/collection"
-              className="avsaraa-btn-primary"
-              style={{
-                height: "48px",
-                padding: "0 32px",
-                fontSize: "12.5px",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                textDecoration: "none",
-              }}
-            >
-              <span>Explore Collection</span>
-              <span>→</span>
-            </Link>
-          </div>
+                      {/* Category Badge */}
+                      <div
+                        className="product-card-badge"
+                        style={{
+                          position: "absolute",
+                          top: "14px",
+                          left: "14px",
+                          backgroundColor: "rgba(38, 27, 19, 0.85)",
+                          backdropFilter: "blur(6px)",
+                          WebkitBackdropFilter: "blur(6px)",
+                          color: "#FAF7F2",
+                          padding: "5px 12px",
+                          borderRadius: "14px",
+                          fontSize: "10.5px",
+                          letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {product.category}
+                      </div>
+
+                      {/* Remove Button */}
+                      <button
+                        type="button"
+                        onClick={() => removeFromWishlist(product.id)}
+                        aria-label="Remove from wishlist"
+                        style={{
+                          position: "absolute",
+                          top: "12px",
+                          right: "12px",
+                          width: "34px",
+                          height: "34px",
+                          borderRadius: "50%",
+                          backgroundColor: "rgba(250, 247, 242, 0.94)",
+                          backdropFilter: "blur(8px)",
+                          border: "1px solid rgba(197, 160, 89, 0.4)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          zIndex: 3,
+                          boxShadow: "0 3px 10px rgba(0,0,0,0.1)",
+                        }}
+                      >
+                        <TrashIcon size={14} color="#866951" />
+                      </button>
+                    </div>
+
+                    {/* Card Body */}
+                    <div
+                      className="product-card-body"
+                      style={{
+                        padding: "20px",
+                        display: "flex",
+                        flexDirection: "column",
+                        flex: 1,
+                      }}
+                    >
+                      <h3
+                        className="product-card-title"
+                        style={{
+                          fontFamily: "var(--font-serif), Georgia, serif",
+                          fontSize: "19px",
+                          fontWeight: 600,
+                          color: "#261B13",
+                          marginBottom: "6px",
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {product.name}
+                      </h3>
+
+                      <p
+                        className="product-card-desc"
+                        style={{
+                          fontSize: "13px",
+                          color: "#6E5B4E",
+                          lineHeight: 1.55,
+                          marginBottom: "16px",
+                          flex: 1,
+                        }}
+                      >
+                        {product.description}
+                      </p>
+
+                      <div
+                        style={{
+                          marginTop: "auto",
+                          paddingTop: "14px",
+                          borderTop: "1px solid #F0E8DF",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "10px",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                          <span
+                            className="product-card-price"
+                            style={{
+                              fontSize: "18px",
+                              fontWeight: 700,
+                              color: "#261B13",
+                            }}
+                          >
+                            ₹{product.price.toLocaleString("en-IN")}
+                          </span>
+
+                          <Link
+                            href={`/contact?inquire=${encodeURIComponent(product.name)}`}
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              color: "#866951",
+                              textDecoration: "underline",
+                              textUnderlineOffset: "3px",
+                            }}
+                          >
+                            Inquire ↗
+                          </Link>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleMoveToBag(product)}
+                          className="avsaraa-btn-primary product-card-btn btn-shine"
+                          style={{
+                            height: "40px",
+                            fontSize: "11px",
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "6px",
+                            borderRadius: "20px",
+                            width: "100%",
+                            backgroundColor: addedId === product.id ? "#1B6B40" : "#261B13",
+                            transition: "background-color 0.3s ease",
+                          }}
+                        >
+                          <ShoppingBagIcon size={14} color="#FAF7F2" />
+                          <span>{addedId === product.id ? "Added to Bag ✓" : "Move to Bag"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       </main>
 

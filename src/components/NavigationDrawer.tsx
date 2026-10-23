@@ -6,6 +6,7 @@ import Image from "next/image";
 import AvsaraaLogo from "./AvsaraaLogo";
 import { UserIcon, ShoppingBagIcon, HeartIcon } from "./Icons";
 import { useCart } from "@/context/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
 import type { User } from "@supabase/supabase-js";
 
 interface NavigationDrawerProps {
@@ -22,7 +23,9 @@ export default function NavigationDrawer({
   onLogout,
 }: NavigationDrawerProps) {
   const { totalItems, openCart } = useCart();
+  const { totalWishlist } = useWishlist();
   if (!isOpen) return null;
+
 
   const categories = [
     { label: "ALL PIECES", subtitle: "Full Atelier Catalog", href: "/collection" },
@@ -232,11 +235,27 @@ export default function NavigationDrawer({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <HeartIcon size={17} color="#866951" />
-              <span>Saved Heirlooms (Wishlist)</span>
+              <HeartIcon size={17} color={totalWishlist > 0 ? "#B83A4B" : "#866951"} />
+              <span>Saved Heirlooms</span>
             </div>
-            <span style={{ color: "#AC9885", fontSize: "14px" }}>›</span>
+            {totalWishlist > 0 ? (
+              <span
+                style={{
+                  backgroundColor: "#B83A4B",
+                  color: "#FAF7F2",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: "10px",
+                }}
+              >
+                {totalWishlist}
+              </span>
+            ) : (
+              <span style={{ color: "#AC9885", fontSize: "14px" }}>›</span>
+            )}
           </Link>
+
 
           <button
             type="button"
