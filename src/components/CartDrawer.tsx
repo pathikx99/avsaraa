@@ -16,7 +16,6 @@ export default function CartDrawer() {
     removeFromCart,
     updateQuantity,
     clearCart,
-    user,
   } = useCart();
 
   if (!isCartOpen) return null;

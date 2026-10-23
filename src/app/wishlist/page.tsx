@@ -8,13 +8,14 @@ import Footer from "@/components/Footer";
 import { HeartIcon, ShoppingBagIcon, TrashIcon } from "@/components/Icons";
 import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/context/CartContext";
+import { Product } from "@/types/product";
 
 export default function WishlistPage() {
   const { wishlist, removeFromWishlist, clearWishlist, user, isLoaded } = useWishlist();
   const { addToCart } = useCart();
   const [addedId, setAddedId] = useState<string | null>(null);
 
-  const handleMoveToBag = (product: any) => {
+  const handleMoveToBag = (product: Product) => {
     const success = addToCart(product);
     if (success) {
       setAddedId(product.id);

@@ -65,10 +65,13 @@ export default function Header() {
     }
   }, [isSearchOpen]);
 
-  // Close search when route changes
-  useEffect(() => {
-    setIsSearchOpen(false);
-  }, [pathname]);
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    if (isSearchOpen) {
+      setIsSearchOpen(false);
+    }
+  }
 
   const handleSignOut = async () => {
     try {

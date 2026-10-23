@@ -17,16 +17,8 @@ export function useScrollReveal(threshold = 0.02) {
 
     // Fallback if IntersectionObserver is unsupported
     if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
-      setIsRevealed(true);
-      return;
-    }
-
-    // Check if element is already within viewport on mount
-    const rect = el.getBoundingClientRect();
-    const isAlreadyVisible = rect.top < window.innerHeight + 100 && rect.bottom > 0;
-    if (isAlreadyVisible) {
-      setIsRevealed(true);
-      return;
+      const timer = setTimeout(() => setIsRevealed(true), 0);
+      return () => clearTimeout(timer);
     }
 
     const observer = new IntersectionObserver(

@@ -115,29 +115,6 @@ const WEAVE_CATEGORIES = [
   },
 ];
 
-const PATRON_REVIEWS = [
-  {
-    quote: "The Banarasi Katan silk saree arrived in the most exquisite heritage box. The zari work is unimaginably soft and authentic. Worth every rupee.",
-    author: "Meera Singhania",
-    city: "Mumbai",
-    rating: 5,
-    piece: "Banarasi Katan Silk",
-  },
-  {
-    quote: "Avsaraa's concierge arranged a private video consultation to help me choose my bridal drape in Surat silk. The drape and fall pico were completed with sheer perfection.",
-    author: "Ananya Desai",
-    city: "Surat & London",
-    rating: 5,
-    piece: "Emerald Royal Organza",
-  },
-  {
-    quote: "Received compliments all evening at my brother's wedding. Pure royal elegance without feeling overly heavy. Truly heirloom craftsmanship.",
-    author: "Rituja Trivedi",
-    city: "Delhi NCR",
-    rating: 5,
-    piece: "Heritage Silk Anarkali",
-  },
-];
 
 export default function HomePage() {
   const { addToCart } = useCart();
@@ -1680,10 +1657,13 @@ export default function HomePage() {
                             }}
                             title="Click to view full photo"
                           >
-                            <img
+                            <Image
                               src={photo}
                               alt="Patron Drape"
-                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              fill
+                              sizes="72px"
+                              unoptimized
+                              style={{ objectFit: "cover" }}
                             />
                             <div
                               style={{
@@ -2175,12 +2155,17 @@ export default function HomePage() {
               }}
             >
               {previewMediaModal.type === "photo" ? (
-                <img
+                <Image
                   src={previewMediaModal.url}
                   alt={previewMediaModal.title || "Patron Drape Photo"}
+                  width={1200}
+                  height={900}
+                  unoptimized
                   style={{
                     maxHeight: "75vh",
                     maxWidth: "100%",
+                    width: "auto",
+                    height: "auto",
                     objectFit: "contain",
                     borderRadius: "10px",
                   }}

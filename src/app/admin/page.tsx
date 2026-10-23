@@ -1818,6 +1818,27 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               </button>
             )}
 
+            {activeTab === "products" && (
+              <button
+                onClick={openAddProductModal}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "10px 18px",
+                  backgroundColor: "#261B13",
+                  color: "#F7F2EE",
+                  borderRadius: "10px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  boxShadow: "0 4px 14px rgba(38,27,19,0.15)",
+                }}
+              >
+                <PlusIcon size={16} color="#F7F2EE" />
+                <span>Add Product</span>
+              </button>
+            )}
+
             {activeTab === "reviews" && (
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
                 <span
