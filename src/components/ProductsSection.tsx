@@ -3,13 +3,13 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Product, ProductCategory } from "@/types/product";
 import { ShoppingBagIcon, HeartIcon } from "./Icons";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import type { User } from "@supabase/supabase-js";
-
 
 interface ProductsSectionProps {
   initialCategory?: ProductCategory | "ALL";
@@ -22,6 +22,8 @@ export default function ProductsSection({
   initialCategory = "ALL",
   showHeader = true,
 }: ProductsSectionProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const [activeCategory, setActiveCategory] = useState<ProductCategory | "ALL">(initialCategory);
@@ -65,44 +67,35 @@ export default function ProductsSection({
         }
       );
 
-    // Read category and search from URL query parameters (e.g. ?category=Sarees&search=Banarasi)
-    const syncCategoryFromUrl = () => {
-      if (typeof window === "undefined") return;
-      const urlParams = new URLSearchParams(window.location.search);
-      const categoryQuery = urlParams.get("category");
-      const searchParam = urlParams.get("search");
-
-      if (searchParam) {
-        setSearchQuery(searchParam);
-      }
-
-      if (categoryQuery) {
-        const normalized = categoryQuery.toLowerCase();
-        if (normalized.includes("saree")) setActiveCategory("Sarees");
-        else if (normalized.includes("dress")) setActiveCategory("Dresses");
-        else if (normalized.includes("new")) setActiveCategory("New Arrivals");
-        else if (normalized.includes("occasion")) setActiveCategory("Occasion Wear");
-        else if (normalized === "all") setActiveCategory("ALL");
-        return;
-      }
-
-      const hash = window.location.hash.toLowerCase();
-      if (hash.includes("sarees")) setActiveCategory("Sarees");
-      else if (hash.includes("dresses")) setActiveCategory("Dresses");
-      else if (hash.includes("new-arrivals")) setActiveCategory("New Arrivals");
-      else if (hash.includes("occasion-wear")) setActiveCategory("Occasion Wear");
-    };
-
-    syncCategoryFromUrl();
-    window.addEventListener("popstate", syncCategoryFromUrl);
-
-
     return () => {
       isMounted = false;
       subscription.unsubscribe();
-      window.removeEventListener("popstate", syncCategoryFromUrl);
     };
   }, []);
+
+  // React to searchParams changes from navigation links across the app
+  useEffect(() => {
+    if (!searchParams) return;
+    const categoryQuery = searchParams.get("category");
+    const searchParam = searchParams.get("search");
+
+    if (searchParam !== null) {
+      setSearchQuery(searchParam);
+    } else {
+      setSearchQuery("");
+    }
+
+    if (categoryQuery) {
+      const normalized = categoryQuery.toLowerCase();
+      if (normalized.includes("saree")) setActiveCategory("Sarees");
+      else if (normalized.includes("dress")) setActiveCategory("Dresses");
+      else if (normalized.includes("new")) setActiveCategory("New Arrivals");
+      else if (normalized.includes("occasion")) setActiveCategory("Occasion Wear");
+      else if (normalized === "all") setActiveCategory("ALL");
+    } else {
+      setActiveCategory(initialCategory);
+    }
+  }, [searchParams, initialCategory]);
 
   const categoriesList: (ProductCategory | "ALL")[] = [
     "ALL",
@@ -198,7 +191,11 @@ export default function ProductsSection({
               return (
                 <button
                   key={cat}
-                  onClick={() => setActiveCategory(cat)}
+                  onClick={() => {
+                    setActiveCategory(cat);
+                    const newUrl = cat === "ALL" ? "/collection" : `/collection?category=${encodeURIComponent(cat)}`;
+                    router.replace(newUrl, { scroll: false });
+                  }}
                   className="luxury-pill-tab"
                   style={{
                     padding: "9px 20px",

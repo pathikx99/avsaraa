@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import AvsaraaLogo from "./AvsaraaLogo";
 import NavigationDrawer from "./NavigationDrawer";
 import { supabase } from "@/lib/supabaseClient";
@@ -13,11 +13,10 @@ import { useScrolled } from "./RevealSection";
 import type { User } from "@supabase/supabase-js";
 
 const ANNOUNCEMENTS = [
-  "Free Shipping & Express Insured Delivery Across India on All Orders",
-  "Handcrafted in Surat — Nationwide Direct Atelier Shipping",
-  "100% Pure Handloom Silk — Certificate of Authenticity Included",
-  "Complimentary Fall, Pico & Blouse Tailoring Consultation",
-  "Festive 2026 Collection Now Available for Preview",
+  "FREE SHIPPING ON ALL ORDERS ABOVE ₹999",
+  "100% PURE HANDLOOM SILK & WEAVES",
+  "COMPLIMENTARY BLOUSE TAILORING",
+  "SURAT ATELIER • PAN-INDIA SHIPPING",
 ];
 
 const QUICK_SEARCH_TERMS = [
@@ -29,9 +28,12 @@ const QUICK_SEARCH_TERMS = [
   "Zari Weaves",
 ];
 
-export default function Header() {
+function HeaderInner() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentCategory = searchParams ? searchParams.get("category") : null;
+
   const { totalItems, openCart } = useCart();
   const { totalWishlist } = useWishlist();
 
@@ -42,6 +44,12 @@ export default function Header() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const scrolled = useScrolled(35);
+
+  const isHomeActive = pathname === "/" && !currentCategory;
+  const isCollectionActive = pathname.startsWith("/collection") && (!currentCategory || currentCategory === "ALL");
+  const isSareesActive = pathname.startsWith("/collection") && currentCategory?.toLowerCase().includes("saree");
+  const isDressesActive = pathname.startsWith("/collection") && currentCategory?.toLowerCase().includes("dress");
+  const isStoryActive = pathname === "/about";
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -98,386 +106,157 @@ export default function Header() {
     setIsSearchOpen(false);
   };
 
+  const [announcementIdx, setAnnouncementIdx] = useState(0);
+
+  const handlePrevAnnouncement = () => {
+    setAnnouncementIdx((prev) => (prev === 0 ? ANNOUNCEMENTS.length - 1 : prev - 1));
+  };
+
+  const handleNextAnnouncement = () => {
+    setAnnouncementIdx((prev) => (prev === ANNOUNCEMENTS.length - 1 ? 0 : prev + 1));
+  };
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setAnnouncementIdx((prev) => (prev === ANNOUNCEMENTS.length - 1 ? 0 : prev + 1));
+    }, 5500);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <>
-      {/* 1. Regal Top Gold Trim */}
-      <div
-        style={{
-          height: "2px",
-          background: "linear-gradient(90deg, #9E7836 0%, #ECC880 25%, #D4AF37 50%, #ECC880 75%, #9E7836 100%)",
-          width: "100%",
-        }}
-      />
+      {/* 1. Dark Espresso Announcement Bar with Chevrons */}
+      <div className="announcement-bar-espresso">
+        <button
+          onClick={handlePrevAnnouncement}
+          aria-label="Previous announcement"
+          className="announcement-chevron-btn"
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
 
-      {/* 2. Premium Marquee Announcement Bar */}
-      <div className="announcement-bar">
-        <div className="announcement-marquee">
-          {[...ANNOUNCEMENTS, ...ANNOUNCEMENTS].map((text, i) => (
-            <span key={i} className="announcement-item">
-              <span className="announcement-dot" />
-              <span>✦</span>
-              <span>{text}</span>
-            </span>
-          ))}
+        <div className="announcement-text-slider">
+          {ANNOUNCEMENTS[announcementIdx]}
         </div>
+
+        <button
+          onClick={handleNextAnnouncement}
+          aria-label="Next announcement"
+          className="announcement-chevron-btn"
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
       </div>
 
-      {/* 3. Main Navigation Bar */}
-      <header
-        className={scrolled ? "header-scrolled" : ""}
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 85,
-          backgroundColor: scrolled
-            ? "rgba(247, 242, 238, 0.98)"
-            : "rgba(247, 242, 238, 0.94)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          borderBottom: "1px solid rgba(207, 190, 173, 0.5)",
-          padding: scrolled ? "10px 24px" : "14px 28px",
-          boxShadow: scrolled
-            ? "0 8px 32px rgba(38, 27, 19, 0.08), 0 1px 0 rgba(197, 160, 89, 0.2)"
-            : "none",
-          transition: "all 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "1320px",
-            margin: "0 auto",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            width: "100%",
-          }}
-        >
-          {/* Mobile Only: Left Area with Hamburger Menu */}
-          <div className="mobile-only" style={{ alignItems: "center", gap: "8px" }}>
+      {/* 2. Main Navigation Bar */}
+      <header className={`avsaraa-main-header ${scrolled ? "header-scrolled" : ""}`}>
+        <div className="header-inner-grid">
+          {/* Left: Hamburger Menu (Mobile) & Desktop Navigation Links */}
+          <div className="header-col-left">
             <button
               onClick={() => setIsDrawerOpen(true)}
               aria-label="Open navigation menu"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "5px",
-                padding: "8px 6px",
-                color: "#261B13",
-                cursor: "pointer",
-                background: "transparent",
-              }}
+              className="mobile-only header-hamburger-btn"
             >
-              <span style={{ display: "block", width: "22px", height: "1.8px", backgroundColor: "#261B13", borderRadius: "2px", transition: "all 0.25s ease" }} />
-              <span style={{ display: "block", width: "16px", height: "1.8px", backgroundColor: "#C5A059", borderRadius: "2px", transition: "all 0.25s ease" }} />
-              <span style={{ display: "block", width: "22px", height: "1.8px", backgroundColor: "#261B13", borderRadius: "2px", transition: "all 0.25s ease" }} />
+              <span className="hamburger-bar" />
+              <span className="hamburger-bar" />
+              <span className="hamburger-bar" />
             </button>
 
-            {/* Quick Search Button on Mobile */}
-            <button
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-              aria-label="Search collection"
-              style={{
-                padding: "8px",
-                color: "#261B13",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "transparent",
-              }}
-            >
-              <SearchIcon size={18} color="#261B13" />
-            </button>
+            {/* Desktop Only: Nav Links */}
+            <nav className="desktop-only desktop-nav-links">
+              <Link href="/" className={`luxury-nav-link ${isHomeActive ? "active" : ""}`}>
+                Home
+              </Link>
+              <Link href="/collection" className={`luxury-nav-link ${isCollectionActive ? "active" : ""}`}>
+                Collection
+              </Link>
+              <Link href="/collection?category=Sarees" className={`luxury-nav-link ${isSareesActive ? "active" : ""}`}>
+                Sarees
+              </Link>
+              <Link href="/collection?category=Dresses" className={`luxury-nav-link ${isDressesActive ? "active" : ""}`}>
+                Dresses
+              </Link>
+              <Link href="/about" className={`luxury-nav-link ${isStoryActive ? "active" : ""}`}>
+                Our Story
+              </Link>
+            </nav>
           </div>
 
-          {/* Brand Logo (Center on mobile, Left on desktop) */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+          {/* Center: Brand Logo Wordmark */}
+          <div className="header-col-center">
             <Link
               href="/"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                transition: "transform 0.25s ease",
-              }}
-              className="logo-hover-glow"
+              className="logo-hover-glow header-logo-link"
+              aria-label="Avsaraa Home"
             >
-              <AvsaraaLogo size={scrolled ? "sm" : "md"} width={scrolled ? 116 : 138} />
+              <AvsaraaLogo variant="wordmark" size={scrolled ? "sm" : "md"} className="header-brand-logo" />
             </Link>
           </div>
 
-          {/* Desktop Only: Royal Navigation Menu */}
-          <nav
-            className="desktop-only"
-            style={{
-              alignItems: "center",
-              gap: "38px",
-            }}
-          >
-            <Link
-              href="/"
-              className={`luxury-nav-link ${pathname === "/" ? "active" : ""}`}
-            >
-              Home
-            </Link>
-            <Link
-              href="/collection"
-              className={`luxury-nav-link ${pathname.startsWith("/collection") ? "active" : ""}`}
-            >
-              Collection
-            </Link>
-            <Link
-              href="/collection?category=Sarees"
-              className="luxury-nav-link"
-            >
-              Sarees
-            </Link>
-            <Link
-              href="/collection?category=Dresses"
-              className="luxury-nav-link"
-            >
-              Dresses
-            </Link>
-            <Link
-              href="/about"
-              className={`luxury-nav-link ${pathname === "/about" ? "active" : ""}`}
-            >
-              Our Story
-            </Link>
-            <Link
-              href="/contact"
-              className={`luxury-nav-link ${pathname === "/contact" ? "active" : ""}`}
-            >
-              Studio
-            </Link>
-          </nav>
-
-          {/* Right Action Icons Area */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              gap: "10px",
-              color: "#261B13",
-            }}
-          >
-            {/* Desktop Search Button */}
+          {/* Right: Search, Wishlist, Cart Bag, Account */}
+          <div className="header-col-right">
+            {/* Search Button */}
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="desktop-only"
-              aria-label="Search handcrafted collection"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "7px",
-                padding: "7px 14px",
-                borderRadius: "20px",
-                backgroundColor: "rgba(255, 255, 255, 0.75)",
-                border: "1px solid #E6DACF",
-                color: "#6E5B4E",
-                fontSize: "12px",
-                cursor: "pointer",
-                transition: "all 0.25s ease",
-              }}
+              aria-label="Search collection"
+              className="header-icon-btn"
             >
-              <SearchIcon size={14} color="#866951" />
-              <span>Search Weaves...</span>
+              <SearchIcon size={20} color="#261B13" />
             </button>
 
-            {/* Wishlist Link with Live Badge */}
+            {/* Wishlist Icon */}
             <Link
               href="/wishlist"
               aria-label={`Saved pieces: ${totalWishlist}`}
-              style={{
-                position: "relative",
-                padding: "8px",
-                color: totalWishlist > 0 ? "#B83A4B" : "#261B13",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "50%",
-                transition: "transform 0.2s ease, color 0.2s ease",
-              }}
+              className="header-icon-btn"
+              style={{ color: totalWishlist > 0 ? "#B83A4B" : "#261B13" }}
             >
-              <HeartIcon
-                size={19}
-                color={totalWishlist > 0 ? "#B83A4B" : "#261B13"}
-              />
+              <HeartIcon size={20} color={totalWishlist > 0 ? "#B83A4B" : "#261B13"} />
               {totalWishlist > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "2px",
-                    right: "2px",
-                    minWidth: "16px",
-                    height: "16px",
-                    padding: "0 3px",
-                    backgroundColor: "#B83A4B",
-                    color: "#FAF7F2",
-                    borderRadius: "10px",
-                    fontSize: "9px",
-                    fontWeight: 700,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: "0 2px 6px rgba(184, 58, 75, 0.35)",
-                    lineHeight: 1,
-                  }}
-                >
+                <span className="header-wishlist-badge">
                   {totalWishlist}
                 </span>
               )}
             </Link>
 
-            {/* Desktop Auth Controls */}
-            <div className="desktop-only" style={{ gap: "8px", alignItems: "center" }}>
-              {user ? (
-                <>
-                  <Link
-                    href="/account"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "7px",
-                      fontSize: "11.5px",
-                      fontWeight: 600,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      color: "#261B13",
-                      padding: "7px 14px",
-                      borderRadius: "20px",
-                      border: "1px solid #CFBEAD",
-                      backgroundColor: "#FAF7F2",
-                      transition: "all 0.25s ease",
-                    }}
-                  >
-                    <UserIcon size={13} color="#866951" />
-                    <span>My Account</span>
-                  </Link>
-
-                  <button
-                    onClick={handleSignOut}
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      color: "#8E7D70",
-                      padding: "6px 10px",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/login"
-                    style={{
-                      fontSize: "11.5px",
-                      fontWeight: 600,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      color: "#543E2E",
-                      padding: "7px 14px",
-                      borderRadius: "20px",
-                      border: "1px solid #CFBEAD",
-                      backgroundColor: "#FFFFFF",
-                      transition: "all 0.25s ease",
-                    }}
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="btn-shine"
-                    style={{
-                      fontSize: "11.5px",
-                      fontWeight: 600,
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      color: "#FAF7F2",
-                      backgroundColor: "#261B13",
-                      padding: "7px 16px",
-                      borderRadius: "20px",
-                      border: "1px solid #261B13",
-                      boxShadow: "0 4px 14px rgba(38, 27, 19, 0.2)",
-                      transition: "all 0.25s ease",
-                    }}
-                  >
-                    Join
-                  </Link>
-                </>
-              )}
-            </div>
-
-            {/* Profile Icon on Mobile */}
-            <Link
-              href={user ? "/account" : "/login"}
-              aria-label={user ? "My Account" : "Sign In"}
-              className="mobile-only"
-              style={{
-                padding: "8px",
-                color: "#261B13",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <UserIcon size={19} color="#261B13" />
-            </Link>
-
-            {/* Shopping Bag Button */}
+            {/* Shopping Bag Button with dark circular badge showing count */}
             <button
               type="button"
               onClick={openCart}
               aria-label={`Shopping Bag with ${totalItems} items`}
-              style={{
-                position: "relative",
-                padding: "8px",
-                color: "#261B13",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                transition: "transform 0.2s ease",
-              }}
+              className="header-icon-btn"
             >
               <ShoppingBagIcon size={20} color="#261B13" />
-              <span
-                style={{
-                  position: "absolute",
-                  top: "2px",
-                  right: "1px",
-                  minWidth: "17px",
-                  height: "17px",
-                  padding: "0 4px",
-                  backgroundColor: totalItems > 0 ? "#C5A059" : "#CFBEAD",
-                  color: totalItems > 0 ? "#1A120C" : "#FFFFFF",
-                  borderRadius: "10px",
-                  fontSize: "9.5px",
-                  fontWeight: 800,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
-                  transition: "all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
-                  transform: totalItems > 0 ? "scale(1)" : "scale(0.85)",
-                  lineHeight: 1,
-                }}
-              >
+              <span className="header-cart-badge">
                 {totalItems > 99 ? "99+" : totalItems}
               </span>
             </button>
+
+            {/* Desktop Only: User Account / Sign In */}
+            <div className="desktop-only" style={{ marginLeft: "4px" }}>
+              {user ? (
+                <Link
+                  href="/account"
+                  aria-label="My Account"
+                  className="header-icon-btn"
+                >
+                  <UserIcon size={19} color="#261B13" />
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  className="header-signin-btn"
+                >
+                  Sign In
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
@@ -621,3 +400,12 @@ export default function Header() {
     </>
   );
 }
+
+export default function Header() {
+  return (
+    <Suspense fallback={<div style={{ height: "80px", backgroundColor: "#FAF7F2" }} />}>
+      <HeaderInner />
+    </Suspense>
+  );
+}
+

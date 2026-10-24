@@ -28,6 +28,7 @@ export default function NavigationDrawer({
 
 
   const categories = [
+    { label: "HOME", subtitle: "Bespoke Sanctuary & Highlights", href: "/" },
     { label: "ALL PIECES", subtitle: "Full Atelier Catalog", href: "/collection" },
     { label: "SAREES", subtitle: "Banarasi & Organza Weaves", href: "/collection?category=Sarees" },
     { label: "DRESSES", subtitle: "Anarkalis & Chanderi Sets", href: "/collection?category=Dresses" },

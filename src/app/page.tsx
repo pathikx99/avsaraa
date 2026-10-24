@@ -59,6 +59,68 @@ const WEAVE_CATEGORIES = [
   },
 ];
 
+const HERO_SLIDES = [
+  {
+    id: "new-arrivals",
+    badge: "NEW COLLECTION",
+    atelierTag: "Handloom Silk • Surat Atelier",
+    titleLine1: "Every",
+    titleLine2: "Moment",
+    titleLine3: "A Little More",
+    titleScript: "You",
+    subtitle: "TIMELESS PIECES FOR YOUR EVERY STORY.",
+    desc: "Handcrafted pure silks and artisanal weaves, thoughtfully designed for defining celebrations.",
+    ctaText: "SHOP NEW ARRIVALS",
+    ctaLink: "/collection",
+    secondaryText: "EXPLORE SAREES",
+    secondaryLink: "/collection?category=Sarees",
+    mobileBanner: "/images/home_hero_banner.webp",
+    desktopImage: "/images/hero_model_clean.webp",
+    alt: "Avsaraa New Collection - Handcrafted Saree in Natural Sunlight",
+    pieceNo: "№ 108",
+    craft: "Pure Katan Silk & Zari Weave",
+  },
+  {
+    id: "banarasi-silks",
+    badge: "HANDLOOM ATELIER",
+    atelierTag: "Varanasi Heritage Looms",
+    titleLine1: "Woven",
+    titleLine2: "With Pure",
+    titleLine3: "Heritage &",
+    titleScript: "Grace",
+    subtitle: "AUTHENTIC VARANASI WEAVES CRAFTED FOR CELEBRATIONS.",
+    desc: "Intricately interlocked gold and silver zari on pure mulberry silk, crafted on traditional pit looms.",
+    ctaText: "EXPLORE SAREES",
+    ctaLink: "/collection?category=Sarees",
+    secondaryText: "VIEW ALL PIECES",
+    secondaryLink: "/collection",
+    mobileBanner: "/images/banarasi_silk_saree.jpg",
+    desktopImage: "/images/banarasi_silk_saree.jpg",
+    alt: "Handcrafted Banarasi Silk Sarees",
+    pieceNo: "№ 247",
+    craft: "Varanasi Pit Loom Katan Silk",
+  },
+  {
+    id: "royal-dresses",
+    badge: "FESTIVE COLLECTION",
+    atelierTag: "Artisan Occasion Wear",
+    titleLine1: "Artisan",
+    titleLine2: "Occasion",
+    titleLine3: "Silhouettes for",
+    titleScript: "Celebrations",
+    subtitle: "BESPOKE ETHNIC DRESSES & TIMELESS SILKS.",
+    desc: "Royal anarkalis and Chanderi silhouettes with hand-stitched gota patti and heritage accents.",
+    ctaText: "EXPLORE DRESSES",
+    ctaLink: "/collection?category=Dresses",
+    secondaryText: "OUR STORY",
+    secondaryLink: "/about",
+    mobileBanner: "/images/royal_occasion_dress.jpg",
+    desktopImage: "/images/royal_occasion_dress.jpg",
+    alt: "Royal Occasion Wear & Handcrafted Festive Dresses",
+    pieceNo: "№ 312",
+    craft: "Handwoven Chanderi & Gota Patti",
+  },
+];
 
 export default function HomePage() {
   const { addToCart } = useCart();
@@ -67,12 +129,22 @@ export default function HomePage() {
   const [addedId, setAddedId] = useState<string | null>(null);
   const [spotlightProducts, setSpotlightProducts] = useState<Product[]>([]);
   const [loadingSpotlight, setLoadingSpotlight] = useState(true);
+  const [spotlightCategory, setSpotlightCategory] = useState<"ALL" | "Sarees" | "Dresses" | "Occasion Wear">("ALL");
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [previewMediaModal, setPreviewMediaModal] = useState<{
     url: string;
     title?: string;
   } | null>(null);
+  const [heroSlide, setHeroSlide] = useState(0);
+
+  // Auto-rotate hero slider every 6.5s
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroSlide((prev) => (prev === HERO_SLIDES.length - 1 ? 0 : prev + 1));
+    }, 6500);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -82,7 +154,7 @@ export default function HomePage() {
       .from("products")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(6)
+      .limit(12)
       .then(({ data, error }) => {
         if (!isMounted) return;
         if (!error && data) {
@@ -131,372 +203,430 @@ export default function HomePage() {
       {/* 1. Header & Marquee Announcement */}
       <Header />
 
-      {/* 2. Hero Section (Grand Royal Editorial Showcase) */}
-      <section
-        style={{
-          position: "relative",
-          backgroundColor: "#FAF7F2",
-          borderBottom: "1px solid #E8DED3",
-          overflow: "hidden",
-          padding: "72px 24px 84px 24px",
-        }}
-        className="mobile-hero-padding"
-      >
-        {/* Subtle Luxury Radial Background */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage: `radial-gradient(circle at 10% 20%, rgba(197, 160, 89, 0.08) 0%, transparent 45%),
-                             radial-gradient(circle at 90% 80%, rgba(134, 105, 81, 0.06) 0%, transparent 50%)`,
-            pointerEvents: "none",
-          }}
-        />
+      {/* 2. Hero Section (Vicky Sagun Design: Minimalist High-Fashion Editorial) */}
+      <section className="hero-vicky-container">
+        {/* MOBILE PRESENTATION: Exact match to Vicky Sagun's design mockup */}
+        <div className="hero-vicky-mobile">
+          <div style={{ position: "relative", width: "100%", aspectRatio: "576 / 906" }}>
+            <Image
+              src={HERO_SLIDES[heroSlide].mobileBanner}
+              alt={HERO_SLIDES[heroSlide].alt}
+              fill
+              priority
+              sizes="(max-width: 560px) 100vw, 560px"
+              style={{ objectFit: "cover" }}
+            />
 
-        {/* Botanical Flourish Corner Accent */}
-        <div
-          className="botanical-float"
-          style={{
-            position: "absolute",
-            left: "-50px",
-            top: "-50px",
-            width: "260px",
-            height: "260px",
-            pointerEvents: "none",
-            opacity: 0.35,
-            zIndex: 0,
-          }}
-        >
-          <Image
-            src="/images/botanical_flowers.jpg"
-            alt=""
-            fill
-            sizes="260px"
-            style={{ objectFit: "contain", mixBlendMode: "multiply" }}
-          />
+            {/* If slide 0 (Vicky's graphic mockup with baked CTA): provide interactive touch target */}
+            {heroSlide === 0 ? (
+              <Link
+                href="/collection"
+                className="hero-mobile-touch-target"
+                aria-label="Shop New Arrivals"
+              />
+            ) : (
+              /* Overlay for other slides with identical typography and live CTA */
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  padding: "0 28px",
+                  background: "linear-gradient(to right, rgba(250, 247, 242, 0.92) 0%, rgba(250, 247, 242, 0.45) 55%, transparent 100%)",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "11px",
+                    letterSpacing: "0.2em",
+                    textTransform: "uppercase",
+                    fontWeight: 600,
+                    color: "#543927",
+                    marginBottom: "12px",
+                  }}
+                >
+                  {HERO_SLIDES[heroSlide].badge}
+                </span>
+
+                <div
+                  style={{
+                    fontFamily: "var(--font-serif), Georgia, serif",
+                    fontSize: "44px",
+                    lineHeight: 1.05,
+                    color: "#3D2415",
+                    fontWeight: 500,
+                  }}
+                >
+                  <div>{HERO_SLIDES[heroSlide].titleLine1}</div>
+                  <div>{HERO_SLIDES[heroSlide].titleLine2}</div>
+                  <div>{HERO_SLIDES[heroSlide].titleLine3}</div>
+                  <div
+                    className="font-script"
+                    style={{
+                      fontSize: "64px",
+                      color: "#3D2415",
+                      lineHeight: 0.9,
+                      marginTop: "4px",
+                    }}
+                  >
+                    {HERO_SLIDES[heroSlide].titleScript}
+                  </div>
+                </div>
+
+                <p
+                  style={{
+                    fontSize: "10px",
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "#543927",
+                    margin: "14px 0 20px 0",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {HERO_SLIDES[heroSlide].subtitle}
+                </p>
+
+                <div>
+                  <Link
+                    href={HERO_SLIDES[heroSlide].ctaLink}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      backgroundColor: "#4A2E1B",
+                      color: "#FFFFFF",
+                      fontSize: "11px",
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      padding: "11px 22px",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <span>{HERO_SLIDES[heroSlide].ctaText}</span>
+                    <span>→</span>
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Mobile Carousel Indicator Dots */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: "5.8%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                zIndex: 20,
+              }}
+            >
+              {HERO_SLIDES.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setHeroSlide(idx)}
+                  aria-label={`Go to slide ${idx + 1}`}
+                  style={{
+                    width: heroSlide === 0 ? "16px" : "8px",
+                    height: heroSlide === 0 ? "16px" : "8px",
+                    borderRadius: "50%",
+                    backgroundColor: heroSlide === 0 ? "transparent" : (heroSlide === idx ? "#4A2E1B" : "transparent"),
+                    border: heroSlide === 0 ? "none" : (heroSlide === idx ? "none" : "1.5px solid #4A2E1B"),
+                    padding: 0,
+                    cursor: "pointer",
+                    transition: "all 0.25s ease",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div
-          style={{
-            maxWidth: "1240px",
-            margin: "0 auto",
-            position: "relative",
-            zIndex: 1,
-          }}
-          className="hero-editorial-grid"
-        >
-          {/* Header Area (Top on Mobile, Top-Left on Desktop) */}
-          <div className="hero-grid-header">
-            {/* Gilded Heritage Badge */}
-            <div style={{ marginBottom: "18px" }} className="hero-badge">
+        {/* DESKTOP PRESENTATION: Bespoke Editorial Luxury Layout */}
+        <div className="hero-vicky-desktop">
+          {/* Left: Typography & Story */}
+          <div style={{ zIndex: 2, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+            {/* Atelier Gilded Badge */}
+            <div style={{ marginBottom: "18px" }}>
               <span
                 className="luxury-badge"
                 style={{
-                  border: "1px solid rgba(197, 160, 89, 0.55)",
-                  backgroundColor: "rgba(255, 255, 255, 0.85)",
-                  boxShadow: "0 2px 12px rgba(197, 160, 89, 0.16)",
-                  letterSpacing: "0.14em",
+                  padding: "6px 18px",
+                  fontSize: "11px",
+                  letterSpacing: "0.2em",
+                  border: "1px solid rgba(197, 160, 89, 0.45)",
+                  backgroundColor: "rgba(250, 245, 238, 0.95)",
+                  color: "#6D4E39",
+                  boxShadow: "0 2px 12px rgba(197, 160, 89, 0.14)",
                 }}
               >
-                ✦ SURAT ATELIER • PAN-INDIA HANDLOOM PREVIEWS ✦
+                ✦ {HERO_SLIDES[heroSlide].badge} • ATELIER 2026 ✦
               </span>
             </div>
 
-            {/* Regal Heading */}
             <h1
-              className="hero-title"
               style={{
                 fontFamily: "var(--font-serif), Georgia, serif",
-                fontSize: "clamp(46px, 6.8vw, 82px)",
-                fontWeight: 500,
+                fontSize: "clamp(52px, 5.2vw, 76px)",
+                lineHeight: 1.05,
                 color: "#261B13",
-                lineHeight: 1.02,
-                letterSpacing: "0.06em",
-                marginBottom: "12px",
+                fontWeight: 500,
+                letterSpacing: "-0.015em",
+                margin: "0 0 16px 0",
               }}
             >
-              AVSARAA
+              <div>{HERO_SLIDES[heroSlide].titleLine1}</div>
+              <div>{HERO_SLIDES[heroSlide].titleLine2}</div>
+              <div>{HERO_SLIDES[heroSlide].titleLine3}</div>
+              <div
+                className="font-script gold-foil-text"
+                style={{
+                  fontSize: "clamp(78px, 7.8vw, 114px)",
+                  lineHeight: 0.88,
+                  marginTop: "6px",
+                  marginBottom: "8px",
+                  fontWeight: 400,
+                  filter: "drop-shadow(0 2px 14px rgba(197, 160, 89, 0.25))",
+                }}
+              >
+                {HERO_SLIDES[heroSlide].titleScript}
+              </div>
             </h1>
 
-            {/* Italic Poetry */}
             <p
-              className="hero-subtitle"
               style={{
-                fontFamily: "var(--font-serif), Georgia, serif",
-                fontSize: "clamp(20px, 3.2vw, 32px)",
-                fontStyle: "italic",
-                color: "#866951",
-                lineHeight: 1.25,
-                marginBottom: "18px",
+                fontSize: "12px",
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: "#6D4E39",
+                lineHeight: 1.6,
+                margin: "0 0 10px 0",
+                fontWeight: 600,
+                maxWidth: "460px",
               }}
             >
-              Wear The Moment. Beautifully Handwoven.
+              {HERO_SLIDES[heroSlide].subtitle}
             </p>
 
-            {/* Subtle Divider Hairline */}
-            <div
-              className="hero-body"
+            <p
               style={{
-                width: "60px",
-                height: "1.5px",
-                background: "linear-gradient(90deg, #C5A059, transparent)",
-                marginBottom: "18px",
-              }}
-            />
-          </div>
-
-          {/* Image Area (Right on Desktop, Middle on Mobile — visible above fold!) */}
-          <div className="hero-grid-image">
-            <div
-              className="arch-top-frame"
-              style={{
-                position: "relative",
-                width: "100%",
-                maxWidth: "460px",
-                height: "clamp(440px, 50vw, 560px)",
-                backgroundColor: "#EFE6DC",
-                boxShadow: "0 24px 60px -15px rgba(38, 27, 19, 0.22), 0 0 0 1px rgba(197, 160, 89, 0.35)",
+                fontSize: "14.5px",
+                color: "#5C4A3E",
+                lineHeight: 1.7,
+                margin: "0 0 32px 0",
+                maxWidth: "480px",
+                fontWeight: 400,
               }}
             >
+              {HERO_SLIDES[heroSlide].desc}
+            </p>
+
+            {/* Action Buttons Row */}
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", marginBottom: "34px" }}>
+              <Link
+                href={HERO_SLIDES[heroSlide].ctaLink}
+                className="hero-cta-btn-link btn-shine"
+              >
+                <span>{HERO_SLIDES[heroSlide].ctaText}</span>
+                <span style={{ fontSize: "16px" }}>→</span>
+              </Link>
+
+              <Link
+                href={HERO_SLIDES[heroSlide].secondaryLink}
+                className="hero-secondary-btn"
+              >
+                <span>{HERO_SLIDES[heroSlide].secondaryText}</span>
+                <span>↗</span>
+              </Link>
+            </div>
+
+            {/* Curated Slide Collection Switcher */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "26px" }}>
+              {HERO_SLIDES.map((slide, idx) => {
+                const isActive = heroSlide === idx;
+                return (
+                  <button
+                    key={slide.id}
+                    onClick={() => setHeroSlide(idx)}
+                    className={`hero-slide-pill ${isActive ? "active" : ""}`}
+                    aria-label={`Select collection ${slide.badge}`}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: isActive ? "#261B13" : "#8E7D70",
+                      }}
+                    >
+                      0{idx + 1}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        fontWeight: isActive ? 700 : 500,
+                        color: isActive ? "#261B13" : "#6E5B4E",
+                      }}
+                    >
+                      {slide.badge}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quality Artisan Guarantees */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "20px",
+                paddingTop: "20px",
+                borderTop: "1px solid rgba(207, 190, 173, 0.5)",
+                width: "100%",
+                maxWidth: "500px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ color: "#C5A059", fontSize: "12px" }}>✦</span>
+                <span style={{ fontSize: "11.5px", color: "#6E5B4E", fontWeight: 500 }}>Silk Mark Certified</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ color: "#C5A059", fontSize: "12px" }}>✦</span>
+                <span style={{ fontSize: "11.5px", color: "#6E5B4E", fontWeight: 500 }}>Free Express Delivery</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ color: "#C5A059", fontSize: "12px" }}>✦</span>
+                <span style={{ fontSize: "11.5px", color: "#6E5B4E", fontWeight: 500 }}>Bespoke Tailoring</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Architectural Luxury Image Frame with Controls */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+            }}
+          >
+            {/* Left Chevron Button */}
+            <button
+              type="button"
+              onClick={() => setHeroSlide((prev) => (prev === 0 ? HERO_SLIDES.length - 1 : prev - 1))}
+              aria-label="Previous slide"
+              className="hero-arrow-btn"
+              style={{
+                position: "absolute",
+                left: "-20px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 10,
+              }}
+            >
+              ‹
+            </button>
+
+            {/* Regal Arch Frame */}
+            <div className="hero-arch-portrait">
               <Image
-                src="/images/royal_organza_saree.jpg"
-                alt="Avsaraa Handcrafted Royal Silk Saree"
+                key={HERO_SLIDES[heroSlide].id}
+                src={HERO_SLIDES[heroSlide].desktopImage}
+                alt={HERO_SLIDES[heroSlide].alt}
                 fill
-                loading="eager"
-                sizes="(min-width: 900px) 460px, 90vw"
-                style={{ objectFit: "cover", objectPosition: "center 20%" }}
+                priority
+                sizes="(min-width: 900px) 480px, 90vw"
+                style={{
+                  objectFit: "cover",
+                  objectPosition: "center 22%",
+                }}
               />
 
-              {/* Season Pill */}
+              {/* Subtle Ambient Vignette Overlay */}
               <div
                 style={{
                   position: "absolute",
-                  top: "22px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  backgroundColor: "rgba(38, 27, 19, 0.92)",
-                  backdropFilter: "blur(10px)",
-                  WebkitBackdropFilter: "blur(10px)",
-                  color: "#FAF7F2",
-                  padding: "6px 18px",
-                  borderRadius: "20px",
-                  fontSize: "11px",
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                  boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
-                  whiteSpace: "nowrap",
-                  zIndex: 2,
-                  border: "1px solid rgba(226, 190, 114, 0.55)",
+                  inset: 0,
+                  background: "linear-gradient(180deg, rgba(38,27,19,0.02) 50%, rgba(26,18,12,0.65) 100%)",
+                  pointerEvents: "none",
                 }}
-              >
-                ✦ Festive 2026 Collection ✦
+              />
+
+              {/* Floating Top Tag */}
+              <div className="hero-floating-top-tag">
+                ✦ {HERO_SLIDES[heroSlide].atelierTag}
               </div>
 
-              {/* Bottom Frosted Atelier Preview Card */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "16px",
-                  left: "16px",
-                  right: "16px",
-                  backgroundColor: "rgba(250, 247, 242, 0.94)",
-                  backdropFilter: "blur(14px)",
-                  WebkitBackdropFilter: "blur(14px)",
-                  border: "1px solid rgba(197, 160, 89, 0.5)",
-                  borderRadius: "18px",
-                  padding: "14px 18px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                  boxShadow: "0 12px 35px rgba(38, 27, 19, 0.16)",
-                  zIndex: 2,
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
+              {/* Floating Heirloom Atelier Seal */}
+              <div className="hero-floating-seal">
+                <div>
                   <span
                     style={{
                       display: "block",
-                      fontSize: "10px",
-                      color: "#866951",
+                      fontSize: "9.5px",
+                      letterSpacing: "0.14em",
                       textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      fontWeight: 600,
+                      color: "#E2BE72",
+                      fontWeight: 700,
+                      marginBottom: "3px",
                     }}
                   >
-                    HANDWOVEN TISSUE
+                    ✦ ATELIER HEIRLOOM {HERO_SLIDES[heroSlide].pieceNo} ✦
                   </span>
                   <span
                     style={{
                       fontFamily: "var(--font-serif), Georgia, serif",
-                      fontSize: "17px",
-                      color: "#261B13",
-                      fontWeight: 600,
-                      whiteSpace: "nowrap",
-                      textOverflow: "ellipsis",
-                      overflow: "hidden",
-                      display: "block",
+                      fontSize: "15px",
+                      fontWeight: 500,
+                      color: "#FAF7F2",
                     }}
                   >
-                    Emerald Royal Organza
+                    {HERO_SLIDES[heroSlide].craft}
                   </span>
                 </div>
+
                 <Link
-                  href="/collection?category=Sarees"
-                  className="btn-shine"
+                  href={HERO_SLIDES[heroSlide].ctaLink}
                   style={{
-                    backgroundColor: "#261B13",
+                    backgroundColor: "rgba(226, 190, 114, 0.2)",
+                    border: "1px solid rgba(226, 190, 114, 0.6)",
                     color: "#FAF7F2",
+                    borderRadius: "20px",
+                    padding: "6px 14px",
                     fontSize: "11px",
                     fontWeight: 600,
                     letterSpacing: "0.06em",
                     textTransform: "uppercase",
-                    padding: "9px 16px",
-                    borderRadius: "20px",
                     textDecoration: "none",
                     whiteSpace: "nowrap",
-                    flexShrink: 0,
                   }}
                 >
-                  View Drape →
+                  Explore →
                 </Link>
               </div>
             </div>
-          </div>
 
-          {/* Actions Area (Bottom on Mobile, Bottom-Left on Desktop) */}
-          <div className="hero-grid-actions">
-            <p
-              className="hero-body"
+            {/* Right Chevron Button */}
+            <button
+              type="button"
+              onClick={() => setHeroSlide((prev) => (prev === HERO_SLIDES.length - 1 ? 0 : prev + 1))}
+              aria-label="Next slide"
+              className="hero-arrow-btn"
               style={{
-                fontSize: "15.5px",
-                lineHeight: 1.85,
-                color: "#5C4A3E",
-                marginBottom: "24px",
-                maxWidth: "520px",
+                position: "absolute",
+                right: "-20px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 10,
               }}
             >
-              Handcrafted Indian sarees and silks from Varanasi, Chanderi, and Surat. Simple, timeless, and thoughtfully loomed for your cherished celebrations.
-            </p>
-
-            {/* Provenance Pills */}
-            <div
-              className="hero-body"
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "8px",
-                marginBottom: "32px",
-              }}
-            >
-              {["Banarasi Katan Silk", "Tissue Organza", "Pure Chanderi", "Hand-Finished Zari"].map((tag) => (
-                <span
-                  key={tag}
-                  style={{
-                    fontSize: "11.5px",
-                    color: "#6E523D",
-                    backgroundColor: "#FFFFFF",
-                    border: "1px solid #E2D5C7",
-                    borderRadius: "18px",
-                    padding: "5px 14px",
-                    fontWeight: 500,
-                    letterSpacing: "0.04em",
-                    boxShadow: "0 2px 6px rgba(38, 27, 19, 0.03)",
-                  }}
-                >
-                  ✦ {tag}
-                </span>
-              ))}
-            </div>
-
-            {/* Core Action Buttons */}
-            <div
-              className="hero-cta"
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "14px",
-                width: "100%",
-              }}
-            >
-              <Link
-                href="/collection"
-                className="avsaraa-btn-primary btn-shine"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "10px",
-                  padding: "0 34px",
-                  height: "52px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  textDecoration: "none",
-                  backgroundColor: "#261B13",
-                  color: "#FAF7F2",
-                  borderRadius: "26px",
-                  boxShadow: "0 6px 20px rgba(38, 27, 19, 0.25)",
-                }}
-              >
-                <span>Explore The Atelier</span>
-                <span>→</span>
-              </Link>
-
-              <Link
-                href="/about"
-                className="avsaraa-btn-outline"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "10px",
-                  padding: "0 30px",
-                  height: "52px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  backgroundColor: "#FFFFFF",
-                  border: "1px solid #CFBEAD",
-                  color: "#261B13",
-                  borderRadius: "26px",
-                  textDecoration: "none",
-                  transition: "all 0.25s ease",
-                }}
-              >
-                <span>Our Heritage</span>
-                <span>→</span>
-              </Link>
-            </div>
-
-            {/* Trust Micro-bar */}
-            <div
-              className="hero-trust"
-              style={{
-                marginTop: "32px",
-                paddingTop: "18px",
-                borderTop: "1px solid #EAE0D5",
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "20px",
-                fontSize: "12px",
-                color: "#8E7D70",
-                width: "100%",
-              }}
-            >
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ color: "#C5A059" }}>✦</span> Free Delivery in India
-              </span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ color: "#C5A059" }}>✦</span> 100% Handloom Certified
-              </span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ color: "#C5A059" }}>✦</span> Private Drape Consultations
-              </span>
-            </div>
+              ›
+            </button>
           </div>
         </div>
       </section>
@@ -1000,14 +1130,44 @@ export default function HomePage() {
             </p>
           </div>
 
+          {/* Interactive Category Filter Tabs on Desktop & Mobile */}
+          <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap", marginBottom: "36px" }}>
+            {(["ALL", "Sarees", "Dresses", "Occasion Wear"] as const).map((cat) => {
+              const isActive = spotlightCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSpotlightCategory(cat)}
+                  className="luxury-pill-tab"
+                  style={{
+                    padding: "8px 22px",
+                    borderRadius: "22px",
+                    fontSize: "12px",
+                    fontWeight: isActive ? 700 : 500,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    backgroundColor: isActive ? "#261B13" : "#FFFFFF",
+                    color: isActive ? "#FAF7F2" : "#6E5B4E",
+                    border: isActive ? "1.5px solid #261B13" : "1px solid #CFBEAD",
+                    cursor: "pointer",
+                    boxShadow: isActive ? "0 4px 14px rgba(38,27,19,0.15)" : "none",
+                    transition: "all 0.25s ease",
+                  }}
+                >
+                  {cat === "ALL" ? "All Pieces" : cat}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Responsive 2-column on mobile, 3-column on desktop */}
           {loadingSpotlight ? (
             <div style={{ textAlign: "center", padding: "60px 24px", color: "#866951" }}>
               <p style={{ fontSize: "14px", fontStyle: "italic" }}>✦ Loading handcrafted heirlooms from our atelier...</p>
             </div>
-          ) : spotlightProducts.length > 0 ? (
+          ) : (spotlightCategory === "ALL" ? spotlightProducts.slice(0, 6) : spotlightProducts.filter((p) => p.category === spotlightCategory).slice(0, 6)).length > 0 ? (
             <div className="responsive-product-grid" style={{ marginBottom: "48px" }}>
-              {spotlightProducts.map((product) => (
+              {(spotlightCategory === "ALL" ? spotlightProducts.slice(0, 6) : spotlightProducts.filter((p) => p.category === spotlightCategory).slice(0, 6)).map((product) => (
               <div
                 key={product.id}
                 className="luxury-hover-card product-card-container product-card-shimmer"
@@ -1254,16 +1414,35 @@ export default function HomePage() {
               backgroundColor: "#FFFFFF",
               borderRadius: "16px",
               border: "1px dashed #D6C7B2",
-              maxWidth: "500px",
+              maxWidth: "520px",
               margin: "0 auto 48px auto",
             }}
           >
-            <p style={{ fontSize: "15px", color: "#6E5B4E", margin: 0, fontWeight: 500 }}>
-              ✦ Catalog Updating ✦
+            <p style={{ fontSize: "15px", color: "#6E5B4E", margin: 0, fontWeight: 600 }}>
+              ✦ {spotlightCategory === "ALL" ? "Catalog Updating" : `Explore All ${spotlightCategory}`} ✦
             </p>
-            <p style={{ fontSize: "13px", color: "#8E7D70", margin: "8px 0 0 0" }}>
-              Our weavers are curating fresh handlooms in the atelier. Explore our complete collection below.
+            <p style={{ fontSize: "13px", color: "#8E7D70", margin: "8px 0 18px 0", lineHeight: 1.6 }}>
+              {spotlightCategory === "ALL"
+                ? "Our master weavers are handcrafting new drapes in the atelier."
+                : `Discover our full artisan range of ${spotlightCategory.toLowerCase()} in the atelier catalog.`}
             </p>
+            <Link
+              href={spotlightCategory === "ALL" ? "/collection" : `/collection?category=${encodeURIComponent(spotlightCategory)}`}
+              className="avsaraa-btn-outline"
+              style={{
+                display: "inline-flex",
+                height: "40px",
+                padding: "0 20px",
+                fontSize: "11.5px",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                borderRadius: "20px",
+                width: "auto",
+              }}
+            >
+              <span>Explore {spotlightCategory === "ALL" ? "Collection" : spotlightCategory} Catalog</span>
+              <span>→</span>
+            </Link>
           </div>
         )}
 

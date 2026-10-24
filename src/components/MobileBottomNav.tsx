@@ -1,20 +1,41 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
-import { ShoppingBagIcon, HeartIcon, WhatsAppIcon } from "./Icons";
+import { ShoppingBagIcon, HeartIcon, UserIcon } from "./Icons";
+import { supabase } from "@/lib/supabaseClient";
+import type { User } from "@supabase/supabase-js";
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const { totalItems, openCart } = useCart();
   const { totalWishlist } = useWishlist();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const isHome = pathname === "/";
   const isCollection = pathname.startsWith("/collection");
   const isWishlist = pathname.startsWith("/wishlist");
+  const isProfile = pathname.startsWith("/account");
+  const isAuth = pathname === "/login" || pathname === "/register";
 
   return (
     <nav
@@ -237,36 +258,92 @@ export default function MobileBottomNav() {
         </span>
       </button>
 
-      {/* 5. Studio Concierge / WhatsApp Direct */}
-      <a
-        href="https://wa.me/919876543210?text=Hello%20Avsaraa%20Atelier,%20I%20am%20interested%20in%20a%20handcrafted%20drape"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "4px",
-          color: "#25D366",
-          textDecoration: "none",
-          flex: 1,
-          padding: "4px 0",
-          transition: "all 0.2s ease",
-        }}
-      >
-        <WhatsAppIcon size={20} color="#25D366" />
-        <span
+      {/* 5. Profile (when logged in) or Sign In (when guest) */}
+      {user ? (
+        <Link
+          href="/account"
           style={{
-            fontSize: "10px",
-            fontWeight: 600,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            color: "#1B6B40",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "4px",
+            color: isProfile ? "#261B13" : "#8E7D70",
+            textDecoration: "none",
+            flex: 1,
+            padding: "4px 0",
+            position: "relative",
+            transition: "all 0.2s ease",
           }}
         >
-          Concierge
-        </span>
-      </a>
+          <div style={{ position: "relative" }}>
+            <UserIcon size={20} color={isProfile ? "#261B13" : "currentColor"} />
+            <span
+              style={{
+                position: "absolute",
+                top: "-2px",
+                right: "-3px",
+                width: "6px",
+                height: "6px",
+                backgroundColor: "#2E7D32",
+                borderRadius: "50%",
+                boxShadow: "0 0 4px rgba(46, 125, 50, 0.4)",
+              }}
+            />
+          </div>
+          <span
+            style={{
+              fontSize: "10px",
+              fontWeight: isProfile ? 700 : 500,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            Profile
+          </span>
+        </Link>
+      ) : (
+        <Link
+          href={pathname && pathname !== "/" && pathname !== "/login" ? `/login?redirect=${encodeURIComponent(pathname)}` : "/login"}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "4px",
+            color: isAuth ? "#261B13" : "#8E7D70",
+            textDecoration: "none",
+            flex: 1,
+            padding: "4px 0",
+            position: "relative",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <div style={{ position: "relative" }}>
+            <UserIcon size={20} color={isAuth ? "#261B13" : "currentColor"} />
+            <span
+              style={{
+                position: "absolute",
+                top: "-3px",
+                right: "-5px",
+                width: "7px",
+                height: "7px",
+                backgroundColor: "#C5A059",
+                borderRadius: "50%",
+                boxShadow: "0 1px 3px rgba(197, 160, 89, 0.5)",
+              }}
+            />
+          </div>
+          <span
+            style={{
+              fontSize: "10px",
+              fontWeight: isAuth ? 700 : 500,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            Sign In
+          </span>
+        </Link>
+      )}
     </nav>
   );
 }
