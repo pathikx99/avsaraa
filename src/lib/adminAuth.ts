@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import crypto from "crypto";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import type { User } from "@supabase/supabase-js";
@@ -13,12 +14,22 @@ export interface AdminAuthResult {
   adminProfile?: AdminUser;
 }
 
+function safeTimingCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf-8");
+  const bufB = Buffer.from(b, "utf-8");
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 /**
  * Returns server-side admin credentials configured from environment variables.
  */
 export function getAdminServerCredentials() {
   return {
-    email: (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase().trim(),
+    email: (process.env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase().trim(),
     password: process.env.ADMIN_PASSWORD || "",
   };
 }
@@ -40,7 +51,13 @@ export async function authenticateAdminRequest(): Promise<AdminAuthResult> {
     // 1. Direct Secret / API Key bypass (for server-to-server or secure automation)
     const secretKey =
       process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (adminKeyHeader && secretKey && adminKeyHeader === secretKey) {
+    if (
+      adminKeyHeader &&
+      secretKey &&
+      !secretKey.includes("•") &&
+      secretKey.length > 20 &&
+      safeTimingCompare(adminKeyHeader, secretKey)
+    ) {
       return { authorized: true, status: 200 };
     }
 
@@ -68,23 +85,8 @@ export async function authenticateAdminRequest(): Promise<AdminAuthResult> {
       }
     }
 
-    // 4. In development mode with no users in DB yet, check for emergency bootstrap
-    const { count, error: countErr } = await adminClient
-      .from("admin_users")
-      .select("*", { count: "exact", head: true });
-
-    const isDatabaseEmpty = !countErr && (count === null || count === 0);
-
     // If no user is logged in
     if (!user) {
-      // In local development, if database has no admins yet, allow bootstrap
-      if (isDatabaseEmpty && process.env.NODE_ENV === "development") {
-        return {
-          authorized: true,
-          status: 200,
-        };
-      }
-
       return {
         authorized: false,
         status: 401,
@@ -128,15 +130,15 @@ export async function authenticateAdminRequest(): Promise<AdminAuthResult> {
     return {
       authorized: false,
       status: 403,
-      error: `Access Denied: Account (${userEmail}) does not possess Super Admin privileges. Only the single Super Admin can control this platform.`,
+      error: `Access Denied: Account (${userEmail}) does not possess Super Admin privileges.`,
       user,
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Authentication verification error";
+    console.error("Administrative authentication error:", err);
     return {
       authorized: false,
       status: 500,
-      error: message,
+      error: "Authentication verification service error.",
     };
   }
 }

@@ -49,7 +49,7 @@ BEGIN
         )
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public, pg_temp;
 
 -- Admin users RLS policies
 DROP POLICY IF EXISTS "Public or admin can view admin users" ON public.admin_users;
@@ -193,12 +193,30 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Security Guard: Prevent non-admin users from escalating membership_tier, reward_points, or status
+CREATE OR REPLACE FUNCTION public.protect_profile_fields()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT public.is_admin() THEN
+        NEW.membership_tier := OLD.membership_tier;
+        NEW.reward_points := OLD.reward_points;
+        NEW.status := OLD.status;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+DROP TRIGGER IF EXISTS protect_profile_fields_trigger ON public.profiles;
+CREATE TRIGGER protect_profile_fields_trigger
+    BEFORE UPDATE ON public.profiles
+    FOR EACH ROW EXECUTE FUNCTION public.protect_profile_fields();
 
 -- Helper function to check if a phone number already exists
 CREATE OR REPLACE FUNCTION public.check_phone_exists(phone_to_check TEXT, current_user_id UUID DEFAULT NULL)
@@ -213,7 +231,7 @@ BEGIN
           AND (current_user_id IS NULL OR id != current_user_id)
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public, pg_temp;
 
 -- Helper function to check if an email already exists
 CREATE OR REPLACE FUNCTION public.check_email_exists(email_to_check TEXT, current_user_id UUID DEFAULT NULL)
@@ -228,7 +246,7 @@ BEGIN
           AND (current_user_id IS NULL OR id != current_user_id)
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public, pg_temp;
 
 -- ==============================================================================
 -- 3. USER ADDRESSES (User Account Delivery Locations)
@@ -417,8 +435,8 @@ CREATE POLICY "Users can delete their own wishlist"
     USING (auth.uid() = user_id OR public.is_admin());
 
 -- ==============================================================================
--- 8. PRODUCT REVIEWS & TESTIMONIALS (With Customer Photos & Videos)
--- Real patron reviews including photo/video media.
+-- 8. PRODUCT REVIEWS & TESTIMONIALS (With Customer Photos)
+-- Real patron reviews including photo media.
 -- Reviews can be managed, moderated, and DELETED by Super Admin.
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.product_reviews (
@@ -433,7 +451,6 @@ CREATE TABLE IF NOT EXISTS public.product_reviews (
     title TEXT,
     comment TEXT NOT NULL,
     photos TEXT[] DEFAULT '{}',
-    videos TEXT[] DEFAULT '{}',
     verified_purchase BOOLEAN DEFAULT false,
     helpful_count INTEGER DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'pending', 'hidden', 'flagged')),
@@ -466,6 +483,23 @@ DROP POLICY IF EXISTS "Super admin can delete reviews" ON public.product_reviews
 CREATE POLICY "Super admin can delete reviews" 
     ON public.product_reviews FOR DELETE 
     USING (public.is_admin());
+
+-- Security Guard: Enforce that public review submissions cannot falsify verified_purchase badge
+CREATE OR REPLACE FUNCTION public.protect_review_fields()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT public.is_admin() THEN
+        NEW.verified_purchase := false;
+        NEW.helpful_count := 0;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+DROP TRIGGER IF EXISTS protect_review_fields_trigger ON public.product_reviews;
+CREATE TRIGGER protect_review_fields_trigger
+    BEFORE INSERT ON public.product_reviews
+    FOR EACH ROW EXECUTE FUNCTION public.protect_review_fields();
 
 -- ==============================================================================
 -- INDEXES FOR MAXIMUM QUERY PERFORMANCE

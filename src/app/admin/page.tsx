@@ -20,14 +20,12 @@ import {
   SpinnerIcon,
   CheckIcon,
   MailIcon,
-  VideoCameraIcon,
   CameraIcon,
   StarIcon,
 } from "@/components/Icons";
 import { AdminUser, CustomerProfile, ContactInquiry, NewsletterSubscriber, ProductReview } from "@/types/admin";
 import { Product, ProductCategory } from "@/types/product";
 import { ADMIN_EMAIL, isSuperAdminUser } from "@/lib/adminConstants";
-import { DEFAULT_PATRON_REVIEWS } from "@/lib/defaultReviews";
 
 const PRESET_PRODUCT_IMAGES = [
   { label: "Banarasi Silk Saree", url: "/images/banarasi_silk_saree.jpg" },
@@ -79,7 +77,7 @@ export default function AdminDashboardPage() {
   const [superAdmin, setSuperAdmin] = useState<AdminUser>(DEFAULT_SUPER_ADMIN);
   const [customerProfiles, setCustomerProfiles] = useState<CustomerProfile[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [reviews, setReviews] = useState<ProductReview[]>(DEFAULT_PATRON_REVIEWS);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [inquiries, setInquiries] = useState<ContactInquiry[]>([]);
   const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,7 +91,7 @@ export default function AdminDashboardPage() {
 
   // Reviews Modals & Actions
   const [isDeletingReviewId, setIsDeletingReviewId] = useState<string | null>(null);
-  const [previewMediaModal, setPreviewMediaModal] = useState<{ type: "photo" | "video"; url: string; title?: string } | null>(null);
+  const [previewMediaModal, setPreviewMediaModal] = useState<{ url: string; title?: string } | null>(null);
 
   // Modals state for Products
   const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -220,7 +218,7 @@ export default function AdminDashboardPage() {
         }
       }
 
-      // 4. Fetch Customer Reviews (photos & videos)
+      // 4. Fetch Customer Reviews (photos)
       const reviewsRes = await fetch("/api/admin/reviews", { headers });
       if (reviewsRes.ok) {
         const reviewsJson = await reviewsRes.json();
@@ -811,7 +809,7 @@ export default function AdminDashboardPage() {
   const handleDeleteReview = async (reviewId: string) => {
     if (
       !window.confirm(
-        "Are you sure you want to permanently delete this customer review? All patron photos and video drapes will be removed."
+        "Are you sure you want to permanently delete this customer review? All patron photos will be removed."
       )
     ) {
       return;
@@ -882,9 +880,7 @@ export default function AdminDashboardPage() {
 
       let matchFilter = true;
       if (reviewFilter === "WITH_MEDIA") {
-        matchFilter =
-          Boolean(r.photos && r.photos.length > 0) ||
-          Boolean(r.videos && r.videos.length > 0);
+        matchFilter = Boolean(r.photos && r.photos.length > 0);
       } else if (reviewFilter === "5_STAR") {
         matchFilter = r.rating === 5;
       } else if (reviewFilter === "FLAGGED") {
@@ -1080,7 +1076,7 @@ CREATE POLICY "Users can insert their own wishlist" ON public.wishlists FOR INSE
 DROP POLICY IF EXISTS "Users can delete their own wishlist" ON public.wishlists;
 CREATE POLICY "Users can delete their own wishlist" ON public.wishlists FOR DELETE USING (auth.uid() = user_id OR public.is_admin());
 
--- 5. PRODUCT REVIEWS & PATRON MEDIA (Photos & Videos)
+-- 5. PRODUCT REVIEWS & PATRON MEDIA (Photos)
 CREATE TABLE IF NOT EXISTS public.product_reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id TEXT NOT NULL,
@@ -1093,7 +1089,6 @@ CREATE TABLE IF NOT EXISTS public.product_reviews (
     title TEXT,
     comment TEXT NOT NULL,
     photos TEXT[] DEFAULT '{}',
-    videos TEXT[] DEFAULT '{}',
     verified_purchase BOOLEAN DEFAULT false,
     helpful_count INTEGER DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'pending', 'hidden', 'flagged')),
@@ -1858,23 +1853,6 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                   <CameraIcon size={14} color="#866951" />
                   <span>{reviews.reduce((acc, r) => acc + (r.photos?.length || 0), 0)} Photos</span>
                 </span>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    padding: "8px 14px",
-                    backgroundColor: "#FAF6F0",
-                    border: "1px solid #E8DED3",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#866951",
-                  }}
-                >
-                  <VideoCameraIcon size={14} color="#866951" />
-                  <span>{reviews.reduce((acc, r) => acc + (r.videos?.length || 0), 0)} Videos</span>
-                </span>
               </div>
             )}
 
@@ -2574,7 +2552,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
         )}
 
         {/* ================================================================= */}
-        {/* VIEW 2: PATRON REVIEWS & MEDIA MANAGEMENT (PHOTOS & VIDEOS)       */}
+        {/* VIEW 2: PATRON REVIEWS & MEDIA MANAGEMENT (PHOTOS)                */}
         {/* ================================================================= */}
         {activeTab === "reviews" && (
           <div>
@@ -2642,12 +2620,11 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 >
                   <CameraIcon size={13} />
                   <span>
-                    With Photos & Videos (
+                    With Photos (
                     {
                       reviews.filter(
                         (r) =>
-                          (r.photos?.length || 0) > 0 ||
-                          (r.videos?.length || 0) > 0
+                          (r.photos?.length || 0) > 0
                       ).length
                     }
                     )
@@ -2955,7 +2932,6 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                               key={photoIdx}
                               onClick={() =>
                                 setPreviewMediaModal({
-                                  type: "photo",
                                   url: photoUrl,
                                   title: `${review.customer_name}'s Saree Photo`,
                                 })
@@ -2978,92 +2954,6 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                                 sizes="90px"
                                 style={{ objectFit: "cover" }}
                               />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Real Customer Video Reviews */}
-                    {review.videos && review.videos.length > 0 && (
-                      <div style={{ paddingTop: "6px" }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#866951",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.06em",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          <VideoCameraIcon size={13} color="#866951" />
-                          <span>Real Patron Video Drape & Unboxing ({review.videos.length})</span>
-                        </div>
-                        <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-                          {review.videos.map((videoUrl, vidIdx) => (
-                            <div
-                              key={vidIdx}
-                              style={{
-                                position: "relative",
-                                width: "100%",
-                                maxWidth: "340px",
-                                borderRadius: "10px",
-                                overflow: "hidden",
-                                border: "1px solid #CFBEAD",
-                                backgroundColor: "#1C140E",
-                                boxShadow: "0 4px 14px rgba(38,27,19,0.1)",
-                              }}
-                            >
-                              <video
-                                src={videoUrl}
-                                controls
-                                preload="metadata"
-                                style={{
-                                  width: "100%",
-                                  height: "200px",
-                                  objectFit: "cover",
-                                  display: "block",
-                                }}
-                              />
-                              <div
-                                style={{
-                                  padding: "6px 10px",
-                                  backgroundColor: "#FAF7F2",
-                                  borderTop: "1px solid #E8DED3",
-                                  fontSize: "11px",
-                                  color: "#866951",
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                }}
-                              >
-                                <span>Clip {vidIdx + 1}: Live Patron Review Drape</span>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setPreviewMediaModal({
-                                      type: "video",
-                                      url: videoUrl,
-                                      title: `${review.customer_name}'s Video Drape Review`,
-                                    })
-                                  }
-                                  style={{
-                                    fontSize: "11px",
-                                    color: "#866951",
-                                    fontWeight: 600,
-                                    textDecoration: "underline",
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  Cinema View ↗
-                                </button>
-                              </div>
                             </div>
                           ))}
                         </div>
@@ -3465,7 +3355,7 @@ CREATE POLICY "Users can insert their own wishlist" ON public.wishlists FOR INSE
 DROP POLICY IF EXISTS "Users can delete their own wishlist" ON public.wishlists;
 CREATE POLICY "Users can delete their own wishlist" ON public.wishlists FOR DELETE USING (auth.uid() = user_id OR public.is_admin());
 
--- 5. PRODUCT REVIEWS & PATRON MEDIA (Photos & Videos)
+-- 5. PRODUCT REVIEWS & PATRON MEDIA (Photos)
 CREATE TABLE IF NOT EXISTS public.product_reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id TEXT NOT NULL,
@@ -3478,7 +3368,6 @@ CREATE TABLE IF NOT EXISTS public.product_reviews (
     title TEXT,
     comment TEXT NOT NULL,
     photos TEXT[] DEFAULT '{}',
-    videos TEXT[] DEFAULT '{}',
     verified_purchase BOOLEAN DEFAULT false,
     helpful_count INTEGER DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'pending', 'hidden', 'flagged')),
@@ -4628,7 +4517,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
       )}
 
       {/* ===================================================================== */}
-      {/* MODAL 9: PATRON MEDIA PREVIEW (PHOTO / VIDEO ENLARGED)                */}
+      {/* MODAL 9: PATRON MEDIA PREVIEW (PHOTO ENLARGED)                        */}
       {/* ===================================================================== */}
       {previewMediaModal && (
         <div
@@ -4653,7 +4542,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               borderRadius: "16px",
               border: "1px solid #C5A059",
               width: "100%",
-              maxWidth: previewMediaModal.type === "video" ? "720px" : "600px",
+              maxWidth: "600px",
               overflow: "hidden",
               boxShadow: "0 24px 60px rgba(0, 0, 0, 0.5)",
             }}
@@ -4668,11 +4557,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                {previewMediaModal.type === "video" ? (
-                  <VideoCameraIcon size={18} color="#C5A059" />
-                ) : (
-                  <CameraIcon size={18} color="#C5A059" />
-                )}
+                <CameraIcon size={18} color="#C5A059" />
                 <span
                   style={{
                     fontSize: "14px",
@@ -4681,7 +4566,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                     fontFamily: "var(--font-playfair), serif",
                   }}
                 >
-                  {previewMediaModal.title || "Customer Heirloom Media"}
+                  {previewMediaModal.title || "Customer Heirloom Photo"}
                 </span>
               </div>
               <button
@@ -4707,35 +4592,21 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 backgroundColor: "#0F0A07",
               }}
             >
-              {previewMediaModal.type === "video" ? (
-                <video
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: "500px",
+                  maxHeight: "70vh",
+                }}
+              >
+                <Image
                   src={previewMediaModal.url}
-                  controls
-                  autoPlay
-                  style={{
-                    width: "100%",
-                    maxHeight: "70vh",
-                    borderRadius: "8px",
-                    outline: "none",
-                  }}
+                  alt={previewMediaModal.title || "Customer Photo"}
+                  fill
+                  style={{ objectFit: "contain" }}
                 />
-              ) : (
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "500px",
-                    maxHeight: "70vh",
-                  }}
-                >
-                  <Image
-                    src={previewMediaModal.url}
-                    alt={previewMediaModal.title || "Customer Photo"}
-                    fill
-                    style={{ objectFit: "contain" }}
-                  />
-                </div>
-              )}
+              </div>
             </div>
 
             <div

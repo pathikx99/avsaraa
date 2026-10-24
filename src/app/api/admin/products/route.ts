@@ -20,7 +20,8 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      console.error("Products query database error:", error);
+      return NextResponse.json({ success: false, error: "Failed to fetch products from catalog." }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -29,8 +30,8 @@ export async function GET() {
       count: data?.length || 0,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to fetch products";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Products GET exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while fetching products." }, { status: 500 });
   }
 }
 
@@ -96,7 +97,8 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      console.error("Product create database error:", error);
+      return NextResponse.json({ success: false, error: "Failed to create product in database." }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -105,8 +107,8 @@ export async function POST(request: Request) {
       message: "Product created successfully.",
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to create product";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Product POST exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while creating product." }, { status: 500 });
   }
 }
 
@@ -184,7 +186,8 @@ export async function PUT(request: Request) {
       .single();
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      console.error("Product update database error:", error);
+      return NextResponse.json({ success: false, error: "Failed to update product." }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -193,8 +196,8 @@ export async function PUT(request: Request) {
       message: "Product updated successfully.",
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to update product";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Product PUT exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while updating product." }, { status: 500 });
   }
 }
 
@@ -223,7 +226,8 @@ export async function DELETE(request: Request) {
       .eq("id", id);
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      console.error("Product delete database error:", error);
+      return NextResponse.json({ success: false, error: "Failed to delete product." }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -231,7 +235,7 @@ export async function DELETE(request: Request) {
       message: "Product deleted successfully.",
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to delete product";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Product DELETE exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while deleting product." }, { status: 500 });
   }
 }

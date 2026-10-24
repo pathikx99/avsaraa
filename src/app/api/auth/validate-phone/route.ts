@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { normalizePhoneNumber, maskEmail, maskPhoneNumber } from "@/lib/phoneUtils";
 
 export async function POST(request: Request) {
@@ -47,8 +48,17 @@ export async function POST(request: Request) {
         `phone_number.eq.${normalized},phone_number.eq.${digitsOnly},phone_number.ilike.%${last10Digits}`
       );
 
+    // Security: Only allow excluding currentUserId if the caller is verified to own that session ID
     if (currentUserId && typeof currentUserId === "string") {
-      query = query.neq("id", currentUserId);
+      try {
+        const supabase = await createSupabaseServerClient();
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user && authData.user.id === currentUserId) {
+          query = query.neq("id", currentUserId);
+        }
+      } catch {
+        // Unauthenticated - do not exclude
+      }
     }
 
     const { data: existingProfiles, error: queryError } = await query;
@@ -99,13 +109,12 @@ export async function POST(request: Request) {
       message: "Phone number is valid and available.",
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Phone validation failed";
     console.error("Phone validation error:", err);
     return NextResponse.json(
       {
         valid: false,
         available: false,
-        error: message,
+        error: "Unable to complete phone validation at this time. Please try again.",
       },
       { status: 500 }
     );

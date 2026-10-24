@@ -27,8 +27,8 @@ export async function GET() {
       subscribers: (!subErr && subscribers) ? subscribers : [],
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to fetch inquiries";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Inquiries GET exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while fetching inquiries." }, { status: 500 });
   }
 }
 
@@ -60,13 +60,14 @@ export async function PATCH(request: Request) {
       .single();
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      console.error("Inquiry status update database error:", error);
+      return NextResponse.json({ success: false, error: "Failed to update inquiry status." }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, data, message: "Inquiry status updated." });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to update inquiry";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Inquiry PATCH exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while updating inquiry." }, { status: 500 });
   }
 }
 
@@ -90,12 +91,13 @@ export async function DELETE(request: Request) {
     const { error } = await supabaseAdmin.from(tableName).delete().eq("id", id);
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      console.error("Inquiry delete database error:", error);
+      return NextResponse.json({ success: false, error: "Failed to delete inquiry record." }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, message: `${target === "subscriber" ? "Subscriber" : "Inquiry"} deleted successfully.` });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to delete record";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Inquiry DELETE exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while deleting record." }, { status: 500 });
   }
 }

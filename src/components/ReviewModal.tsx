@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { StarIcon, CloseIcon, CameraIcon, VideoCameraIcon, SpinnerIcon, CheckIcon } from "@/components/Icons";
+import { StarIcon, CloseIcon, CameraIcon, SpinnerIcon, CheckIcon } from "@/components/Icons";
 import { ProductReview } from "@/types/review";
 import { useCart } from "@/context/CartContext";
 
@@ -29,7 +29,6 @@ export default function ReviewModal({
   const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -50,7 +49,6 @@ export default function ReviewModal({
     setErrorMsg(null);
 
     const photos = photoUrl.trim() ? [photoUrl.trim()] : [];
-    const videos = videoUrl.trim() ? [videoUrl.trim()] : [];
 
     try {
       const res = await fetch("/api/reviews", {
@@ -66,7 +64,6 @@ export default function ReviewModal({
           title: title || null,
           comment,
           photos,
-          videos,
         }),
       });
 
@@ -312,72 +309,38 @@ export default function ReviewModal({
             />
           </div>
 
-          {/* Real Customer Photo & Video URL inputs */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-            <div>
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "#866951",
-                  textTransform: "uppercase",
-                  marginBottom: "6px",
-                }}
-              >
-                <CameraIcon size={13} color="#866951" />
-                <span>Patron Photo (URL)</span>
-              </label>
-              <input
-                type="text"
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
-                placeholder="/images/... or image URL"
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #CFBEAD",
-                  backgroundColor: "#FCFAF7",
-                  fontSize: "12.5px",
-                  color: "#261B13",
-                }}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "#866951",
-                  textTransform: "uppercase",
-                  marginBottom: "6px",
-                }}
-              >
-                <VideoCameraIcon size={13} color="#866951" />
-                <span>Video Drape (URL)</span>
-              </label>
-              <input
-                type="text"
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="Video clip MP4 or video URL"
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #CFBEAD",
-                  backgroundColor: "#FCFAF7",
-                  fontSize: "12.5px",
-                  color: "#261B13",
-                }}
-              />
-            </div>
+          {/* Real Customer Photo URL input */}
+          <div>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#866951",
+                textTransform: "uppercase",
+                marginBottom: "6px",
+              }}
+            >
+              <CameraIcon size={13} color="#866951" />
+              <span>Patron Photo (URL)</span>
+            </label>
+            <input
+              type="text"
+              value={photoUrl}
+              onChange={(e) => setPhotoUrl(e.target.value)}
+              placeholder="/images/... or image URL (optional)"
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: "1px solid #CFBEAD",
+                backgroundColor: "#FCFAF7",
+                fontSize: "12.5px",
+                color: "#261B13",
+              }}
+            />
           </div>
 
           {/* Action Buttons */}

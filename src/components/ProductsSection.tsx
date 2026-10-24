@@ -18,63 +18,6 @@ interface ProductsSectionProps {
 
 const DEFAULT_FALLBACK_IMAGE = "/images/banarasi_silk_saree.jpg";
 
-const DEFAULT_PRODUCTS: Product[] = [
-  {
-    id: "prod-1",
-    name: "Pure Banarasi Katan Silk Saree",
-    category: "Sarees",
-    price: 18500,
-    image_url: "/images/banarasi_silk_saree.jpg",
-    description: "Hand-loomed in Varanasi with authentic gold zari floral jaal, finished with heritage border.",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "prod-2",
-    name: "Emerald Royal Organza Saree",
-    category: "Sarees",
-    price: 14200,
-    image_url: "/images/royal_organza_saree.jpg",
-    description: "Sheer tissue organza drape in jewel emerald with delicate hand-embroidered scallop borders.",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "prod-3",
-    name: "Heritage Silk Anarkali Gown",
-    category: "Dresses",
-    price: 16800,
-    image_url: "/images/royal_occasion_dress.jpg",
-    description: "Floor-length raw silk flare adorned with regal dabka and gota patti artisan embroidery.",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "prod-4",
-    name: "Festive Chanderi Kurta Set",
-    category: "Dresses",
-    price: 9800,
-    image_url: "/images/festive_chanderi_dress.jpg",
-    description: "Breathable pure Chanderi silk with hand block-printed motifs and zari-threaded dupatta.",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "prod-5",
-    name: "Royal Zari Bridal Drape",
-    category: "Occasion Wear",
-    price: 24500,
-    image_url: "/images/saree_model_hero.jpg",
-    description: "Masterpiece festive weave featuring pure metallic zari embellishments and rich pallu craft.",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "prod-6",
-    name: "Surat Handloom Tissue Saree",
-    category: "New Arrivals",
-    price: 12900,
-    image_url: "/images/account_hero.jpg",
-    description: "Modern metallic sheen handloom drape woven in Surat with refined lightweight texture.",
-    created_at: new Date().toISOString(),
-  },
-];
-
 export default function ProductsSection({
   initialCategory = "ALL",
   showHeader = true,
@@ -82,7 +25,7 @@ export default function ProductsSection({
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const [activeCategory, setActiveCategory] = useState<ProductCategory | "ALL">(initialCategory);
-  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [, setUser] = useState<User | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -103,7 +46,7 @@ export default function ProductsSection({
       if (isMounted) setUser(session?.user ?? null);
     });
 
-    // Load products strictly from Supabase database; fallback to curated collection
+    // Load products strictly from Supabase database
     void supabase
       .from("products")
       .select("*")
@@ -111,14 +54,14 @@ export default function ProductsSection({
       .then(
         ({ data, error }) => {
           if (!isMounted) return;
-          if (error || !data || data.length === 0) {
-            setProducts(DEFAULT_PRODUCTS);
+          if (error || !data) {
+            setProducts([]);
           } else {
             setProducts(data);
           }
         },
         () => {
-          if (isMounted) setProducts(DEFAULT_PRODUCTS);
+          if (isMounted) setProducts([]);
         }
       );
 

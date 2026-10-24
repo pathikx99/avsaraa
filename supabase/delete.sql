@@ -27,6 +27,8 @@ SET session_replication_role = 'replica';
 TRUNCATE TABLE 
     public.newsletter_subscribers,
     public.contact_inquiries,
+    public.product_reviews,
+    public.wishlists,
     public.addresses,
     public.products,
     public.admin_users,
@@ -41,6 +43,20 @@ COMMIT;
 
 
 -- ==============================================================================
+-- MODE 3: REMOVE ALL DUMMY / DEMO SEED DATA ONLY (Targeted Cleanup)
+-- Uncomment to selectively purge dummy/demo items while keeping live customers:
+-- ==============================================================================
+/*
+BEGIN;
+DELETE FROM public.contact_inquiries WHERE email LIKE '%@example.com';
+DELETE FROM public.newsletter_subscribers WHERE email LIKE '%@example.com';
+DELETE FROM public.product_reviews WHERE customer_email LIKE '%@example.com' OR id LIKE 'rev-%';
+DELETE FROM public.products WHERE id LIKE 'prod-%';
+COMMIT;
+*/
+
+
+-- ==============================================================================
 -- MODE 2: COMPLETE TEAR-DOWN (DROP EVERYTHING)
 -- Runs by default: cleanly removes all tables, functions, triggers, and policies.
 -- After running this, execute `schema.sql` to re-create the pristine structure.
@@ -50,6 +66,8 @@ BEGIN;
 
 -- 1. Drop Triggers
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP TRIGGER IF EXISTS protect_profile_fields_trigger ON public.profiles;
+DROP TRIGGER IF EXISTS protect_review_fields_trigger ON public.product_reviews;
 DROP TRIGGER IF EXISTS set_profiles_updated_at ON public.profiles;
 DROP TRIGGER IF EXISTS set_addresses_updated_at ON public.addresses;
 DROP TRIGGER IF EXISTS set_products_updated_at ON public.products;
@@ -58,6 +76,8 @@ DROP TRIGGER IF EXISTS set_admin_users_updated_at ON public.admin_users;
 -- 2. Drop Tables (in reverse dependency order with CASCADE)
 DROP TABLE IF EXISTS public.newsletter_subscribers CASCADE;
 DROP TABLE IF EXISTS public.contact_inquiries CASCADE;
+DROP TABLE IF EXISTS public.product_reviews CASCADE;
+DROP TABLE IF EXISTS public.wishlists CASCADE;
 DROP TABLE IF EXISTS public.addresses CASCADE;
 DROP TABLE IF EXISTS public.products CASCADE;
 DROP TABLE IF EXISTS public.admin_users CASCADE;
@@ -66,6 +86,8 @@ DROP TABLE IF EXISTS public.profiles CASCADE;
 -- 3. Drop Helper Functions
 DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.protect_profile_fields() CASCADE;
+DROP FUNCTION IF EXISTS public.protect_review_fields() CASCADE;
 DROP FUNCTION IF EXISTS public.handle_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS public.check_phone_exists(TEXT, UUID) CASCADE;
 DROP FUNCTION IF EXISTS public.check_email_exists(TEXT, UUID) CASCADE;
@@ -76,3 +98,9 @@ COMMIT;
 SELECT table_name 
 FROM information_schema.tables 
 WHERE table_schema = 'public';
+
+-- ==============================================================================
+-- TARGETED MIGRATION: REMOVE VIDEOS FROM REVIEWS
+-- Run this if you have an active database and only want to drop videos from reviews:
+-- ALTER TABLE public.product_reviews DROP COLUMN IF EXISTS videos;
+-- ==============================================================================

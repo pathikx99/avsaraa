@@ -12,7 +12,7 @@ export interface ProductReview {
   title?: string | null;
   comment: string;
   photos: string[]; // URLs of customer photos
-  videos: string[]; // URLs of customer videos
+  videos?: string[]; // Optional URLs of customer videos (deprecated)
   verified_purchase: boolean;
   helpful_count: number;
   status: ReviewStatus;

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
-import { DEFAULT_PATRON_REVIEWS } from "@/lib/defaultReviews";
 import { ProductReview } from "@/types/review";
 
 export async function GET(request: Request) {
@@ -21,25 +20,18 @@ export async function GET(request: Request) {
 
     const { data, error } = await query;
 
-    if (error || !data || data.length === 0) {
-      const filtered = productId && productId !== "ALL"
-        ? DEFAULT_PATRON_REVIEWS.filter((r) => r.product_id === productId)
-        : DEFAULT_PATRON_REVIEWS;
-
-      return NextResponse.json({
-        success: true,
-        reviews: filtered,
-        isFallback: true,
-      });
+    if (error) {
+      console.error("Reviews load database error:", error);
+      return NextResponse.json({ success: false, error: "Unable to load reviews." }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
-      reviews: data as ProductReview[],
+      reviews: (data as ProductReview[]) || [],
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to load reviews";
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    console.error("Reviews GET exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while loading reviews." }, { status: 500 });
   }
 }
 
@@ -56,7 +48,6 @@ export async function POST(request: Request) {
       title = null,
       comment,
       photos = [],
-      videos = [],
       user_id = null,
     } = body;
 
@@ -82,33 +73,43 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!comment || typeof comment !== "string" || comment.trim().length < 5) {
+    if (!comment || typeof comment !== "string" || comment.trim().length < 5 || comment.length > 3000) {
       return NextResponse.json(
-        { success: false, error: "Please share a brief review of at least 5 characters." },
+        { success: false, error: "Review must be between 5 and 3,000 characters." },
         { status: 400 }
       );
     }
 
+    // Security (Check 16): Strict photo whitelist - only allow HTTPS images or local /images/ paths.
+    // Disallow dangerous data: URIs and SVG files to prevent stored XSS vectors.
+    const SAFE_PHOTO_REGEX = /^(\/images\/|https:\/\/)/i;
     const cleanPhotos: string[] = Array.isArray(photos)
-      ? photos.filter((p) => typeof p === "string" && p.trim().length > 0)
-      : [];
-
-    const cleanVideos: string[] = Array.isArray(videos)
-      ? videos.filter((v) => typeof v === "string" && v.trim().length > 0)
+      ? photos
+          .filter(
+            (p) =>
+              typeof p === "string" &&
+              p.trim().length > 0 &&
+              SAFE_PHOTO_REGEX.test(p.trim()) &&
+              !p.toLowerCase().includes(".svg") &&
+              !p.toLowerCase().includes("javascript:") &&
+              !p.toLowerCase().includes("data:")
+          )
+          .slice(0, 10)
       : [];
 
     const newReview: Partial<ProductReview> = {
-      product_id,
-      product_name,
-      customer_name: customer_name.trim(),
-      customer_email: customer_email ? String(customer_email).trim() : null,
-      customer_city: customer_city ? String(customer_city).trim() : null,
+      product_id: String(product_id).slice(0, 100),
+      product_name: String(product_name).slice(0, 200),
+      customer_name: customer_name.trim().slice(0, 100),
+      customer_email: customer_email ? String(customer_email).trim().slice(0, 200) : null,
+      customer_city: customer_city ? String(customer_city).trim().slice(0, 100) : null,
       rating: Math.round(numRating),
-      title: title ? String(title).trim() : null,
-      comment: comment.trim(),
+      title: title ? String(title).trim().slice(0, 150) : null,
+      comment: comment.trim().slice(0, 3000),
       photos: cleanPhotos,
-      videos: cleanVideos,
-      verified_purchase: true,
+      videos: [],
+      // Security (Check 11): Public reviews MUST NOT be pre-verified as verified purchases
+      verified_purchase: false,
       helpful_count: 0,
       status: "published",
       user_id,
@@ -124,13 +125,11 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      console.warn("Review insert fallback notice:", error);
-      // Return simulated success with local ID if database table has not been migrated yet
-      return NextResponse.json({
-        success: true,
-        message: "Thank you for sharing your royal review!",
-        review: { ...newReview, id: `rev-${Date.now()}` },
-      });
+      console.error("Reviews submission database error:", error);
+      return NextResponse.json(
+        { success: false, error: "Unable to submit your review at this time. Please try again." },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
@@ -139,7 +138,7 @@ export async function POST(request: Request) {
       review: data,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to post review";
-    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+    console.error("Reviews POST exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while posting your review." }, { status: 500 });
   }
 }

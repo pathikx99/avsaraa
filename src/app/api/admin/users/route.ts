@@ -50,8 +50,8 @@ export async function GET(request: Request) {
       customerProfiles,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to fetch users";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Admin users GET exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while fetching users." }, { status: 500 });
   }
 }
 
@@ -138,14 +138,15 @@ export async function POST(request: Request) {
         .single();
 
       if (error) {
-        return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+        console.error("Customer profile create database error:", error);
+        return NextResponse.json({ success: false, error: "Failed to create customer profile." }, { status: 500 });
       }
 
       return NextResponse.json({ success: true, data, message: "Customer user profile created." });
     }
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to create user";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Admin users POST exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while creating user." }, { status: 500 });
   }
 }
 
@@ -211,7 +212,8 @@ export async function PUT(request: Request) {
         .single();
 
       if (error) {
-        return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+        console.error("Super Admin update database error:", error);
+        return NextResponse.json({ success: false, error: "Failed to update Super Admin details." }, { status: 500 });
       }
 
       return NextResponse.json({ success: true, data, message: "Super Admin details updated successfully." });
@@ -264,14 +266,15 @@ export async function PUT(request: Request) {
         .single();
 
       if (error) {
-        return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+        console.error("Customer profile update database error:", error);
+        return NextResponse.json({ success: false, error: "Failed to update customer profile." }, { status: 500 });
       }
 
       return NextResponse.json({ success: true, data, message: "Customer profile updated successfully." });
     }
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to update user";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Admin users PUT exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while updating user." }, { status: 500 });
   }
 }
 
@@ -307,13 +310,14 @@ export async function DELETE(request: Request) {
         .eq("id", id);
 
       if (error) {
-        return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+        console.error("Customer profile delete database error:", error);
+        return NextResponse.json({ success: false, error: "Failed to delete customer profile." }, { status: 500 });
       }
 
       return NextResponse.json({ success: true, message: "Customer user profile deleted successfully." });
     }
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to delete user";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Admin users DELETE exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while deleting user." }, { status: 500 });
   }
 }

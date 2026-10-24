@@ -4,8 +4,7 @@
  */
 
 export const ADMIN_EMAIL: string = (
-  process.env.NEXT_PUBLIC_ADMIN_EMAIL ||
-  process.env.ADMIN_EMAIL ||
+  (typeof process !== "undefined" && process.env?.ADMIN_EMAIL) ||
   "admin@avsaraa.com"
 )
   .toLowerCase()
@@ -18,7 +17,8 @@ export interface AdminUserLike {
 }
 
 /**
- * Validates whether an email string matches the configured Super Admin email from environment variables.
+ * Validates whether an email string matches the configured Super Admin email.
+ * This is primarily intended for server-side verification.
  */
 export function isSuperAdminEmail(email?: string | null): boolean {
   if (!email) return false;
@@ -27,11 +27,11 @@ export function isSuperAdminEmail(email?: string | null): boolean {
 
 /**
  * Validates whether a Supabase user entity possesses Super Admin authority.
- * Checks against configured environment email and Supabase auth roles (app_metadata / user_metadata).
+ * Checks against Supabase auth roles (app_metadata only) which are tamper-proof.
+ * Falls back to server-side email verification if running on server.
  */
 export function isSuperAdminUser(user?: AdminUserLike | null): boolean {
   if (!user) return false;
-  if (isSuperAdminEmail(user.email)) return true;
 
   const appRole = user.app_metadata?.role;
   if (
@@ -41,11 +41,8 @@ export function isSuperAdminUser(user?: AdminUserLike | null): boolean {
     return true;
   }
 
-  const userRole = user.user_metadata?.role;
-  if (
-    typeof userRole === "string" &&
-    (userRole.toLowerCase() === "super_admin" || userRole.toLowerCase() === "admin")
-  ) {
+  // Server-side check against ADMIN_EMAIL
+  if (typeof window === "undefined" && isSuperAdminEmail(user.email)) {
     return true;
   }
 

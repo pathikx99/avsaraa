@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
-import { DEFAULT_PATRON_REVIEWS } from "@/lib/defaultReviews";
 import { ProductReview } from "@/types/review";
 
 export async function GET(request: Request) {
@@ -33,22 +32,18 @@ export async function GET(request: Request) {
 
     const { data, error } = await query;
 
-    if (error || !data || data.length === 0) {
-      // Return default initial reviews if table is freshly seeded/empty
-      return NextResponse.json({
-        success: true,
-        reviews: DEFAULT_PATRON_REVIEWS,
-        isFallback: !data || data.length === 0,
-      });
+    if (error) {
+      console.error("Reviews query database error:", error);
+      return NextResponse.json({ success: false, error: "Failed to fetch reviews." }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
-      reviews: data as ProductReview[],
+      reviews: (data as ProductReview[]) || [],
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to fetch reviews";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Reviews GET exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while fetching reviews." }, { status: 500 });
   }
 }
 
@@ -88,7 +83,8 @@ export async function DELETE(request: Request) {
       .eq("id", reviewId);
 
     if (error) {
-      console.warn("Supabase review deletion note:", error);
+      console.error("Supabase review deletion error:", error);
+      return NextResponse.json({ success: false, error: "Failed to delete review." }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -97,8 +93,8 @@ export async function DELETE(request: Request) {
       deletedId: reviewId,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to delete review";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Review DELETE exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while deleting review." }, { status: 500 });
   }
 }
 
@@ -122,11 +118,19 @@ export async function PATCH(request: Request) {
       );
     }
 
+    const VALID_STATUSES = ["published", "pending", "hidden", "flagged"];
+    if (status !== undefined && !VALID_STATUSES.includes(status)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
     if (status !== undefined) updates.status = status;
-    if (verified_purchase !== undefined) updates.verified_purchase = verified_purchase;
+    if (verified_purchase !== undefined) updates.verified_purchase = Boolean(verified_purchase);
 
     const supabaseAdmin = getAdminSupabaseClient();
     const { data, error } = await supabaseAdmin
@@ -137,9 +141,10 @@ export async function PATCH(request: Request) {
       .maybeSingle();
 
     if (error) {
+      console.error("Review update database error:", error);
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 400 }
+        { success: false, error: "Failed to update review status." },
+        { status: 500 }
       );
     }
 
@@ -149,7 +154,7 @@ export async function PATCH(request: Request) {
       review: data,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to update review";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error("Review PATCH exception:", err);
+    return NextResponse.json({ success: false, error: "An unexpected error occurred while updating review." }, { status: 500 });
   }
 }

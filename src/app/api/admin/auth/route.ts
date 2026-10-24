@@ -1,21 +1,45 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
+import crypto from "crypto";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { ADMIN_EMAIL } from "@/lib/adminConstants";
+import { checkRateLimit, resetRateLimit } from "@/lib/rateLimit";
+
+function safeTimingCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf-8");
+  const bufB = Buffer.from(b, "utf-8");
+  if (bufA.length !== bufB.length) {
+    // Perform dummy timing safe compare to avoid timing leak on length
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 export async function POST(request: Request) {
   try {
+    const headerList = await headers();
+    const forwardedFor = headerList.get("x-forwarded-for");
+    const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
+    const rateLimitKey = `admin-auth:${ip}`;
+
+    // 1. Rate Limiting Check (Check 18: Maximum 5 attempts per 15 minutes)
+    const rateCheck = checkRateLimit(rateLimitKey, 5, 900);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many failed administrative attempts. Access blocked for ${rateCheck.resetSeconds} seconds.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { email, password } = body;
 
-    const configuredEmail = (
-      process.env.ADMIN_EMAIL ||
-      process.env.NEXT_PUBLIC_ADMIN_EMAIL ||
-      ADMIN_EMAIL
-    )
-      .toLowerCase()
-      .trim();
-
-    const envPassword = process.env.ADMIN_PASSWORD || "avsaraa_super_secret_admin_key_2026";
+    const configuredEmail = (process.env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase().trim();
+    const envPassword = process.env.ADMIN_PASSWORD;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -24,23 +48,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const cleanEmail = String(email).toLowerCase().trim();
-
-    if (cleanEmail !== configuredEmail) {
+    if (!envPassword) {
+      console.error("ADMIN_PASSWORD environment variable is not configured.");
       return NextResponse.json(
-        {
-          success: false,
-          error: "Access Denied: Specified email does not match the configured Super Admin email.",
-        },
-        { status: 403 }
+        { success: false, error: "Server authentication service unavailable." },
+        { status: 500 }
       );
     }
 
-    // If an ADMIN_PASSWORD is set in environment and matches the provided password
-    if (envPassword && password === envPassword) {
-      const supabaseAdmin = getAdminSupabaseClient();
+    const cleanEmail = String(email).toLowerCase().trim();
+
+    // Constant-time comparison for password and email match
+    const emailMatches = safeTimingCompare(cleanEmail, configuredEmail);
+    const passwordMatches = safeTimingCompare(String(password), envPassword);
+
+    if (emailMatches && passwordMatches) {
+      // Successful authentication: Reset rate limit for this IP
+      resetRateLimit(rateLimitKey);
 
       try {
+        const supabaseAdmin = getAdminSupabaseClient();
+
         // Check if user already exists in Supabase Auth
         const { data: userListData } = await supabaseAdmin.auth.admin.listUsers();
         const existingUser = userListData?.users?.find(
@@ -92,7 +120,7 @@ export async function POST(request: Request) {
           { onConflict: "email" }
         );
       } catch (provisionErr) {
-        console.warn("Supabase auth sync notice:", provisionErr);
+        console.error("Supabase auth sync error:", provisionErr);
       }
 
       return NextResponse.json({
@@ -105,14 +133,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: "Invalid admin credentials.",
+        error: "Invalid administrator credentials.",
       },
       { status: 401 }
     );
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Authentication error";
+    console.error("Admin authentication exception:", err);
     return NextResponse.json(
-      { success: false, error: message },
+      { success: false, error: "Authentication processing failed. Please try again later." },
       { status: 500 }
     );
   }

@@ -2,25 +2,25 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
+import { getSupabaseUrl, getSupabasePublishableKey } from "@/lib/env";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const rawNext = requestUrl.searchParams.get("next") ?? "/account";
 
-  // Security: Prevent open redirect vulnerability - next must start with "/" and not "//"
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/account";
+  // Security: Prevent open redirect vulnerability - next must be a safe internal relative path
+  const isSafeRelativePath =
+    rawNext.startsWith("/") &&
+    !rawNext.startsWith("//") &&
+    !rawNext.startsWith("/\\") &&
+    !rawNext.includes("://");
+  const next = isSafeRelativePath ? rawNext : "/account";
 
   if (code) {
     const cookieStore = await cookies();
-    const supabaseUrl =
-      process.env.SUPABASE_URL ||
-      process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      "https://slovsjusigggadxxkgcs.supabase.co";
-    const publishableKey =
-      process.env.SUPABASE_PUBLISHABLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-      "sb_publishable_TM_iuGMbcMcqHEeRPNET9A_cTwB8lfv";
+    const supabaseUrl = getSupabaseUrl();
+    const publishableKey = getSupabasePublishableKey();
 
     const supabase = createServerClient(supabaseUrl, publishableKey, {
       cookies: {

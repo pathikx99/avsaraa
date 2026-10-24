@@ -17,72 +17,16 @@ import {
   DeliveryVanIcon,
   WhatsAppIcon,
   CameraIcon,
-  VideoCameraIcon,
   StarIcon,
   CloseIcon,
 } from "@/components/Icons";
 import { RevealSection } from "@/components/RevealSection";
 import ReviewModal from "@/components/ReviewModal";
 import { ProductReview } from "@/types/review";
-import { DEFAULT_PATRON_REVIEWS } from "@/lib/defaultReviews";
+import { supabase } from "@/lib/supabaseClient";
 
 
-const CURATED_SPOTLIGHT: Product[] = [
-  {
-    id: "prod-1",
-    name: "Pure Banarasi Katan Silk Saree",
-    category: "Sarees",
-    price: 18500,
-    image_url: "/images/banarasi_silk_saree.jpg",
-    description: "Hand-loomed in Varanasi with authentic gold zari floral jaal, finished with heritage border.",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "prod-2",
-    name: "Emerald Royal Organza Saree",
-    category: "Sarees",
-    price: 14200,
-    image_url: "/images/royal_organza_saree.jpg",
-    description: "Sheer tissue organza drape in jewel emerald with delicate hand-embroidered scallop borders.",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "prod-3",
-    name: "Heritage Silk Anarkali Gown",
-    category: "Dresses",
-    price: 16800,
-    image_url: "/images/royal_occasion_dress.jpg",
-    description: "Floor-length raw silk flare adorned with regal dabka and gota patti artisan embroidery.",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "prod-4",
-    name: "Festive Chanderi Kurta Set",
-    category: "Dresses",
-    price: 9800,
-    image_url: "/images/festive_chanderi_dress.jpg",
-    description: "Breathable pure Chanderi silk with hand block-printed motifs and zari-threaded dupatta.",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "prod-5",
-    name: "Royal Zari Bridal Drape",
-    category: "Occasion Wear",
-    price: 24500,
-    image_url: "/images/saree_model_hero.jpg",
-    description: "Masterpiece festive weave featuring pure metallic zari embellishments and rich pallu craft.",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "prod-6",
-    name: "Surat Handloom Tissue Saree",
-    category: "New Arrivals",
-    price: 12900,
-    image_url: "/images/account_hero.jpg",
-    description: "Modern metallic sheen handloom drape woven in Surat with refined lightweight texture.",
-    created_at: new Date().toISOString(),
-  },
-];
+
 
 const WEAVE_CATEGORIES = [
   {
@@ -121,26 +65,46 @@ export default function HomePage() {
   const { isInWishlist, toggleWishlist } = useWishlist();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
-  const [reviews, setReviews] = useState<ProductReview[]>(DEFAULT_PATRON_REVIEWS);
+  const [spotlightProducts, setSpotlightProducts] = useState<Product[]>([]);
+  const [loadingSpotlight, setLoadingSpotlight] = useState(true);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [previewMediaModal, setPreviewMediaModal] = useState<{
-    type: "photo" | "video";
     url: string;
     title?: string;
   } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
+
+    // Load spotlight products directly from Supabase database
+    void supabase
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(6)
+      .then(({ data, error }) => {
+        if (!isMounted) return;
+        if (!error && data) {
+          setSpotlightProducts(data);
+        } else {
+          setSpotlightProducts([]);
+        }
+        setLoadingSpotlight(false);
+      });
+
+    // Load reviews strictly from database
     fetch("/api/reviews")
       .then((res) => res.json())
       .then((data) => {
-        if (isMounted && data.success && Array.isArray(data.reviews) && data.reviews.length > 0) {
+        if (isMounted && data.success && Array.isArray(data.reviews)) {
           setReviews(data.reviews);
         }
       })
       .catch(() => {
-        // Silently retain DEFAULT_PATRON_REVIEWS
+        if (isMounted) setReviews([]);
       });
+
     return () => {
       isMounted = false;
     };
@@ -1037,8 +1001,13 @@ export default function HomePage() {
           </div>
 
           {/* Responsive 2-column on mobile, 3-column on desktop */}
-          <div className="responsive-product-grid" style={{ marginBottom: "48px" }}>
-            {CURATED_SPOTLIGHT.map((product) => (
+          {loadingSpotlight ? (
+            <div style={{ textAlign: "center", padding: "60px 24px", color: "#866951" }}>
+              <p style={{ fontSize: "14px", fontStyle: "italic" }}>✦ Loading handcrafted heirlooms from our atelier...</p>
+            </div>
+          ) : spotlightProducts.length > 0 ? (
+            <div className="responsive-product-grid" style={{ marginBottom: "48px" }}>
+              {spotlightProducts.map((product) => (
               <div
                 key={product.id}
                 className="luxury-hover-card product-card-container product-card-shimmer"
@@ -1277,6 +1246,26 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+        ) : (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "48px 24px",
+              backgroundColor: "#FFFFFF",
+              borderRadius: "16px",
+              border: "1px dashed #D6C7B2",
+              maxWidth: "500px",
+              margin: "0 auto 48px auto",
+            }}
+          >
+            <p style={{ fontSize: "15px", color: "#6E5B4E", margin: 0, fontWeight: 500 }}>
+              ✦ Catalog Updating ✦
+            </p>
+            <p style={{ fontSize: "13px", color: "#8E7D70", margin: "8px 0 0 0" }}>
+              Our weavers are curating fresh handlooms in the atelier. Explore our complete collection below.
+            </p>
+          </div>
+        )}
 
           {/* Link to Full Collection */}
           <div style={{ textAlign: "center" }}>
@@ -1481,7 +1470,7 @@ export default function HomePage() {
         </div>
       </RevealSection>
 
-      {/* 7. Patron Reviews & Royal Testimonials with Real Photos and Videos */}
+      {/* 7. Patron Reviews & Royal Testimonials with Real Photos */}
       <RevealSection
         as="section"
         className="reveal"
@@ -1510,7 +1499,7 @@ export default function HomePage() {
             </h2>
             <div className="section-divider" style={{ marginBottom: "16px" }} />
             <p style={{ fontSize: "14.5px", color: "#6E5B4E", maxWidth: "600px", margin: "0 auto 20px" }}>
-              Authentic bridal moments, heirloom drapes, and video testimonials from patrons who chose Avsaraa for their defining celebrations.
+              Authentic bridal moments, heirloom drapes, and heartfelt testimonials from patrons who chose Avsaraa for their defining celebrations.
             </p>
             <button
               type="button"
@@ -1537,203 +1526,213 @@ export default function HomePage() {
             </button>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: "24px",
-            }}
-          >
-            {reviews.map((review) => (
-              <div
-                key={review.id}
-                className="trust-pillar-card"
+          {reviews.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "48px 24px",
+                backgroundColor: "#FCFAF7",
+                borderRadius: "20px",
+                border: "1px dashed #D8C5B2",
+                maxWidth: "580px",
+                margin: "0 auto",
+              }}
+            >
+              <div style={{ fontSize: "32px", color: "#C5A059", marginBottom: "12px" }}>✦</div>
+              <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "20px", color: "#261B13", marginBottom: "8px" }}>
+                No Patron Reviews Yet
+              </h3>
+              <p style={{ fontSize: "14px", color: "#6E5B4E", lineHeight: 1.6, marginBottom: "20px" }}>
+                Every review published here comes directly from patrons who draped our handlooms. Be the first to share your drape experience.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowReviewModal(true)}
+                className="avsaraa-btn-outline"
                 style={{
-                  backgroundColor: "#FCFAF7",
-                  border: "1px solid #EAE0D5",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "10px 22px",
                   borderRadius: "22px",
-                  padding: "28px 24px",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  position: "relative",
-                  boxShadow: "0 8px 24px -10px rgba(38, 27, 19, 0.06)",
+                  backgroundColor: "#FCFAF7",
+                  border: "1px solid #C5A059",
+                  color: "#261B13",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: "pointer",
                 }}
               >
-                <div>
-                  {/* Rating & Verified Badge */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                    <div style={{ display: "flex", gap: "3px" }}>
-                      {[...Array(review.rating || 5)].map((_, idx) => (
-                        <StarIcon key={idx} size={16} color="#C5A059" filled />
-                      ))}
-                    </div>
-                    <span
-                      style={{
-                        fontSize: "10.5px",
-                        letterSpacing: "0.08em",
-                        textTransform: "uppercase",
-                        color: "#866951",
-                        fontWeight: 600,
-                        backgroundColor: "rgba(197, 160, 89, 0.12)",
-                        padding: "3px 10px",
-                        borderRadius: "12px",
-                        border: "1px solid rgba(197, 160, 89, 0.25)",
-                      }}
-                    >
-                      ✦ Verified Patron
-                    </span>
-                  </div>
-
-                  {/* Review Title */}
-                  {review.title && (
-                    <h4
-                      style={{
-                        fontFamily: "var(--font-serif), Georgia, serif",
-                        fontSize: "16px",
-                        fontWeight: 600,
-                        color: "#261B13",
-                        marginBottom: "10px",
-                        lineHeight: 1.35,
-                      }}
-                    >
-                      {review.title}
-                    </h4>
-                  )}
-
-                  {/* Review Comment */}
-                  <p
-                    style={{
-                      fontFamily: "var(--font-serif), Georgia, serif",
-                      fontSize: "14.5px",
-                      fontStyle: "italic",
-                      color: "#3B2B20",
-                      lineHeight: 1.65,
-                      marginBottom: "18px",
-                    }}
-                  >
-                    “{review.comment}”
-                  </p>
-
-                  {/* Patron Photos Gallery */}
-                  {review.photos && review.photos.length > 0 && (
-                    <div style={{ marginBottom: "16px" }}>
-                      <div
-                        style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          color: "#866951",
-                          letterSpacing: "0.05em",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "5px",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        <CameraIcon size={12} color="#866951" />
-                        <span>Patron Drape Photos:</span>
-                      </div>
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        {review.photos.map((photo, pIdx) => (
-                          <div
-                            key={pIdx}
-                            onClick={() =>
-                              setPreviewMediaModal({
-                                type: "photo",
-                                url: photo,
-                                title: `${review.customer_name}’s Drape Photo`,
-                              })
-                            }
-                            style={{
-                              position: "relative",
-                              width: "72px",
-                              height: "72px",
-                              borderRadius: "10px",
-                              overflow: "hidden",
-                              border: "1px solid #CFBEAD",
-                              cursor: "pointer",
-                              transition: "transform 0.2s ease, box-shadow 0.2s ease",
-                            }}
-                            title="Click to view full photo"
-                          >
-                            <Image
-                              src={photo}
-                              alt="Patron Drape"
-                              fill
-                              sizes="72px"
-                              unoptimized
-                              style={{ objectFit: "cover" }}
-                            />
-                            <div
-                              style={{
-                                position: "absolute",
-                                inset: 0,
-                                backgroundColor: "rgba(0,0,0,0.15)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                opacity: 0.9,
-                              }}
-                            >
-                              <span style={{ fontSize: "10px", color: "#FFF", backgroundColor: "rgba(0,0,0,0.5)", padding: "1px 4px", borderRadius: "4px" }}>
-                                🔍
-                              </span>
-                            </div>
-                          </div>
+                <CameraIcon size={14} color="#C5A059" />
+                <span>Write the First Review</span>
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                gap: "24px",
+              }}
+            >
+              {reviews.map((review) => (
+                <div
+                  key={review.id}
+                  className="trust-pillar-card"
+                  style={{
+                    backgroundColor: "#FCFAF7",
+                    border: "1px solid #EAE0D5",
+                    borderRadius: "22px",
+                    padding: "28px 24px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    position: "relative",
+                    boxShadow: "0 8px 24px -10px rgba(38, 27, 19, 0.06)",
+                  }}
+                >
+                  <div>
+                    {/* Rating & Verified Badge */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                      <div style={{ display: "flex", gap: "3px" }}>
+                        {[...Array(review.rating || 5)].map((_, idx) => (
+                          <StarIcon key={idx} size={16} color="#C5A059" filled />
                         ))}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Patron Video Drape */}
-                  {review.videos && review.videos.length > 0 && (
-                    <div style={{ marginBottom: "16px" }}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPreviewMediaModal({
-                            type: "video",
-                            url: review.videos![0],
-                            title: `${review.customer_name}’s Video Drape`,
-                          })
-                        }
+                      <span
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          padding: "6px 12px",
-                          borderRadius: "14px",
-                          backgroundColor: "#F4ECE1",
-                          border: "1px solid #D8C5B2",
-                          color: "#5A422D",
-                          fontSize: "12px",
+                          fontSize: "10.5px",
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          color: "#866951",
                           fontWeight: 600,
-                          cursor: "pointer",
+                          backgroundColor: "rgba(197, 160, 89, 0.12)",
+                          padding: "3px 10px",
+                          borderRadius: "12px",
+                          border: "1px solid rgba(197, 160, 89, 0.25)",
                         }}
                       >
-                        <VideoCameraIcon size={14} color="#C5A059" />
-                        <span>▶ Watch Real Drape Clip</span>
-                      </button>
+                        ✦ Verified Patron
+                      </span>
                     </div>
-                  )}
-                </div>
 
-                {/* Author Info */}
-                <div style={{ borderTop: "1px solid #EFE6DC", paddingTop: "14px", marginTop: "12px" }}>
-                  <div style={{ fontWeight: 600, fontSize: "14px", color: "#261B13", marginBottom: "2px" }}>
-                    {review.customer_name}
+                    {/* Review Title */}
+                    {review.title && (
+                      <h4
+                        style={{
+                          fontFamily: "var(--font-serif), Georgia, serif",
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#261B13",
+                          marginBottom: "10px",
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {review.title}
+                      </h4>
+                    )}
+
+                    {/* Review Comment */}
+                    <p
+                      style={{
+                        fontFamily: "var(--font-serif), Georgia, serif",
+                        fontSize: "14.5px",
+                        fontStyle: "italic",
+                        color: "#3B2B20",
+                        lineHeight: 1.65,
+                        marginBottom: "18px",
+                      }}
+                    >
+                      “{review.comment}”
+                    </p>
+
+                    {/* Patron Photos Gallery */}
+                    {review.photos && review.photos.length > 0 && (
+                      <div style={{ marginBottom: "16px" }}>
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            color: "#866951",
+                            letterSpacing: "0.05em",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            marginBottom: "8px",
+                          }}
+                        >
+                          <CameraIcon size={12} color="#866951" />
+                          <span>Patron Drape Photos:</span>
+                        </div>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          {review.photos.map((photo, pIdx) => (
+                            <div
+                              key={pIdx}
+                              onClick={() =>
+                                setPreviewMediaModal({
+                                  url: photo,
+                                  title: `${review.customer_name}’s Drape Photo`,
+                                })
+                              }
+                              style={{
+                                position: "relative",
+                                width: "72px",
+                                height: "72px",
+                                borderRadius: "10px",
+                                overflow: "hidden",
+                                border: "1px solid #CFBEAD",
+                                cursor: "pointer",
+                                transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                              }}
+                              title="Click to view full photo"
+                            >
+                              <Image
+                                src={photo}
+                                alt="Patron Drape"
+                                fill
+                                sizes="72px"
+                                unoptimized
+                                style={{ objectFit: "cover" }}
+                              />
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  backgroundColor: "rgba(0,0,0,0.15)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  opacity: 0.9,
+                                }}
+                              >
+                                <span style={{ fontSize: "10px", color: "#FFF", backgroundColor: "rgba(0,0,0,0.5)", padding: "1px 4px", borderRadius: "4px" }}>
+                                  🔍
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontSize: "12px", color: "#8E7D70", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>{review.customer_city || "India"}</span>
-                    <span style={{ color: "#C5A059", fontWeight: 600, fontSize: "11.5px" }}>
-                      ✦ {review.product_name || "Avsaraa Heirloom"}
-                    </span>
+
+                  {/* Author Info */}
+                  <div style={{ borderTop: "1px solid #EFE6DC", paddingTop: "14px", marginTop: "12px" }}>
+                    <div style={{ fontWeight: 600, fontSize: "14px", color: "#261B13", marginBottom: "2px" }}>
+                      {review.customer_name}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#8E7D70", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>{review.customer_city || "India"}</span>
+                      <span style={{ color: "#C5A059", fontWeight: 600, fontSize: "11.5px" }}>
+                        ✦ {review.product_name || "Avsaraa Heirloom"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </RevealSection>
 
@@ -2071,7 +2070,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Review Modal for Submitting Real Customer Reviews with Photos & Videos */}
+      {/* Review Modal for Submitting Real Customer Reviews with Photos */}
       <ReviewModal
         isOpen={showReviewModal}
         onClose={() => setShowReviewModal(false)}
@@ -2080,7 +2079,7 @@ export default function HomePage() {
         }}
       />
 
-      {/* Media Lightbox Modal for Real Patron Photos & Video Drapes */}
+      {/* Media Lightbox Modal for Real Patron Photos */}
       {previewMediaModal && (
         <div
           style={{
@@ -2121,11 +2120,7 @@ export default function HomePage() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                {previewMediaModal.type === "photo" ? (
-                  <CameraIcon size={16} color="#C5A059" />
-                ) : (
-                  <VideoCameraIcon size={16} color="#C5A059" />
-                )}
+                <CameraIcon size={16} color="#C5A059" />
                 <span style={{ color: "#FAF7F2", fontSize: "13.5px", fontWeight: 600 }}>
                   {previewMediaModal.title || "Real Patron Drape"}
                 </span>
@@ -2154,36 +2149,21 @@ export default function HomePage() {
                 backgroundColor: "#120C08",
               }}
             >
-              {previewMediaModal.type === "photo" ? (
-                <Image
-                  src={previewMediaModal.url}
-                  alt={previewMediaModal.title || "Patron Drape Photo"}
-                  width={1200}
-                  height={900}
-                  unoptimized
-                  style={{
-                    maxHeight: "75vh",
-                    maxWidth: "100%",
-                    width: "auto",
-                    height: "auto",
-                    objectFit: "contain",
-                    borderRadius: "10px",
-                  }}
-                />
-              ) : (
-                <video
-                  src={previewMediaModal.url}
-                  controls
-                  autoPlay
-                  playsInline
-                  style={{
-                    maxHeight: "75vh",
-                    maxWidth: "100%",
-                    borderRadius: "10px",
-                    outline: "none",
-                  }}
-                />
-              )}
+              <Image
+                src={previewMediaModal.url}
+                alt={previewMediaModal.title || "Patron Drape Photo"}
+                width={1200}
+                height={900}
+                unoptimized
+                style={{
+                  maxHeight: "75vh",
+                  maxWidth: "100%",
+                  width: "auto",
+                  height: "auto",
+                  objectFit: "contain",
+                  borderRadius: "10px",
+                }}
+              />
             </div>
           </div>
         </div>
