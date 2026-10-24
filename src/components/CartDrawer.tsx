@@ -20,9 +20,6 @@ export default function CartDrawer() {
 
   if (!isCartOpen) return null;
 
-  const freeDeliveryThreshold = 2999;
-  const isFreeDelivery = subtotal >= freeDeliveryThreshold;
-  const amountRemaining = Math.max(0, freeDeliveryThreshold - subtotal);
   return (
     <div
       style={{
@@ -105,25 +102,22 @@ export default function CartDrawer() {
           </button>
         </div>
 
-        {/* Free Shipping Progress Indicator */}
+        {/* Free Shipping Indicator */}
         <div
           style={{
-            backgroundColor: isFreeDelivery ? "#F0F7EE" : "#F7F2EB",
+            backgroundColor: "#F0F7EE",
             borderBottom: "1px solid #E6DACF",
             padding: "10px 24px",
             fontSize: "12px",
-            color: isFreeDelivery ? "#2E6930" : "#6E5B4E",
+            color: "#2E6930",
             display: "flex",
             alignItems: "center",
             gap: "8px",
+            fontWeight: 500,
           }}
         >
-          <span>{isFreeDelivery ? "✨" : "🚚"}</span>
-          <span>
-            {isFreeDelivery
-              ? "Congratulations! You have unlocked FREE Delivery Across India."
-              : `Add ₹${amountRemaining.toLocaleString("en-IN")} more for FREE Delivery Across India.`}
-          </span>
+          <span>✨</span>
+          <span>Complimentary Express Shipping & Free Delivery on All Orders across India</span>
         </div>
 
         {/* Cart Items List */}
@@ -403,7 +397,7 @@ export default function CartDrawer() {
               >
                 <span>Shipping across India</span>
                 <span style={{ color: "#2E6930", fontWeight: 600 }}>
-                  {isFreeDelivery ? "FREE" : "₹150"}
+                  FREE
                 </span>
               </div>
               <div
@@ -419,7 +413,7 @@ export default function CartDrawer() {
                 }}
               >
                 <span>Total</span>
-                <span>₹{(subtotal + (isFreeDelivery ? 0 : 150)).toLocaleString("en-IN")}</span>
+                <span>₹{subtotal.toLocaleString("en-IN")}</span>
               </div>
               <span style={{ fontSize: "10.5px", color: "#8E7D70" }}>
                 * All applicable GST and handcrafted charges included

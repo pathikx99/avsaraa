@@ -149,7 +149,6 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
                 src="/images/account_hero.jpg"
                 alt="Avsaraa Handloom Weaves"
                 fill
-                priority
                 sizes="(min-width: 900px) 500px, 90vw"
                 style={{ objectFit: "cover", objectPosition: "center 20%" }}
               />

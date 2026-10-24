@@ -968,7 +968,7 @@ export default function AccountPage() {
                 MEMBER BENEFITS
               </span>
               <p style={{ fontSize: "13px", color: "#6E5B4E", lineHeight: 1.5, marginTop: "6px" }}>
-                Enjoy free delivery on orders above ₹2,999 and priority concierge support.
+                Enjoy complimentary free shipping and delivery on all orders with priority concierge support.
               </p>
             </div>
           </aside>

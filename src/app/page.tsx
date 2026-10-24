@@ -262,7 +262,7 @@ export default function HomePage() {
                 src="/images/royal_organza_saree.jpg"
                 alt="Avsaraa Handcrafted Royal Silk Saree"
                 fill
-                priority
+                loading="eager"
                 sizes="(min-width: 900px) 460px, 90vw"
                 style={{ objectFit: "cover", objectPosition: "center 20%" }}
               />

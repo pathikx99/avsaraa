@@ -305,7 +305,7 @@ export default function Footer() {
               </div>
             </div>
             <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Free Shipping</h4>
-            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>On all orders above ₹2,999</p>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Free delivery on all orders across India</p>
           </div>
 
           <div>

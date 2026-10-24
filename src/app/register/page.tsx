@@ -173,7 +173,7 @@ export default function RegisterPage() {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={{ color: "#C4AB94" }}>✦</span>
-                    <span>Free delivery on orders above ₹2,999</span>
+                    <span>Free shipping & delivery on all orders across India</span>
                   </div>
                 </div>
               </div>

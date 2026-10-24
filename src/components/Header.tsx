@@ -13,7 +13,7 @@ import { useScrolled } from "./RevealSection";
 import type { User } from "@supabase/supabase-js";
 
 const ANNOUNCEMENTS = [
-  "Free Insured Delivery Across India on Orders Above ₹2,999",
+  "Free Shipping & Express Insured Delivery Across India on All Orders",
   "Handcrafted in Surat — Nationwide Direct Atelier Shipping",
   "100% Pure Handloom Silk — Certificate of Authenticity Included",
   "Complimentary Fall, Pico & Blouse Tailoring Consultation",
