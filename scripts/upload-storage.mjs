@@ -96,7 +96,7 @@ async function uploadImages() {
       });
       if (createError) {
         console.warn(`Could not create bucket automatically (${createError.message}).`);
-        console.warn(`Please run supabase/storage.sql in the Supabase Dashboard SQL editor.`);
+        console.warn(`Please ensure you have executed supabase/schema.sql in the Supabase Dashboard SQL editor.`);
       } else {
         console.log(`✅ Bucket '${BUCKET_NAME}' created successfully.`);
       }

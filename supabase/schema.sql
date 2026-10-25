@@ -518,3 +518,59 @@ CREATE INDEX IF NOT EXISTS idx_reviews_product ON public.product_reviews(product
 CREATE INDEX IF NOT EXISTS idx_reviews_status ON public.product_reviews(status);
 CREATE INDEX IF NOT EXISTS idx_reviews_rating ON public.product_reviews(rating DESC);
 CREATE INDEX IF NOT EXISTS idx_reviews_created ON public.product_reviews(created_at DESC);
+
+
+-- ==============================================================================
+-- 9. SUPABASE STORAGE: 'items' BUCKET & ACCESS POLICIES
+-- ==============================================================================
+-- 1. Create or ensure 'items' storage bucket exists with public access enabled
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'items',
+    'items',
+    true,
+    52428800, -- 50 MB limit
+    ARRAY[
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'image/gif',
+        'image/svg+xml'
+    ]
+)
+ON CONFLICT (id) DO UPDATE SET
+    public = true,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+-- 2. Drop existing policies if re-running script to avoid duplicate errors
+DROP POLICY IF EXISTS "Public Items Access" ON storage.objects;
+DROP POLICY IF EXISTS "Allow Upload to Items" ON storage.objects;
+DROP POLICY IF EXISTS "Allow Service and Authenticated Upload to Items" ON storage.objects;
+DROP POLICY IF EXISTS "Allow Upload Overwrite on Items" ON storage.objects;
+DROP POLICY IF EXISTS "Allow Authenticated Delete on Items" ON storage.objects;
+
+-- 3. Policy: Allow public read access to all files inside 'items' bucket
+CREATE POLICY "Public Items Access"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'items');
+
+-- 4. Policy: Allow authenticated users, anon (for seeding/uploads), and service role to upload
+CREATE POLICY "Allow Service and Authenticated Upload to Items"
+ON storage.objects FOR INSERT
+TO authenticated, anon, service_role
+WITH CHECK (bucket_id = 'items');
+
+-- 5. Policy: Allow update/overwrite on items bucket
+CREATE POLICY "Allow Upload Overwrite on Items"
+ON storage.objects FOR UPDATE
+TO authenticated, anon, service_role
+USING (bucket_id = 'items');
+
+-- 6. Policy: Allow deletion on items bucket
+CREATE POLICY "Allow Authenticated Delete on Items"
+ON storage.objects FOR DELETE
+TO authenticated, service_role
+USING (bucket_id = 'items');
+

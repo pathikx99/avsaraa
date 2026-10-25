@@ -91,7 +91,6 @@ DROP FUNCTION IF EXISTS public.protect_review_fields() CASCADE;
 DROP FUNCTION IF EXISTS public.handle_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS public.check_phone_exists(TEXT, UUID) CASCADE;
 DROP FUNCTION IF EXISTS public.check_email_exists(TEXT, UUID) CASCADE;
-
 COMMIT;
 
 -- Verification query (should return 0 rows for public tables)
