@@ -1111,7 +1111,7 @@ export default function AccountPage() {
                       <div style={{ backgroundColor: "#FAF7F2", padding: "16px", borderRadius: "12px", border: "1px solid #EFE6DC" }}>
                         <span style={{ fontSize: "11px", color: "#8E7D70", display: "block", textTransform: "uppercase", letterSpacing: "0.06em" }}>Email Address</span>
                         <span style={{ fontSize: "15px", fontWeight: 600, color: "#261B13", marginTop: "2px", display: "block" }}>
-                          {profile?.email || authUser?.email || "guest@avsaraa.in"}
+                          {profile?.email || authUser?.email || "guest@avsaraa.com"}
                         </span>
                       </div>
 
@@ -1524,11 +1524,11 @@ export default function AccountPage() {
                       <span>Contact Atelier Concierge</span>
                     </Link>
                     <a
-                      href="mailto:hello@avsaraa.in"
+                      href="mailto:contact.avsaraa@gmail.com"
                       className="avsaraa-btn-outline"
                       style={{ height: "48px", fontSize: "13px", display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}
                     >
-                      Email Us (hello@avsaraa.in)
+                      Email Us (contact.avsaraa@gmail.com)
                     </a>
                   </div>
                 </div>

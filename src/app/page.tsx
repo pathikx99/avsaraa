@@ -15,7 +15,6 @@ import {
   NeedleThreadIcon,
   DiamondCrownIcon,
   DeliveryVanIcon,
-  WhatsAppIcon,
   CameraIcon,
   StarIcon,
   CloseIcon,
@@ -75,7 +74,7 @@ const HERO_SLIDES = [
     secondaryText: "EXPLORE SAREES",
     secondaryLink: "/collection?category=Sarees",
     mobileBanner: "/images/home_hero_banner.webp",
-    desktopImage: "/images/hero_model_clean.webp",
+    desktopBanner: "/images/desktop_hero_cinematic_1.jpg",
     alt: "Avsaraa New Collection - Handcrafted Saree in Natural Sunlight",
     pieceNo: "№ 108",
     craft: "Pure Katan Silk & Zari Weave",
@@ -95,7 +94,7 @@ const HERO_SLIDES = [
     secondaryText: "VIEW ALL PIECES",
     secondaryLink: "/collection",
     mobileBanner: "/images/banarasi_silk_saree.jpg",
-    desktopImage: "/images/banarasi_silk_saree.jpg",
+    desktopBanner: "/images/desktop_hero_cinematic_2.jpg",
     alt: "Handcrafted Banarasi Silk Sarees",
     pieceNo: "№ 247",
     craft: "Varanasi Pit Loom Katan Silk",
@@ -115,7 +114,7 @@ const HERO_SLIDES = [
     secondaryText: "OUR STORY",
     secondaryLink: "/about",
     mobileBanner: "/images/royal_occasion_dress.jpg",
-    desktopImage: "/images/royal_occasion_dress.jpg",
+    desktopBanner: "/images/desktop_hero_cinematic_3.jpg",
     alt: "Royal Occasion Wear & Handcrafted Festive Dresses",
     pieceNo: "№ 312",
     craft: "Handwoven Chanderi & Gota Patti",
@@ -345,87 +344,56 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* DESKTOP PRESENTATION: Bespoke Editorial Luxury Layout */}
-        <div className="hero-vicky-desktop">
-          {/* Left: Typography & Story */}
-          <div style={{ zIndex: 2, display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+        {/* DESKTOP PRESENTATION: Full-Bleed High-Fashion Cinematic Editorial */}
+        <div className="hero-cinematic-stage">
+          {/* 1. Full-Bleed Cinematic Background Image */}
+          <div className="hero-cinematic-bg-wrapper">
+            <Image
+              key={HERO_SLIDES[heroSlide].id}
+              src={HERO_SLIDES[heroSlide].desktopBanner}
+              alt={HERO_SLIDES[heroSlide].alt}
+              fill
+              priority
+              sizes="100vw"
+              className="hero-cinematic-img"
+              style={{
+                objectFit: "cover",
+                objectPosition: "right 25%",
+              }}
+            />
+            {/* Seamless Soft Directional Ambient Gradient */}
+            <div className="hero-cinematic-overlay" />
+          </div>
+
+          {/* 2. Editorial Typography & Story Canvas */}
+          <div className="hero-cinematic-content">
             {/* Atelier Gilded Badge */}
-            <div style={{ marginBottom: "18px" }}>
-              <span
-                className="luxury-badge"
-                style={{
-                  padding: "6px 18px",
-                  fontSize: "11px",
-                  letterSpacing: "0.2em",
-                  border: "1px solid rgba(197, 160, 89, 0.45)",
-                  backgroundColor: "rgba(250, 245, 238, 0.95)",
-                  color: "#6D4E39",
-                  boxShadow: "0 2px 12px rgba(197, 160, 89, 0.14)",
-                }}
-              >
+            <div style={{ marginBottom: "16px" }}>
+              <span className="hero-cinematic-badge">
                 ✦ {HERO_SLIDES[heroSlide].badge} • ATELIER 2026 ✦
               </span>
             </div>
 
-            <h1
-              style={{
-                fontFamily: "var(--font-serif), Georgia, serif",
-                fontSize: "clamp(52px, 5.2vw, 76px)",
-                lineHeight: 1.05,
-                color: "#261B13",
-                fontWeight: 500,
-                letterSpacing: "-0.015em",
-                margin: "0 0 16px 0",
-              }}
-            >
+            {/* Editorial Grand Headline */}
+            <h1 className="hero-cinematic-title">
               <div>{HERO_SLIDES[heroSlide].titleLine1}</div>
               <div>{HERO_SLIDES[heroSlide].titleLine2}</div>
               <div>{HERO_SLIDES[heroSlide].titleLine3}</div>
-              <div
-                className="font-script gold-foil-text"
-                style={{
-                  fontSize: "clamp(78px, 7.8vw, 114px)",
-                  lineHeight: 0.88,
-                  marginTop: "6px",
-                  marginBottom: "8px",
-                  fontWeight: 400,
-                  filter: "drop-shadow(0 2px 14px rgba(197, 160, 89, 0.25))",
-                }}
-              >
+              <div className="font-script gold-foil-text hero-cinematic-script">
                 {HERO_SLIDES[heroSlide].titleScript}
               </div>
             </h1>
 
-            <p
-              style={{
-                fontSize: "12px",
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: "#6D4E39",
-                lineHeight: 1.6,
-                margin: "0 0 10px 0",
-                fontWeight: 600,
-                maxWidth: "460px",
-              }}
-            >
+            {/* Subtitle & Craft Narrative */}
+            <p className="hero-cinematic-subtitle">
               {HERO_SLIDES[heroSlide].subtitle}
             </p>
-
-            <p
-              style={{
-                fontSize: "14.5px",
-                color: "#5C4A3E",
-                lineHeight: 1.7,
-                margin: "0 0 32px 0",
-                maxWidth: "480px",
-                fontWeight: 400,
-              }}
-            >
+            <p className="hero-cinematic-desc">
               {HERO_SLIDES[heroSlide].desc}
             </p>
 
-            {/* Action Buttons Row */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", marginBottom: "34px" }}>
+            {/* Haute Couture Action Buttons */}
+            <div className="hero-cinematic-actions">
               <Link
                 href={HERO_SLIDES[heroSlide].ctaLink}
                 className="hero-cta-btn-link btn-shine"
@@ -443,190 +411,96 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Curated Slide Collection Switcher */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "26px" }}>
+            {/* Artisan Guarantees Row */}
+            <div className="hero-cinematic-guarantees">
+              <div className="hero-guarantee-item">
+                <span className="hero-guarantee-star">✦</span>
+                <span>Silk Mark Certified</span>
+              </div>
+              <div className="hero-guarantee-item">
+                <span className="hero-guarantee-star">✦</span>
+                <span>Pan-India Express Shipping</span>
+              </div>
+              <div className="hero-guarantee-item">
+                <span className="hero-guarantee-star">✦</span>
+                <span>Complimentary Tailoring</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Unique Atelier Provenance Capsule & Golden Zari Horizon */}
+          <div className="hero-provenance-stage">
+            {/* Floating Haute Couture Provenance Card (Bottom-Right) */}
+            <div className="hero-provenance-capsule">
+              <div className="hero-provenance-info">
+                <div className="hero-provenance-tagline">
+                  <span className="hero-provenance-gem">✦</span>
+                  <span className="hero-provenance-archive">
+                    EDITION 0{heroSlide + 1} / 0{HERO_SLIDES.length}
+                  </span>
+                  <span className="hero-provenance-dot">•</span>
+                  <span className="hero-provenance-piece">{HERO_SLIDES[heroSlide].pieceNo}</span>
+                </div>
+                <div className="hero-provenance-craft">
+                  {HERO_SLIDES[heroSlide].craft}
+                </div>
+              </div>
+
+              <div className="hero-provenance-divider" />
+
+              <div className="hero-provenance-controls">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setHeroSlide((prev) => (prev === 0 ? HERO_SLIDES.length - 1 : prev - 1))
+                  }
+                  className="hero-provenance-prev-btn"
+                  aria-label={`Previous edition: ${HERO_SLIDES[heroSlide === 0 ? HERO_SLIDES.length - 1 : heroSlide - 1].badge}`}
+                  title="Previous Edition"
+                >
+                  ‹
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setHeroSlide((prev) => (prev === HERO_SLIDES.length - 1 ? 0 : prev + 1))
+                  }
+                  className="hero-provenance-next-pill"
+                  aria-label={`Next edition: ${HERO_SLIDES[(heroSlide + 1) % HERO_SLIDES.length].badge}`}
+                >
+                  <span className="hero-next-label">NEXT:</span>
+                  <span className="hero-next-edition">
+                    {HERO_SLIDES[(heroSlide + 1) % HERO_SLIDES.length].badge}
+                  </span>
+                  <span className="hero-next-arrow">→</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Hair-Thin Golden Zari Horizon Timeline (Baseline) */}
+            <div className="hero-zari-horizon" role="tablist" aria-label="Campaign Editions">
               {HERO_SLIDES.map((slide, idx) => {
                 const isActive = heroSlide === idx;
                 return (
                   <button
                     key={slide.id}
+                    role="tab"
+                    aria-selected={isActive}
                     onClick={() => setHeroSlide(idx)}
-                    className={`hero-slide-pill ${isActive ? "active" : ""}`}
-                    aria-label={`Select collection ${slide.badge}`}
+                    className={`hero-zari-segment ${isActive ? "active" : ""}`}
+                    aria-label={`View Edition ${idx + 1}: ${slide.badge}`}
                   >
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        color: isActive ? "#261B13" : "#8E7D70",
-                      }}
-                    >
-                      0{idx + 1}
+                    <span className="hero-zari-numeral">
+                      {idx === 0 ? "I" : idx === 1 ? "II" : "III"}
                     </span>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        letterSpacing: "0.08em",
-                        textTransform: "uppercase",
-                        fontWeight: isActive ? 700 : 500,
-                        color: isActive ? "#261B13" : "#6E5B4E",
-                      }}
-                    >
-                      {slide.badge}
+                    <span className="hero-zari-line">
+                      <span className="hero-zari-line-fill" />
                     </span>
                   </button>
                 );
               })}
             </div>
-
-            {/* Quality Artisan Guarantees */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "20px",
-                paddingTop: "20px",
-                borderTop: "1px solid rgba(207, 190, 173, 0.5)",
-                width: "100%",
-                maxWidth: "500px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ color: "#C5A059", fontSize: "12px" }}>✦</span>
-                <span style={{ fontSize: "11.5px", color: "#6E5B4E", fontWeight: 500 }}>Silk Mark Certified</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ color: "#C5A059", fontSize: "12px" }}>✦</span>
-                <span style={{ fontSize: "11.5px", color: "#6E5B4E", fontWeight: 500 }}>Free Express Delivery</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ color: "#C5A059", fontSize: "12px" }}>✦</span>
-                <span style={{ fontSize: "11.5px", color: "#6E5B4E", fontWeight: 500 }}>Bespoke Tailoring</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Architectural Luxury Image Frame with Controls */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              position: "relative",
-            }}
-          >
-            {/* Left Chevron Button */}
-            <button
-              type="button"
-              onClick={() => setHeroSlide((prev) => (prev === 0 ? HERO_SLIDES.length - 1 : prev - 1))}
-              aria-label="Previous slide"
-              className="hero-arrow-btn"
-              style={{
-                position: "absolute",
-                left: "-20px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                zIndex: 10,
-              }}
-            >
-              ‹
-            </button>
-
-            {/* Regal Arch Frame */}
-            <div className="hero-arch-portrait">
-              <Image
-                key={HERO_SLIDES[heroSlide].id}
-                src={HERO_SLIDES[heroSlide].desktopImage}
-                alt={HERO_SLIDES[heroSlide].alt}
-                fill
-                priority
-                sizes="(min-width: 900px) 480px, 90vw"
-                style={{
-                  objectFit: "cover",
-                  objectPosition: "center 22%",
-                }}
-              />
-
-              {/* Subtle Ambient Vignette Overlay */}
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "linear-gradient(180deg, rgba(38,27,19,0.02) 50%, rgba(26,18,12,0.65) 100%)",
-                  pointerEvents: "none",
-                }}
-              />
-
-              {/* Floating Top Tag */}
-              <div className="hero-floating-top-tag">
-                ✦ {HERO_SLIDES[heroSlide].atelierTag}
-              </div>
-
-              {/* Floating Heirloom Atelier Seal */}
-              <div className="hero-floating-seal">
-                <div>
-                  <span
-                    style={{
-                      display: "block",
-                      fontSize: "9.5px",
-                      letterSpacing: "0.14em",
-                      textTransform: "uppercase",
-                      color: "#E2BE72",
-                      fontWeight: 700,
-                      marginBottom: "3px",
-                    }}
-                  >
-                    ✦ ATELIER HEIRLOOM {HERO_SLIDES[heroSlide].pieceNo} ✦
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-serif), Georgia, serif",
-                      fontSize: "15px",
-                      fontWeight: 500,
-                      color: "#FAF7F2",
-                    }}
-                  >
-                    {HERO_SLIDES[heroSlide].craft}
-                  </span>
-                </div>
-
-                <Link
-                  href={HERO_SLIDES[heroSlide].ctaLink}
-                  style={{
-                    backgroundColor: "rgba(226, 190, 114, 0.2)",
-                    border: "1px solid rgba(226, 190, 114, 0.6)",
-                    color: "#FAF7F2",
-                    borderRadius: "20px",
-                    padding: "6px 14px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    textDecoration: "none",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Explore →
-                </Link>
-              </div>
-            </div>
-
-            {/* Right Chevron Button */}
-            <button
-              type="button"
-              onClick={() => setHeroSlide((prev) => (prev === HERO_SLIDES.length - 1 ? 0 : prev + 1))}
-              aria-label="Next slide"
-              className="hero-arrow-btn"
-              style={{
-                position: "absolute",
-                right: "-20px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                zIndex: 10,
-              }}
-            >
-              ›
-            </button>
           </div>
         </div>
       </section>
@@ -1066,10 +940,8 @@ export default function HomePage() {
                 <span>→</span>
               </Link>
 
-              <a
-                href="https://wa.me/919876543210?text=Hello%20Avsaraa%20Atelier,%20I%20would%20like%20to%20schedule%20a%20private%20video%20drape%20consultation%20for%20the%20Festive%20Trousseau%20collection."
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/contact"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1089,9 +961,9 @@ export default function HomePage() {
                   transition: "all 0.25s ease",
                 }}
               >
-                <WhatsAppIcon size={16} color="#25D366" />
-                <span>Video Drape Call</span>
-              </a>
+                <span>Private Consultation</span>
+                <span>↗</span>
+              </Link>
             </div>
           </div>
         </div>
@@ -1986,10 +1858,8 @@ export default function HomePage() {
               <span>→</span>
             </Link>
 
-            <a
-              href="https://wa.me/919876543210?text=Hello%20Avsaraa%20Atelier,%20I%20would%20like%20to%20connect%20with%20a%20master%20draper."
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/contact"
               style={{
                 height: "52px",
                 padding: "0 28px",
@@ -2007,9 +1877,9 @@ export default function HomePage() {
                 transition: "all 0.25s ease",
               }}
             >
-              <WhatsAppIcon size={16} color="#25D366" />
-              <span>WhatsApp Studio</span>
-            </a>
+              <span>Atelier Concierge Desk</span>
+              <span>↗</span>
+            </Link>
           </div>
         </div>
       </RevealSection>

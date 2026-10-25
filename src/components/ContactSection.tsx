@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import { PhoneIcon, MailIcon, ClockIcon, SpinnerIcon, WhatsAppIcon } from "./Icons";
+import { PhoneIcon, MailIcon, ClockIcon, SpinnerIcon } from "./Icons";
 
 
 interface ContactSectionProps {
@@ -250,50 +250,21 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      color: "#25D366",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <WhatsAppIcon size={18} color="#25D366" />
-                  </div>
-                  <div>
-                    <span style={{ display: "block", fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      WhatsApp Atelier
-                    </span>
-                    <a
-                      href="https://wa.me/919876543210?text=Hello%20Avsaraa%20Atelier,%20I%20would%20like%20to%20inquire%20about%20a%20handcrafted%20drape"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: "14px", fontWeight: 600, color: "#1B6B40" }}
-                    >
-                      Chat with Master Draper →
-                    </a>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                  <div
-                    style={{
-                      width: "38px",
-                      height: "38px",
-                      borderRadius: "50%",
-                      backgroundColor: "#FFFFFF",
-                      border: "1px solid #E6DACF",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
                       color: "#866951",
                       flexShrink: 0,
                     }}
                   >
-                    <MailIcon size={16} color="#866951" />
+                    <MailIcon size={18} color="#866951" />
                   </div>
                   <div>
                     <span style={{ display: "block", fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      Email
+                      Atelier Concierge & Inquiries
                     </span>
-                    <a href="mailto:hello@avsaraa.in" style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
-                      hello@avsaraa.in
+                    <a
+                      href="mailto:contact.avsaraa@gmail.com"
+                      style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}
+                    >
+                      contact.avsaraa@gmail.com
                     </a>
                   </div>
                 </div>

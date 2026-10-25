@@ -281,7 +281,7 @@ export default function Footer() {
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
               <li><Link href="/contact">Contact Us</Link></li>
               <li><Link href="/contact">Concierge Support</Link></li>
-              <li><a href="mailto:hello@avsaraa.in">hello@avsaraa.in</a></li>
+              <li><a href="mailto:contact.avsaraa@gmail.com">contact.avsaraa@gmail.com</a></li>
             </ul>
           </div>
         </div>
@@ -358,27 +358,13 @@ export default function Footer() {
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: "16px",
+              justifyContent: "center",
               fontSize: "12px",
               color: "#7E6E62",
+              textAlign: "center",
             }}
           >
             <span>© 2026 Avsaraa. All rights reserved.</span>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: 600, fontSize: "10.5px", letterSpacing: "0.05em", color: "#543E2E" }}>
-              <span>VISA</span>
-              <span>•</span>
-              <span>MASTERCARD</span>
-              <span>•</span>
-              <span>RUPAY</span>
-              <span>•</span>
-              <span>UPI</span>
-              <span>•</span>
-              <span>PAYTM</span>
-              <span>•</span>
-              <span>APPLE PAY</span>
-            </div>
           </div>
         </div>
       </div>

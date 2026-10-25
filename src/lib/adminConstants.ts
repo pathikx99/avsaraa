@@ -5,7 +5,7 @@
 
 export const ADMIN_EMAIL: string = (
   (typeof process !== "undefined" && process.env?.ADMIN_EMAIL) ||
-  "admin@avsaraa.com"
+  "contact.avsaraa@gmail.com"
 )
   .toLowerCase()
   .trim();
@@ -22,7 +22,12 @@ export interface AdminUserLike {
  */
 export function isSuperAdminEmail(email?: string | null): boolean {
   if (!email) return false;
-  return email.toLowerCase().trim() === ADMIN_EMAIL;
+  const normalized = email.toLowerCase().trim();
+  return (
+    normalized === ADMIN_EMAIL ||
+    normalized === "contact.avsaraa@gmail.com" ||
+    normalized === "admin@avsaraa.com"
+  );
 }
 
 /**

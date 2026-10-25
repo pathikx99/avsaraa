@@ -80,6 +80,7 @@ export default function ProductsSection({
     const searchParam = searchParams.get("search");
 
     if (searchParam !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchQuery(searchParam);
     } else {
       setSearchQuery("");
