@@ -73,7 +73,7 @@ const HERO_SLIDES = [
     ctaLink: "/collection",
     secondaryText: "EXPLORE SAREES",
     secondaryLink: "/collection?category=Sarees",
-    mobileBanner: "/images/home_hero_banner.webp",
+    mobileBanner: "/images/handloom_silk_saree.jpg",
     desktopBanner: "/images/desktop_hero_cinematic_1.jpg",
     alt: "Avsaraa New Collection - Handcrafted Saree in Natural Sunlight",
     pieceNo: "№ 108",
@@ -205,141 +205,84 @@ export default function HomePage() {
       {/* 2. Hero Section (Vicky Sagun Design: Minimalist High-Fashion Editorial) */}
       <section className="hero-vicky-container">
         {/* MOBILE PRESENTATION: Exact match to Vicky Sagun's design mockup */}
+        {/* MOBILE PRESENTATION: Luxury Haute Couture Editorial */}
         <div className="hero-vicky-mobile">
-          <div style={{ position: "relative", width: "100%", aspectRatio: "576 / 906" }}>
+          <div className="hero-mobile-stage">
             <Image
+              key={HERO_SLIDES[heroSlide].id}
               src={HERO_SLIDES[heroSlide].mobileBanner}
               alt={HERO_SLIDES[heroSlide].alt}
               fill
               priority
-              sizes="(max-width: 560px) 100vw, 560px"
-              style={{ objectFit: "cover" }}
+              sizes="(max-width: 900px) 100vw, 560px"
+              className="hero-mobile-bg-img"
             />
 
-            {/* If slide 0 (Vicky's graphic mockup with baked CTA): provide interactive touch target */}
-            {heroSlide === 0 ? (
-              <Link
-                href="/collection"
-                className="hero-mobile-touch-target"
-                aria-label="Shop New Arrivals"
-              />
-            ) : (
-              /* Overlay for other slides with identical typography and live CTA */
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                  padding: "0 28px",
-                  background: "linear-gradient(to right, rgba(250, 247, 242, 0.92) 0%, rgba(250, 247, 242, 0.45) 55%, transparent 100%)",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "11px",
-                    letterSpacing: "0.2em",
-                    textTransform: "uppercase",
-                    fontWeight: 600,
-                    color: "#543927",
-                    marginBottom: "12px",
-                  }}
+            {/* Cinematic Gradient Scrim */}
+            <div className="hero-mobile-scrim" />
+
+            {/* Luxury Editorial Overlay */}
+            <div className="hero-mobile-content-box">
+              {/* Atelier Badge */}
+              <div className="hero-mobile-pill-badge">
+                <span style={{ color: "#E2BE72", fontSize: "10px" }}>✦</span>
+                <span className="hero-mobile-pill-text">{HERO_SLIDES[heroSlide].badge}</span>
+                <span style={{ color: "rgba(226, 190, 114, 0.6)", fontSize: "9px" }}>•</span>
+                <span style={{ color: "#E2BE72", fontSize: "9.5px", letterSpacing: "0.1em" }}>2026</span>
+              </div>
+
+              {/* Headline */}
+              <h1 className="hero-mobile-title">
+                <div>{HERO_SLIDES[heroSlide].titleLine1} {HERO_SLIDES[heroSlide].titleLine2}</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
+                  <span>{HERO_SLIDES[heroSlide].titleLine3}</span>
+                  <span className="font-script gold-foil-text hero-mobile-script">
+                    {HERO_SLIDES[heroSlide].titleScript}
+                  </span>
+                </div>
+              </h1>
+
+              {/* Subtitle / Narrative */}
+              <p className="hero-mobile-desc">
+                {HERO_SLIDES[heroSlide].desc}
+              </p>
+
+              {/* Actions */}
+              <div className="hero-mobile-btn-row">
+                <Link
+                  href={HERO_SLIDES[heroSlide].ctaLink}
+                  className="hero-mobile-primary-cta btn-shine"
                 >
-                  {HERO_SLIDES[heroSlide].badge}
+                  <span>{HERO_SLIDES[heroSlide].ctaText}</span>
+                  <span style={{ fontSize: "14px" }}>→</span>
+                </Link>
+
+                <Link
+                  href={HERO_SLIDES[heroSlide].secondaryLink}
+                  className="hero-mobile-secondary-cta"
+                >
+                  <span>{HERO_SLIDES[heroSlide].secondaryText}</span>
+                  <span>↗</span>
+                </Link>
+              </div>
+
+              {/* Provenance & Indicators */}
+              <div className="hero-mobile-provenance-tag">
+                <span className="hero-mobile-provenance-craft">
+                  ✦ {HERO_SLIDES[heroSlide].craft}
                 </span>
 
-                <div
-                  style={{
-                    fontFamily: "var(--font-serif), Georgia, serif",
-                    fontSize: "44px",
-                    lineHeight: 1.05,
-                    color: "#3D2415",
-                    fontWeight: 500,
-                  }}
-                >
-                  <div>{HERO_SLIDES[heroSlide].titleLine1}</div>
-                  <div>{HERO_SLIDES[heroSlide].titleLine2}</div>
-                  <div>{HERO_SLIDES[heroSlide].titleLine3}</div>
-                  <div
-                    className="font-script"
-                    style={{
-                      fontSize: "64px",
-                      color: "#3D2415",
-                      lineHeight: 0.9,
-                      marginTop: "4px",
-                    }}
-                  >
-                    {HERO_SLIDES[heroSlide].titleScript}
-                  </div>
-                </div>
-
-                <p
-                  style={{
-                    fontSize: "10px",
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    color: "#543927",
-                    margin: "14px 0 20px 0",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {HERO_SLIDES[heroSlide].subtitle}
-                </p>
-
-                <div>
-                  <Link
-                    href={HERO_SLIDES[heroSlide].ctaLink}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      backgroundColor: "#4A2E1B",
-                      color: "#FFFFFF",
-                      fontSize: "11px",
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      padding: "11px 22px",
-                      textDecoration: "none",
-                    }}
-                  >
-                    <span>{HERO_SLIDES[heroSlide].ctaText}</span>
-                    <span>→</span>
-                  </Link>
+                <div className="hero-mobile-indicators">
+                  {HERO_SLIDES.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setHeroSlide(idx)}
+                      aria-label={`Go to slide ${idx + 1}`}
+                      className={`hero-mobile-indicator-bar ${heroSlide === idx ? "active" : "inactive"}`}
+                    />
+                  ))}
                 </div>
               </div>
-            )}
-
-            {/* Mobile Carousel Indicator Dots */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: "5.8%",
-                left: "50%",
-                transform: "translateX(-50%)",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                zIndex: 20,
-              }}
-            >
-              {HERO_SLIDES.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setHeroSlide(idx)}
-                  aria-label={`Go to slide ${idx + 1}`}
-                  style={{
-                    width: heroSlide === 0 ? "16px" : "8px",
-                    height: heroSlide === 0 ? "16px" : "8px",
-                    borderRadius: "50%",
-                    backgroundColor: heroSlide === 0 ? "transparent" : (heroSlide === idx ? "#4A2E1B" : "transparent"),
-                    border: heroSlide === 0 ? "none" : (heroSlide === idx ? "none" : "1.5px solid #4A2E1B"),
-                    padding: 0,
-                    cursor: "pointer",
-                    transition: "all 0.25s ease",
-                  }}
-                />
-              ))}
             </div>
           </div>
         </div>
@@ -784,7 +727,7 @@ export default function HomePage() {
           </div>
 
           {/* Narrative Column: Couture Heritage & Royal Seals */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
+          <div className="lookbook-narrative-col" style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
             <span
               className="luxury-badge"
               style={{
@@ -833,12 +776,12 @@ export default function HomePage() {
             />
 
             {/* 3 Royal Seal Badges */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "32px", width: "100%" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "32px", width: "100%" }}>
+              <div className="lookbook-seal-item">
                 <div
                   style={{
-                    width: "36px",
-                    height: "36px",
+                    width: "38px",
+                    height: "38px",
                     borderRadius: "50%",
                     backgroundColor: "rgba(226, 190, 114, 0.15)",
                     border: "1px solid rgba(226, 190, 114, 0.4)",
@@ -861,11 +804,11 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+              <div className="lookbook-seal-item">
                 <div
                   style={{
-                    width: "36px",
-                    height: "36px",
+                    width: "38px",
+                    height: "38px",
                     borderRadius: "50%",
                     backgroundColor: "rgba(226, 190, 114, 0.15)",
                     border: "1px solid rgba(226, 190, 114, 0.4)",
@@ -888,11 +831,11 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+              <div className="lookbook-seal-item">
                 <div
                   style={{
-                    width: "36px",
-                    height: "36px",
+                    width: "38px",
+                    height: "38px",
                     borderRadius: "50%",
                     backgroundColor: "rgba(226, 190, 114, 0.15)",
                     border: "1px solid rgba(226, 190, 114, 0.4)",
@@ -1012,17 +955,19 @@ export default function HomePage() {
                   onClick={() => setSpotlightCategory(cat)}
                   className="luxury-pill-tab"
                   style={{
-                    padding: "8px 22px",
-                    borderRadius: "22px",
+                    padding: "9px 24px",
+                    borderRadius: "24px",
                     fontSize: "12px",
                     fontWeight: isActive ? 700 : 500,
-                    letterSpacing: "0.08em",
+                    letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    backgroundColor: isActive ? "#261B13" : "#FFFFFF",
-                    color: isActive ? "#FAF7F2" : "#6E5B4E",
-                    border: isActive ? "1.5px solid #261B13" : "1px solid #CFBEAD",
+                    backgroundColor: isActive ? "#261B13" : "rgba(255, 255, 255, 0.85)",
+                    backdropFilter: "blur(8px)",
+                    WebkitBackdropFilter: "blur(8px)",
+                    color: isActive ? "#FAF7F2" : "#543927",
+                    border: isActive ? "1.5px solid #C5A059" : "1px solid rgba(197, 160, 89, 0.35)",
                     cursor: "pointer",
-                    boxShadow: isActive ? "0 4px 14px rgba(38,27,19,0.15)" : "none",
+                    boxShadow: isActive ? "0 4px 18px rgba(197, 160, 89, 0.32)" : "0 2px 8px rgba(38, 27, 19, 0.03)",
                     transition: "all 0.25s ease",
                   }}
                 >
@@ -1217,9 +1162,11 @@ export default function HomePage() {
                           className="product-card-price"
                           style={{
                             display: "block",
-                            fontSize: "18px",
+                            fontFamily: "var(--font-serif), Georgia, serif",
+                            fontSize: "20px",
                             fontWeight: 700,
                             color: "#261B13",
+                            letterSpacing: "0.01em",
                           }}
                         >
                           ₹{product.price.toLocaleString("en-IN")}
@@ -1230,7 +1177,7 @@ export default function HomePage() {
                             fontSize: "10.5px",
                             color: "#8E7D70",
                             textTransform: "uppercase",
-                            letterSpacing: "0.04em",
+                            letterSpacing: "0.05em",
                           }}
                         >
                           Free Insured Delivery
@@ -1245,6 +1192,7 @@ export default function HomePage() {
                           color: "#866951",
                           textDecoration: "underline",
                           textUnderlineOffset: "3px",
+                          letterSpacing: "0.02em",
                         }}
                       >
                         Inquire ↗
@@ -1256,18 +1204,21 @@ export default function HomePage() {
                       onClick={() => handleQuickAdd(product)}
                       className="avsaraa-btn-primary product-card-btn btn-shine"
                       style={{
-                        height: "40px",
-                        fontSize: "11px",
-                        letterSpacing: "0.08em",
+                        height: "42px",
+                        fontSize: "11.5px",
+                        letterSpacing: "0.09em",
                         textTransform: "uppercase",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "6px",
-                        borderRadius: "20px",
+                        gap: "8px",
+                        borderRadius: "22px",
                         width: "100%",
                         backgroundColor: addedId === product.id ? "#1B6B40" : "#261B13",
-                        transition: "background-color 0.3s ease",
+                        color: "#FAF7F2",
+                        border: "1px solid rgba(197, 160, 89, 0.35)",
+                        boxShadow: addedId === product.id ? "0 4px 14px rgba(27, 107, 64, 0.3)" : "0 4px 16px rgba(38, 27, 19, 0.2)",
+                        transition: "all 0.25s ease",
                       }}
                     >
                       <ShoppingBagIcon size={14} color="#FAF7F2" />
@@ -1836,22 +1787,20 @@ export default function HomePage() {
           <div style={{ display: "flex", gap: "14px", justifyContent: "center", flexWrap: "wrap" }}>
             <Link
               href="/contact"
-              className="btn-shine"
+              className="gold-foil-bg btn-shine"
               style={{
                 height: "52px",
-                padding: "0 30px",
-                fontSize: "13px",
-                fontWeight: 600,
-                letterSpacing: "0.06em",
+                padding: "0 34px",
+                fontSize: "12.5px",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                backgroundColor: "#FAF7F2",
-                color: "#261B13",
-                textDecoration: "none",
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "8px",
+                gap: "10px",
                 borderRadius: "26px",
-                boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
+                textDecoration: "none",
+                boxShadow: "0 8px 25px rgba(197, 160, 89, 0.4)",
               }}
             >
               <span>Book Studio Consultation</span>
