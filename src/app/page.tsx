@@ -136,6 +136,27 @@ export default function HomePage() {
     title?: string;
   } | null>(null);
   const [heroSlide, setHeroSlide] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  const handleMobileTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleMobileTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+    if (Math.abs(diff) > 35) {
+      if (diff > 0) {
+        // Swiped left -> advance to next slide
+        setHeroSlide((prev) => (prev === HERO_SLIDES.length - 1 ? 0 : prev + 1));
+      } else {
+        // Swiped right -> go to previous slide
+        setHeroSlide((prev) => (prev === 0 ? HERO_SLIDES.length - 1 : prev - 1));
+      }
+    }
+    setTouchStartX(null);
+  };
 
   // Auto-rotate hero slider every 6.5s
   useEffect(() => {
@@ -204,85 +225,83 @@ export default function HomePage() {
 
       {/* 2. Hero Section (Vicky Sagun Design: Minimalist High-Fashion Editorial) */}
       <section className="hero-vicky-container">
-        {/* MOBILE PRESENTATION: Exact match to Vicky Sagun's design mockup */}
-        {/* MOBILE PRESENTATION: Luxury Haute Couture Editorial */}
+        {/* MOBILE PRESENTATION: 3. ARCH FRAME (Client's Preferred Luxury Choice) */}
         <div className="hero-vicky-mobile">
-          <div className="hero-mobile-stage">
-            <Image
-              key={HERO_SLIDES[heroSlide].id}
-              src={HERO_SLIDES[heroSlide].mobileBanner}
-              alt={HERO_SLIDES[heroSlide].alt}
-              fill
-              priority
-              sizes="(max-width: 900px) 100vw, 560px"
-              className="hero-mobile-bg-img"
-            />
+          <div
+            className="hero-arch-outer-card"
+            onTouchStart={handleMobileTouchStart}
+            onTouchEnd={handleMobileTouchEnd}
+          >
+            {/* Heirloom Gold Corner Filigree Accents */}
+            <div className="hero-arch-corner top-left" aria-hidden="true" />
+            <div className="hero-arch-corner top-right" aria-hidden="true" />
+            <div className="hero-arch-corner bottom-left" aria-hidden="true" />
+            <div className="hero-arch-corner bottom-right" aria-hidden="true" />
 
-            {/* Cinematic Gradient Scrim */}
-            <div className="hero-mobile-scrim" />
+            {/* Top Apex Star Ornament with Gilded Flourish */}
+            <div className="hero-arch-top-ornament">
+              <span className="hero-arch-ornament-line left" aria-hidden="true" />
+              <span className="hero-arch-apex-star">✦</span>
+              <span className="hero-arch-ornament-line right" aria-hidden="true" />
+            </div>
 
-            {/* Luxury Editorial Overlay */}
-            <div className="hero-mobile-content-box">
-              {/* Atelier Badge */}
-              <div className="hero-mobile-pill-badge">
-                <span style={{ color: "#E2BE72", fontSize: "10px" }}>✦</span>
-                <span className="hero-mobile-pill-text">{HERO_SLIDES[heroSlide].badge}</span>
-                <span style={{ color: "rgba(226, 190, 114, 0.6)", fontSize: "9px" }}>•</span>
-                <span style={{ color: "#E2BE72", fontSize: "9.5px", letterSpacing: "0.1em" }}>2026</span>
-              </div>
+            {/* Semicircular Royal Arch Frame Window */}
+            <div className="hero-arch-frame-window">
+              <Image
+                key={HERO_SLIDES[heroSlide].id}
+                src={HERO_SLIDES[heroSlide].mobileBanner}
+                alt={HERO_SLIDES[heroSlide].alt}
+                fill
+                priority
+                sizes="(max-width: 900px) 100vw, 560px"
+                className="hero-arch-img"
+              />
 
-              {/* Headline */}
-              <h1 className="hero-mobile-title">
-                <div>{HERO_SLIDES[heroSlide].titleLine1} {HERO_SLIDES[heroSlide].titleLine2}</div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
-                  <span>{HERO_SLIDES[heroSlide].titleLine3}</span>
-                  <span className="font-script gold-foil-text hero-mobile-script">
-                    {HERO_SLIDES[heroSlide].titleScript}
-                  </span>
-                </div>
-              </h1>
+              {/* Directional Soft Limestone Gradient Scrim */}
+              <div className="hero-arch-scrim" />
 
-              {/* Subtitle / Narrative */}
-              <p className="hero-mobile-desc">
-                {HERO_SLIDES[heroSlide].desc}
-              </p>
-
-              {/* Actions */}
-              <div className="hero-mobile-btn-row">
-                <Link
-                  href={HERO_SLIDES[heroSlide].ctaLink}
-                  className="hero-mobile-primary-cta btn-shine"
-                >
-                  <span>{HERO_SLIDES[heroSlide].ctaText}</span>
-                  <span style={{ fontSize: "14px" }}>→</span>
-                </Link>
-
-                <Link
-                  href={HERO_SLIDES[heroSlide].secondaryLink}
-                  className="hero-mobile-secondary-cta"
-                >
-                  <span>{HERO_SLIDES[heroSlide].secondaryText}</span>
-                  <span>↗</span>
-                </Link>
-              </div>
-
-              {/* Provenance & Indicators */}
-              <div className="hero-mobile-provenance-tag">
-                <span className="hero-mobile-provenance-craft">
-                  ✦ {HERO_SLIDES[heroSlide].craft}
+              {/* Left-Aligned Editorial Typography */}
+              <div className="hero-arch-content">
+                <span className="hero-arch-kicker">
+                  {HERO_SLIDES[heroSlide].badge}
                 </span>
 
-                <div className="hero-mobile-indicators">
-                  {HERO_SLIDES.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setHeroSlide(idx)}
-                      aria-label={`Go to slide ${idx + 1}`}
-                      className={`hero-mobile-indicator-bar ${heroSlide === idx ? "active" : "inactive"}`}
-                    />
-                  ))}
-                </div>
+                <h1 className="hero-arch-title">
+                  <div>{HERO_SLIDES[heroSlide].titleLine1}</div>
+                  <div>{HERO_SLIDES[heroSlide].titleLine2}</div>
+                  <div>{HERO_SLIDES[heroSlide].titleLine3}</div>
+                  <div className="font-script hero-arch-script">
+                    {HERO_SLIDES[heroSlide].titleScript}
+                  </div>
+                </h1>
+
+                <p className="hero-arch-subtitle">
+                  {HERO_SLIDES[heroSlide].subtitle}
+                </p>
+
+                <Link
+                  href={HERO_SLIDES[heroSlide].ctaLink}
+                  className="hero-arch-cta-btn btn-shine"
+                  id="hero-mobile-cta"
+                >
+                  <span>{HERO_SLIDES[heroSlide].ctaText}</span>
+                  <span className="hero-arch-cta-arrow">→</span>
+                </Link>
               </div>
+            </div>
+
+            {/* Bottom Carousel Indicator Dots */}
+            <div className="hero-arch-dots-bar" role="tablist" aria-label="Hero carousel navigation">
+              {HERO_SLIDES.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setHeroSlide(idx)}
+                  aria-label={`Slide ${idx + 1}: ${HERO_SLIDES[idx].badge}`}
+                  aria-selected={heroSlide === idx}
+                  role="tab"
+                  className={`hero-arch-dot ${heroSlide === idx ? "active" : ""}`}
+                />
+              ))}
             </div>
           </div>
         </div>
