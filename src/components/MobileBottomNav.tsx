@@ -14,8 +14,10 @@ export default function MobileBottomNav() {
   const { totalItems, openCart } = useCart();
   const { totalWishlist } = useWishlist();
   const [user, setUser] = useState<User | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
     });
@@ -32,7 +34,7 @@ export default function MobileBottomNav() {
   }, []);
 
   const isHome = pathname === "/";
-  const isCollection = pathname.startsWith("/collection");
+  const isProducts = pathname.startsWith("/products") || pathname.startsWith("/collection");
   const isWishlist = pathname.startsWith("/wishlist");
   const isProfile = pathname.startsWith("/account");
   const isAuth = pathname === "/login" || pathname === "/register";
@@ -55,7 +57,7 @@ export default function MobileBottomNav() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-around",
-        padding: "8px 12px calc(8px + env(safe-area-inset-bottom, 0px)) 12px",
+        padding: "8px 10px calc(8px + env(safe-area-inset-bottom, 0px)) 10px",
       }}
     >
       {/* 1. Home */}
@@ -70,6 +72,7 @@ export default function MobileBottomNav() {
           textDecoration: "none",
           flex: 1,
           padding: "4px 0",
+          position: "relative",
           transition: "all 0.2s ease",
         }}
       >
@@ -96,20 +99,33 @@ export default function MobileBottomNav() {
         >
           Home
         </span>
+        {isHome && (
+          <span
+            style={{
+              position: "absolute",
+              bottom: "-2px",
+              width: "4px",
+              height: "4px",
+              borderRadius: "50%",
+              backgroundColor: "#C5A059",
+            }}
+          />
+        )}
       </Link>
 
-      {/* 2. Collection */}
+      {/* 2. Products */}
       <Link
-        href="/collection"
+        href="/products"
         style={{
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           gap: "4px",
-          color: isCollection ? "#261B13" : "#8E7D70",
+          color: isProducts ? "#261B13" : "#8E7D70",
           textDecoration: "none",
           flex: 1,
           padding: "4px 0",
+          position: "relative",
           transition: "all 0.2s ease",
         }}
       >
@@ -118,26 +134,38 @@ export default function MobileBottomNav() {
           height="20"
           viewBox="0 0 24 24"
           fill="none"
-          stroke={isCollection ? "#261B13" : "currentColor"}
-          strokeWidth={isCollection ? "2.2" : "1.7"}
+          stroke="currentColor"
+          strokeWidth={isProducts ? "2.2" : "1.7"}
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="14" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect width="7" height="7" x="3" y="3" rx="1" />
+          <rect width="7" height="7" x="14" y="3" rx="1" />
+          <rect width="7" height="7" x="14" y="14" rx="1" />
+          <rect width="7" height="7" x="3" y="14" rx="1" />
         </svg>
         <span
           style={{
             fontSize: "10px",
-            fontWeight: isCollection ? 700 : 500,
+            fontWeight: isProducts ? 700 : 500,
             letterSpacing: "0.06em",
             textTransform: "uppercase",
           }}
         >
-          Atelier
+          Products
         </span>
+        {isProducts && (
+          <span
+            style={{
+              position: "absolute",
+              bottom: "-2px",
+              width: "4px",
+              height: "4px",
+              borderRadius: "50%",
+              backgroundColor: "#C5A059",
+            }}
+          />
+        )}
       </Link>
 
       {/* 3. Wishlist */}
@@ -161,7 +189,7 @@ export default function MobileBottomNav() {
             size={20}
             color={isWishlist ? "#B83A4B" : "currentColor"}
           />
-          {totalWishlist > 0 && (
+          {mounted && totalWishlist > 0 && (
             <span
               style={{
                 position: "absolute",
@@ -195,6 +223,18 @@ export default function MobileBottomNav() {
         >
           Saved
         </span>
+        {isWishlist && (
+          <span
+            style={{
+              position: "absolute",
+              bottom: "-2px",
+              width: "4px",
+              height: "4px",
+              borderRadius: "50%",
+              backgroundColor: "#B83A4B",
+            }}
+          />
+        )}
       </Link>
 
       {/* 4. Shopping Bag Drawer Trigger */}
@@ -206,7 +246,7 @@ export default function MobileBottomNav() {
           flexDirection: "column",
           alignItems: "center",
           gap: "4px",
-          color: totalItems > 0 ? "#261B13" : "#8E7D70",
+          color: mounted && totalItems > 0 ? "#261B13" : "#8E7D70",
           background: "none",
           border: "none",
           cursor: "pointer",
@@ -219,9 +259,9 @@ export default function MobileBottomNav() {
         <div style={{ position: "relative" }}>
           <ShoppingBagIcon
             size={20}
-            color={totalItems > 0 ? "#261B13" : "currentColor"}
+            color={mounted && totalItems > 0 ? "#261B13" : "currentColor"}
           />
-          {totalItems > 0 && (
+          {mounted && totalItems > 0 && (
             <span
               style={{
                 position: "absolute",
@@ -249,7 +289,7 @@ export default function MobileBottomNav() {
         <span
           style={{
             fontSize: "10px",
-            fontWeight: totalItems > 0 ? 700 : 500,
+            fontWeight: mounted && totalItems > 0 ? 700 : 500,
             letterSpacing: "0.06em",
             textTransform: "uppercase",
           }}
@@ -258,8 +298,8 @@ export default function MobileBottomNav() {
         </span>
       </button>
 
-      {/* 5. Profile (when logged in) or Sign In (when guest) */}
-      {user ? (
+      {/* 5. Profile / Account */}
+      {mounted && user ? (
         <Link
           href="/account"
           style={{
@@ -300,6 +340,18 @@ export default function MobileBottomNav() {
           >
             Profile
           </span>
+          {isProfile && (
+            <span
+              style={{
+                position: "absolute",
+                bottom: "-2px",
+                width: "4px",
+                height: "4px",
+                borderRadius: "50%",
+                backgroundColor: "#C5A059",
+              }}
+            />
+          )}
         </Link>
       ) : (
         <Link
@@ -342,6 +394,18 @@ export default function MobileBottomNav() {
           >
             Sign In
           </span>
+          {isAuth && (
+            <span
+              style={{
+                position: "absolute",
+                bottom: "-2px",
+                width: "4px",
+                height: "4px",
+                borderRadius: "50%",
+                backgroundColor: "#C5A059",
+              }}
+            />
+          )}
         </Link>
       )}
     </nav>

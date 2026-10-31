@@ -29,11 +29,12 @@ export default function NavigationDrawer({
 
   const categories = [
     { label: "HOME", subtitle: "Bespoke Sanctuary & Highlights", href: "/" },
-    { label: "ALL PIECES", subtitle: "Full Atelier Catalog", href: "/collection" },
-    { label: "SAREES", subtitle: "Banarasi & Organza Weaves", href: "/collection?category=Sarees" },
-    { label: "DRESSES", subtitle: "Anarkalis & Chanderi Sets", href: "/collection?category=Dresses" },
-    { label: "NEW ARRIVALS", subtitle: "Festive 2026 Edition", href: "/collection?category=New%20Arrivals" },
-    { label: "OCCASION WEAR", subtitle: "Bridal Zari & Heavy Drapes", href: "/collection?category=Occasion%20Wear" },
+    { label: "ALL PRODUCTS", subtitle: "Full Handcrafted Catalog", href: "/products" },
+    { label: "UP TO ₹1,299 EDIT", subtitle: "Daily Wear Kurtas & Stoles", href: "/products?maxPrice=1299" },
+    { label: "SAREES", subtitle: "Banarasi & Organza Weaves", href: "/products?category=Sarees" },
+    { label: "DRESSES", subtitle: "Anarkalis & Chanderi Sets", href: "/products?category=Dresses" },
+    { label: "AVSARAA STYLE", subtitle: "Mix & Match Combinations", href: "/products/styles" },
+    { label: "OCCASION WEAR", subtitle: "Bridal Zari & Heavy Drapes", href: "/products?category=Occasion%20Wear" },
   ];
 
   return (

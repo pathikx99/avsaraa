@@ -46,9 +46,9 @@ function HeaderInner() {
   const scrolled = useScrolled(35);
 
   const isHomeActive = pathname === "/" && !currentCategory;
-  const isCollectionActive = pathname.startsWith("/collection") && (!currentCategory || currentCategory === "ALL");
-  const isSareesActive = pathname.startsWith("/collection") && currentCategory?.toLowerCase().includes("saree");
-  const isDressesActive = pathname.startsWith("/collection") && currentCategory?.toLowerCase().includes("dress");
+  const isProductsActive = (pathname.startsWith("/products") || pathname.startsWith("/collection")) && (!currentCategory || currentCategory === "ALL");
+  const isSareesActive = (pathname.startsWith("/products") || pathname.startsWith("/collection")) && currentCategory?.toLowerCase().includes("saree");
+  const isDressesActive = (pathname.startsWith("/products") || pathname.startsWith("/collection")) && currentCategory?.toLowerCase().includes("dress");
   const isStoryActive = pathname === "/about";
 
   useEffect(() => {
@@ -96,13 +96,13 @@ function HeaderInner() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    router.push(`/collection?search=${encodeURIComponent(searchQuery.trim())}`);
+    router.push(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
     setIsSearchOpen(false);
   };
 
   const handleQuickTagClick = (term: string) => {
     setSearchQuery(term);
-    router.push(`/collection?search=${encodeURIComponent(term)}`);
+    router.push(`/products?search=${encodeURIComponent(term)}`);
     setIsSearchOpen(false);
   };
 
@@ -172,14 +172,17 @@ function HeaderInner() {
               <Link href="/" className={`luxury-nav-link ${isHomeActive ? "active" : ""}`}>
                 Home
               </Link>
-              <Link href="/collection" className={`luxury-nav-link ${isCollectionActive ? "active" : ""}`}>
-                Collection
+              <Link href="/products" className={`luxury-nav-link ${isProductsActive ? "active" : ""}`}>
+                Products
               </Link>
-              <Link href="/collection?category=Sarees" className={`luxury-nav-link ${isSareesActive ? "active" : ""}`}>
+              <Link href="/products?category=Sarees" className={`luxury-nav-link ${isSareesActive ? "active" : ""}`}>
                 Sarees
               </Link>
-              <Link href="/collection?category=Dresses" className={`luxury-nav-link ${isDressesActive ? "active" : ""}`}>
+              <Link href="/products?category=Dresses" className={`luxury-nav-link ${isDressesActive ? "active" : ""}`}>
                 Dresses
+              </Link>
+              <Link href="/products/styles" className="luxury-nav-link">
+                Styles
               </Link>
               <Link href="/about" className={`luxury-nav-link ${isStoryActive ? "active" : ""}`}>
                 Our Story

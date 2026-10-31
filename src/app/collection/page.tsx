@@ -1,94 +1,21 @@
 "use client";
 
-import React, { Suspense } from "react";
-import Link from "next/link";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import ProductsSection from "@/components/ProductsSection";
+import { useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-function CollectionContent() {
+function CollectionRedirect() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const params = searchParams?.toString();
+    const destination = params ? `/products?${params}` : "/products";
+    router.replace(destination);
+  }, [router, searchParams]);
+
   return (
-    <div className="page-enter" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#FAF7F2" }}>
-      <Header />
-
-      <main style={{ flex: 1 }}>
-        {/* Editorial Collection Hero Banner */}
-        <section
-          className="collection-hero-pattern"
-          style={{
-            backgroundColor: "#261B13",
-            color: "#FAF7F2",
-            padding: "54px 24px 44px 24px",
-            textAlign: "center",
-            position: "relative",
-            borderBottom: "1px solid #3E2D22",
-          }}
-        >
-          {/* Breadcrumb */}
-          <nav
-            aria-label="Breadcrumb"
-            style={{
-              fontSize: "12px",
-              color: "#C4AB94",
-              marginBottom: "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-            }}
-          >
-            <Link href="/" style={{ color: "#C4AB94", textDecoration: "none" }}>
-              Home
-            </Link>
-            <span>/</span>
-            <span style={{ color: "#FAF7F2", fontWeight: 600 }}>Collection</span>
-          </nav>
-
-          <span
-            className="luxury-badge"
-            style={{
-              marginBottom: "12px",
-              backgroundColor: "rgba(196, 171, 148, 0.15)",
-              color: "#E2D7CC",
-              border: "1px solid rgba(196, 171, 148, 0.3)",
-            }}
-          >
-            ✦ THE ATELIER CATALOG ✦
-          </span>
-
-          <h1
-            style={{
-              fontFamily: "var(--font-serif), Georgia, serif",
-              fontSize: "clamp(34px, 5vw, 52px)",
-              fontWeight: 500,
-              lineHeight: 1.15,
-              marginBottom: "14px",
-              color: "#FAF7F2",
-            }}
-          >
-            Handcrafted Collection
-          </h1>
-
-          <p
-            style={{
-              fontSize: "15px",
-              color: "#D6C7B8",
-              maxWidth: "580px",
-              margin: "0 auto",
-              lineHeight: 1.7,
-            }}
-          >
-            Explore our complete collection of pure Banarasi silks, organza drapes, and festive ensembles. Filter by category or inquire directly with our Surat studio.
-          </p>
-        </section>
-
-        {/* The Catalog with Category Filters and Gated Add to Bag */}
-        <ProductsSection showHeader={false} />
-      </main>
-
-      <Footer />
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#FAF7F2" }}>
+      <p style={{ color: "#8E7D70", fontSize: "14px" }}>Redirecting to Products Catalog...</p>
     </div>
   );
 }
@@ -98,11 +25,11 @@ export default function CollectionPage() {
     <Suspense
       fallback={
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#FAF7F2" }}>
-          <p style={{ color: "#8E7D70", fontSize: "14px" }}>Loading Avsaraa Collection...</p>
+          <p style={{ color: "#8E7D70", fontSize: "14px" }}>Redirecting...</p>
         </div>
       }
     >
-      <CollectionContent />
+      <CollectionRedirect />
     </Suspense>
   );
 }

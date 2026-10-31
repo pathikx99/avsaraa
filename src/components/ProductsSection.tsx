@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Product, ProductCategory } from "@/types/product";
+import { normalizeProducts, productMatchesOccasion, getOccasionTitleBySlug, formatINR } from "@/lib/productUtils";
 import { ShoppingBagIcon, HeartIcon } from "./Icons";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
@@ -31,7 +32,9 @@ export default function ProductsSection({
   const [, setUser] = useState<User | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"featured" | "price-asc" | "price-desc">("featured");
+  const [activeOccasion, setActiveOccasion] = useState<string | null>(null);
+  const [activeMaxPrice, setActiveMaxPrice] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<"featured" | "bestsellers" | "newest" | "price-asc" | "price-desc">("featured");
   const [addedId, setAddedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,7 +62,7 @@ export default function ProductsSection({
           if (error || !data) {
             setProducts([]);
           } else {
-            setProducts(data);
+            setProducts(normalizeProducts(data));
           }
         },
         () => {
@@ -78,12 +81,32 @@ export default function ProductsSection({
     if (!searchParams) return;
     const categoryQuery = searchParams.get("category");
     const searchParam = searchParams.get("search");
+    const occasionParam = searchParams.get("occasion");
+    const maxPriceParam = searchParams.get("maxPrice");
+    const sortParam = searchParams.get("sort");
 
     if (searchParam !== null) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchQuery(searchParam);
     } else {
       setSearchQuery("");
+    }
+
+    if (occasionParam) {
+      setActiveOccasion(occasionParam);
+    } else {
+      setActiveOccasion(null);
+    }
+
+    if (maxPriceParam && !isNaN(Number(maxPriceParam))) {
+      setActiveMaxPrice(Number(maxPriceParam));
+    } else {
+      setActiveMaxPrice(null);
+    }
+
+    if (sortParam) {
+      if (["featured", "bestsellers", "newest", "price-asc", "price-desc"].includes(sortParam)) {
+        setSortBy(sortParam as "featured" | "bestsellers" | "newest" | "price-asc" | "price-desc");
+      }
     }
 
     if (categoryQuery) {
@@ -112,24 +135,41 @@ export default function ProductsSection({
       ? [...products]
       : products.filter((p) => p.category === activeCategory);
 
+    // Filter by occasion if active
+    if (activeOccasion) {
+      result = result.filter((p) => productMatchesOccasion(p, activeOccasion));
+    }
+
+    // Filter by max price if active (e.g., Up to ₹1,299)
+    if (activeMaxPrice !== null) {
+      result = result.filter((p) => p.price <= activeMaxPrice);
+    }
+
+    // Text search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
           p.category.toLowerCase().includes(q) ||
-          p.description?.toLowerCase().includes(q)
+          p.description?.toLowerCase().includes(q) ||
+          (p.occasion_tags && p.occasion_tags.some((tag) => tag.toLowerCase().includes(q)))
       );
     }
 
+    // Sorting
     if (sortBy === "price-asc") {
       result.sort((a, b) => a.price - b.price);
     } else if (sortBy === "price-desc") {
       result.sort((a, b) => b.price - a.price);
+    } else if (sortBy === "bestsellers") {
+      result.sort((a, b) => (b.sales_count || 0) - (a.sales_count || 0));
+    } else if (sortBy === "newest") {
+      result.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
     }
 
     return result;
-  }, [products, activeCategory, searchQuery, sortBy]);
+  }, [products, activeCategory, activeOccasion, activeMaxPrice, searchQuery, sortBy]);
 
   const handleQuickAdd = (product: Product) => {
     const success = addToCart(product);
@@ -194,7 +234,7 @@ export default function ProductsSection({
                   key={cat}
                   onClick={() => {
                     setActiveCategory(cat);
-                    const newUrl = cat === "ALL" ? "/collection" : `/collection?category=${encodeURIComponent(cat)}`;
+                    const newUrl = cat === "ALL" ? "/products" : `/products?category=${encodeURIComponent(cat)}`;
                     router.replace(newUrl, { scroll: false });
                   }}
                   className="luxury-pill-tab"
@@ -232,6 +272,132 @@ export default function ProductsSection({
             })}
           </div>
         </div>
+
+        {/* Active Filter Chips (Occasion, Price Ceiling, Search) */}
+        {(activeOccasion || activeMaxPrice !== null || searchQuery) && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "8px",
+              marginBottom: "20px",
+              padding: "10px 14px",
+              backgroundColor: "#F2EBE3",
+              borderRadius: "12px",
+              border: "1px solid #E2D7CC",
+            }}
+          >
+            <span style={{ fontSize: "11.5px", fontWeight: 600, color: "#6E5B4E", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Active Filters:
+            </span>
+
+            {activeOccasion && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "4px 10px",
+                  borderRadius: "16px",
+                  backgroundColor: "#261B13",
+                  color: "#FAF7F2",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                }}
+              >
+                <span>Occasion: {getOccasionTitleBySlug(activeOccasion)}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveOccasion(null);
+                    router.replace("/products", { scroll: false });
+                  }}
+                  style={{ background: "none", border: "none", color: "#C4AB94", cursor: "pointer", fontSize: "13px", padding: 0 }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+
+            {activeMaxPrice !== null && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "4px 10px",
+                  borderRadius: "16px",
+                  backgroundColor: "#1E5E3A",
+                  color: "#FAF7F2",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                }}
+              >
+                <span>Up to ₹{activeMaxPrice.toLocaleString("en-IN")}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveMaxPrice(null);
+                    router.replace("/products", { scroll: false });
+                  }}
+                  style={{ background: "none", border: "none", color: "#D4EDDA", cursor: "pointer", fontSize: "13px", padding: 0 }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+
+            {searchQuery && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "4px 10px",
+                  borderRadius: "16px",
+                  backgroundColor: "#FFFFFF",
+                  color: "#261B13",
+                  border: "1px solid #CFBEAD",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                }}
+              >
+                <span>Query: &ldquo;{searchQuery}&rdquo;</span>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  style={{ background: "none", border: "none", color: "#8E7D70", cursor: "pointer", fontSize: "13px", padding: 0 }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveOccasion(null);
+                setActiveMaxPrice(null);
+                setActiveCategory("ALL");
+                setSearchQuery("");
+                router.replace("/products", { scroll: false });
+              }}
+              style={{
+                marginLeft: "auto",
+                background: "none",
+                border: "none",
+                fontSize: "11.5px",
+                color: "#8A181A",
+                textDecoration: "underline",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Clear All Filters
+            </button>
+          </div>
+        )}
 
         {/* 2. Search & Sort Bar */}
         <div
@@ -295,7 +461,7 @@ export default function ProductsSection({
               </span>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "featured" | "price-asc" | "price-desc")}
+                onChange={(e) => setSortBy(e.target.value as "featured" | "bestsellers" | "newest" | "price-asc" | "price-desc")}
                 style={{
                   backgroundColor: "#FFFFFF",
                   border: "1px solid #CFBEAD",
@@ -309,6 +475,8 @@ export default function ProductsSection({
                 }}
               >
                 <option value="featured">Featured First</option>
+                <option value="bestsellers">Bestsellers</option>
+                <option value="newest">New Arrivals First</option>
                 <option value="price-asc">Price: Low to High</option>
                 <option value="price-desc">Price: High to Low</option>
               </select>
@@ -431,7 +599,6 @@ export default function ProductsSection({
                   style={{
                     position: "relative",
                     width: "100%",
-                    height: "360px",
                     backgroundColor: "#F2EBE3",
                     cursor: "pointer",
                   }}

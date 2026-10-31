@@ -305,7 +305,11 @@ CREATE TABLE IF NOT EXISTS public.products (
     image_url TEXT NOT NULL,
     description TEXT,
     user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    occasion_tags TEXT[] DEFAULT '{}',
+    color_variants JSONB DEFAULT '[]',
+    sales_count INTEGER DEFAULT 0,
+    product_type TEXT DEFAULT 'standalone' CHECK (product_type IN ('standalone', 'top', 'bottom', 'set'))
 );
 
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;

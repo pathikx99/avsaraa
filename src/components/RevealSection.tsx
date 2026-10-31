@@ -7,7 +7,7 @@ import React, { useEffect, useRef, useState } from "react";
  * Uses a generous rootMargin and low threshold so elements animate smoothly
  * as they approach the viewport, eliminating blank page gaps.
  */
-export function useScrollReveal(threshold = 0.02) {
+export function useScrollReveal(threshold = 0.01) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [isRevealed, setIsRevealed] = useState(false);
 
@@ -15,24 +15,46 @@ export function useScrollReveal(threshold = 0.02) {
     const el = ref.current;
     if (!el) return;
 
-    // Fallback if IntersectionObserver is unsupported
-    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
-      const timer = setTimeout(() => setIsRevealed(true), 0);
-      return () => clearTimeout(timer);
+    // Check if element is already in or near viewport on mount
+    try {
+      const rect = el.getBoundingClientRect();
+      if (rect.top <= (window.innerHeight || document.documentElement.clientHeight) + 120) {
+        setIsRevealed(true);
+        return;
+      }
+    } catch {
+      // Fallback
     }
 
+    // Fallback if IntersectionObserver is unsupported
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      setIsRevealed(true);
+      return;
+    }
+
+    // Safety fallback timer: ensure content is NEVER permanently invisible
+    const safetyTimer = setTimeout(() => {
+      setIsRevealed(true);
+    }, 1200);
+
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsRevealed(true);
-          observer.unobserve(el);
-        }
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsRevealed(true);
+            observer.unobserve(el);
+            clearTimeout(safetyTimer);
+          }
+        });
       },
-      { threshold, rootMargin: "120px 0px 80px 0px" }
+      { threshold, rootMargin: "160px 0px 100px 0px" }
     );
 
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      clearTimeout(safetyTimer);
+      observer.disconnect();
+    };
   }, [threshold]);
 
   return { ref, isRevealed };
@@ -82,7 +104,7 @@ export function RevealSection({
       className={`${className} ${isRevealed ? "revealed" : ""}`}
       style={{
         ...style,
-        transitionDelay: delay ? `${delay}s` : undefined,
+        transitionDelay: delay ? (delay > 10 ? `${delay}ms` : `${delay}s`) : undefined,
       }}
     >
       {children}

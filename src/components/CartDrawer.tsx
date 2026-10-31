@@ -182,7 +182,7 @@ export default function CartDrawer() {
                 Explore our handcrafted pure silk sarees and festive wear to add pieces to your collection.
               </p>
               <Link
-                href="/collection"
+                href="/products"
                 onClick={closeCart}
                 className="avsaraa-btn-primary"
                 style={{
@@ -194,7 +194,7 @@ export default function CartDrawer() {
                   alignItems: "center",
                 }}
               >
-                Explore Collection →
+                Explore Products →
               </Link>
             </div>
           ) : (
