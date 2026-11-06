@@ -9,6 +9,7 @@ import { HeartIcon, ShoppingBagIcon, TrashIcon } from "@/components/Icons";
 import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/context/CartContext";
 import { Product } from "@/types/product";
+import { resolveProductImage } from "@/lib/productUtils";
 
 export default function WishlistPage() {
   const { wishlist, removeFromWishlist, clearWishlist, user, isLoaded } = useWishlist();
@@ -357,7 +358,7 @@ export default function WishlistPage() {
                       }}
                     >
                       <Image
-                        src={product.image_url || "/images/banarasi_silk_saree.jpg"}
+                        src={resolveProductImage(product.image_url) || "/images/banarasi_silk_saree.jpg"}
                         alt={product.name}
                         fill
                         sizes="(min-width: 900px) 25vw, 50vw"

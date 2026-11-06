@@ -274,7 +274,16 @@ DELETE FROM public.products WHERE name IN (
     'Royal Zari Bridal Drape',
     'Surat Brocade Evening Gown',
     'Handloom Tissue Silk Saree',
-    'Crimson Heritage Bridal Kalidar'
+    'Crimson Heritage Bridal Kalidar',
+    'Peach Slub Cotton Embroidered Kurta',
+    'Royal Ivory Zari Woven Chanderi Dupatta',
+    'Indigo Floral Handblock Printed Suit Set',
+    'Mustard Mirror-Work Silk Blend Short Kurti',
+    'Blush Pink Embroidered Festive Stole',
+    'Sunshine Marigold Sharara Ensemble',
+    'Midnight Sequin Cocktail Pre-Draped Saree',
+    'Pastel Rose Garden Wedding Lehenga',
+    'Sage Minimalist Linen Everyday Kurta'
 );
 
 INSERT INTO public.products (
@@ -284,9 +293,80 @@ INSERT INTO public.products (
     price,
     image_url,
     description,
+    occasion_tags,
+    color_variants,
+    sales_count,
+    product_type,
     created_at
 )
 VALUES
+    -- Under ₹1,299 Everyday & Festive Essentials
+    (
+        'e1000000-0000-0000-0000-000000000001',
+        'Peach Slub Cotton Embroidered Kurta',
+        'Dresses',
+        999.00,
+        'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/product_kurta_under1299.jpg',
+        'Lightweight, breathable pure cotton slub daily wear kurta adorned with delicate Kashmiri-inspired threadwork and mother-of-pearl buttons.',
+        ARRAY['Everyday Essentials', 'Festive Edit'],
+        '[{"name": "Peach", "hex": "#F8B195"}, {"name": "Sage Green", "hex": "#A8BBA2"}, {"name": "Ivory White", "hex": "#FAF5EF"}]'::jsonb,
+        145,
+        'top',
+        NOW() - INTERVAL '15 days'
+    ),
+    (
+        'e1000000-0000-0000-0000-000000000002',
+        'Royal Ivory Zari Woven Chanderi Dupatta',
+        'Occasion Wear',
+        899.00,
+        'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/product_dupatta_under1299.jpg',
+        'Classic handwoven Chanderi silk blend stole with antique gold zari booti weaving and delicate artisan tassel hem.',
+        ARRAY['Festive Edit', 'Wedding Guest', 'Traditional & Ceremonial Wear'],
+        '[{"name": "Ivory Gold", "hex": "#F3EFE0"}, {"name": "Blush Rose", "hex": "#E8C5C8"}]'::jsonb,
+        182,
+        'standalone',
+        NOW() - INTERVAL '10 days'
+    ),
+    (
+        'e1000000-0000-0000-0000-000000000003',
+        'Indigo Floral Handblock Printed Suit Set',
+        'Dresses',
+        1299.00,
+        'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/product_suit_under1299.jpg',
+        'Artisanal handblock printed Jaipur cotton suit set featuring a notched Mandarin collar kurta and straight cropped pants.',
+        ARRAY['Everyday Essentials', 'Festive Edit'],
+        '[{"name": "Powder Blue", "hex": "#A0C4E2"}, {"name": "Indigo Navy", "hex": "#2C3E50"}]'::jsonb,
+        210,
+        'set',
+        NOW() - INTERVAL '5 days'
+    ),
+    (
+        'e1000000-0000-0000-0000-000000000004',
+        'Mustard Mirror-Work Silk Blend Short Kurti',
+        'Dresses',
+        1199.00,
+        'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/product_kurti_under1299.jpg',
+        'Vibrant festive short kurti with hand-embroidered mirror work yoke and metallic gota patti piping along the cuffs and hem.',
+        ARRAY['Haldi & Mehendi', 'Festive Edit', 'Everyday Essentials'],
+        '[{"name": "Mustard", "hex": "#E5A93C"}, {"name": "Rani Pink", "hex": "#D63384"}]'::jsonb,
+        98,
+        'top',
+        NOW() - INTERVAL '3 days'
+    ),
+    (
+        'e1000000-0000-0000-0000-000000000005',
+        'Blush Pink Embroidered Festive Stole',
+        'Occasion Wear',
+        799.00,
+        'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/product_dupatta_under1299.jpg',
+        'Soft viscose silk festive stole with dainty floral threadwork and scalloped border finish.',
+        ARRAY['Everyday Essentials', 'Festive Edit'],
+        '[{"name": "Blush", "hex": "#FAD2E1"}, {"name": "Champagne", "hex": "#F3E5AB"}]'::jsonb,
+        74,
+        'standalone',
+        NOW() - INTERVAL '2 days'
+    ),
+    -- Luxury Heritage Sarees & Drapes
     (
         'e0000000-0000-0000-0000-000000000001',
         'Royal Banarasi Katan Silk Saree',
@@ -294,6 +374,10 @@ VALUES
         24999.00,
         'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/banarasi_silk_saree.jpg',
         'Authentic handwoven pure Banarasi katan silk saree featuring antique gold zari kadhwa borders and delicate floral jaal artistry.',
+        ARRAY['Traditional & Ceremonial Wear', 'Wedding Guest', 'Festive Edit'],
+        '[{"name": "Crimson Red", "hex": "#8A181A"}, {"name": "Antique Gold", "hex": "#CFB53B"}]'::jsonb,
+        320,
+        'standalone',
         NOW() - INTERVAL '30 days'
     ),
     (
@@ -303,6 +387,10 @@ VALUES
         18450.00,
         'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/royal_organza_saree.jpg',
         'Weightless sheer organza drape adorned with intricate resham threadwork, scalloped borders, and lustrous pearl highlights.',
+        ARRAY['Festive Edit', 'Wedding Guest', 'Party & Special Occasions'],
+        '[{"name": "Emerald Green", "hex": "#0E5A3B"}, {"name": "Mint Frost", "hex": "#9BD5C1"}]'::jsonb,
+        290,
+        'standalone',
         NOW() - INTERVAL '25 days'
     ),
     (
@@ -312,6 +400,10 @@ VALUES
         28900.00,
         'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/royal_occasion_dress.jpg',
         'Regal floor-sweeping Kalidar gown tailored in Surat silk with heritage hand-zardozi embroidery across the neckline and cuffs.',
+        ARRAY['Wedding Guest', 'Party & Special Occasions', 'Festive Edit'],
+        '[{"name": "Royal Purple", "hex": "#4A1942"}, {"name": "Wine Berry", "hex": "#6B1D2F"}]'::jsonb,
+        260,
+        'standalone',
         NOW() - INTERVAL '20 days'
     ),
     (
@@ -321,6 +413,10 @@ VALUES
         12500.00,
         'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/festive_chanderi_dress.jpg',
         'Contemporary silhouette crafted from lightweight Chanderi weave featuring artisanal metallic foil accents and a flowing flared hem.',
+        ARRAY['Festive Edit', 'Everyday Essentials'],
+        '[{"name": "Mustard", "hex": "#E5A93C"}, {"name": "Teal Blue", "hex": "#008080"}]'::jsonb,
+        195,
+        'standalone',
         NOW() - INTERVAL '18 days'
     ),
     (
@@ -330,6 +426,10 @@ VALUES
         34500.00,
         'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/saree_model_hero.jpg',
         'Exquisite bridal masterpiece with intricate peacock and floral motifs in pure gold-toned zari, crafted for auspicious celebrations.',
+        ARRAY['Wedding Guest', 'Traditional & Ceremonial Wear'],
+        '[{"name": "Vermilion", "hex": "#E34234"}, {"name": "Gold", "hex": "#D4AF37"}]'::jsonb,
+        110,
+        'standalone',
         NOW() - INTERVAL '12 days'
     ),
     (
@@ -339,6 +439,10 @@ VALUES
         19200.00,
         'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/royal_occasion_dress.jpg',
         'Modern cocktail gown woven with traditional gold-thread Surat brocade, complete with a structured silhouette and concealed pockets.',
+        ARRAY['Party & Special Occasions', 'Wedding Guest'],
+        '[{"name": "Brocade Gold", "hex": "#CFB53B"}, {"name": "Obsidian", "hex": "#1B1B1B"}]'::jsonb,
+        155,
+        'standalone',
         NOW() - INTERVAL '8 days'
     ),
     (
@@ -348,6 +452,10 @@ VALUES
         21800.00,
         'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/banarasi_silk_saree.jpg',
         'Glimmering metallic gold tissue saree interwoven with fine silk threads, paired with an embellished running blouse piece.',
+        ARRAY['Traditional & Ceremonial Wear', 'Festive Edit'],
+        '[{"name": "Tissue Gold", "hex": "#E6CA65"}, {"name": "Silver Rose", "hex": "#C4A482"}]'::jsonb,
+        135,
+        'standalone',
         NOW() - INTERVAL '5 days'
     ),
     (
@@ -357,6 +465,10 @@ VALUES
         38000.00,
         'https://slovsjusigggadxxkgcs.supabase.co/storage/v1/object/public/items/items/saree_model_hero.jpg',
         'Opulent crimson bridal silhouette featuring intensive hand-embroidered dabka, sitara, and gota patti craftsmanship.',
+        ARRAY['Traditional & Ceremonial Wear', 'Wedding Guest'],
+        '[{"name": "Crimson Red", "hex": "#990000"}]'::jsonb,
+        85,
+        'standalone',
         NOW() - INTERVAL '2 days'
     );
 

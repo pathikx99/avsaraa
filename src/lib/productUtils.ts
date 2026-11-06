@@ -23,6 +23,55 @@ export function extractMetaFromDescription(description?: string): ExtractedMeta 
 }
 
 /**
+ * Known local image assets stored directly in /public/images/
+ */
+const LOCAL_IMAGE_FILES = new Set([
+  "account_hero.jpg",
+  "avsaraa-logo.png",
+  "avsaraa_wordmark.png",
+  "banarasi_silk_saree.jpg",
+  "botanical_flowers.jpg",
+  "desktop_hero_cinematic_1.jpg",
+  "desktop_hero_cinematic_2.jpg",
+  "desktop_hero_cinematic_3.jpg",
+  "festive_chanderi_dress.jpg",
+  "handloom_silk_saree.jpg",
+  "occasion_everyday.jpg",
+  "occasion_festive.jpg",
+  "occasion_haldi.jpg",
+  "occasion_party.jpg",
+  "occasion_traditional.jpg",
+  "occasion_wedding.jpg",
+  "product_dupatta_under1299.jpg",
+  "product_kurta_under1299.jpg",
+  "product_kurti_under1299.jpg",
+  "product_suit_under1299.jpg",
+  "royal_occasion_dress.jpg",
+  "royal_organza_saree.jpg",
+  "saree_model_hero.jpg",
+]);
+
+/**
+ * Resolves remote Supabase storage image URLs to high-speed local assets if present,
+ * preventing upstream network timeouts (504s).
+ */
+export function resolveProductImage(url?: string): string {
+  if (!url) return "/images/banarasi_silk_saree.jpg";
+  if (url.startsWith("/")) return url;
+
+  try {
+    const filename = url.split("/").pop()?.split("?")[0] || "";
+    if (filename && LOCAL_IMAGE_FILES.has(filename)) {
+      return `/images/${filename}`;
+    }
+  } catch {
+    // fallback to original url
+  }
+
+  return url;
+}
+
+/**
  * Returns clean user-facing description text without internal metadata comments.
  */
 export function cleanDescription(description?: string): string {
@@ -43,10 +92,14 @@ export function normalizeProduct(raw: Product): Product {
       ? raw.occasion_tags
       : meta.occasion_tags || [];
 
-  const color_variants =
+  const color_variants = (
     Array.isArray(raw.color_variants) && raw.color_variants.length > 0
       ? raw.color_variants
-      : meta.color_variants || [];
+      : meta.color_variants || []
+  ).map((v) => ({
+    ...v,
+    image_url: v.image_url ? resolveProductImage(v.image_url) : undefined,
+  }));
 
   const sales_count =
     typeof raw.sales_count === "number" && raw.sales_count > 0
@@ -59,6 +112,7 @@ export function normalizeProduct(raw: Product): Product {
 
   return {
     ...raw,
+    image_url: resolveProductImage(raw.image_url),
     occasion_tags,
     color_variants,
     sales_count,

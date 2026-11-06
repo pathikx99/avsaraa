@@ -271,6 +271,10 @@ The luxury handloom and couture inventory catalog.
 | `description` | `TEXT` | Nullable | Weave, zari, and silhouette details |
 | `user_id` | `UUID` | `REFERENCES auth.users(id) ON DELETE SET NULL` | Creator ID |
 | `created_at` | `TIMESTAMPTZ` | `DEFAULT TIMEZONE('utc', NOW()) NOT NULL` | Inventory addition date |
+| `occasion_tags` | `TEXT[]` | `DEFAULT '{}'` | Occasion tags for curated filters |
+| `color_variants`| `JSONB` | `DEFAULT '[]'` | Color variant swatches array |
+| `sales_count` | `INTEGER` | `DEFAULT 0` | Sales volume ranking for bestsellers |
+| `product_type` | `TEXT` | `DEFAULT 'standalone' CHECK IN ('standalone', 'top', 'bottom', 'set')` | Combination classification |
 
 > [!NOTE]
 > **RLS Policies**: Anyone (including public visitors) can SELECT (`true`). Only Super Admin can INSERT, UPDATE, or DELETE (`public.is_admin()`).

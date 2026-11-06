@@ -1153,11 +1153,10 @@ a {
   inset: 0;
   background: linear-gradient(
     90deg,
-    rgba(250, 247, 242, 0.96) 0%,
-    rgba(250, 247, 242, 0.88) 34%,
-    rgba(250, 247, 242, 0.52) 54%,
-    rgba(250, 247, 242, 0.12) 72%,
-    transparent 100%
+    rgba(250, 247, 242, 0.45) 0%,
+    rgba(250, 247, 242, 0.28) 28%,
+    rgba(250, 247, 242, 0.08) 48%,
+    transparent 65%
   );
   pointer-events: none;
   z-index: 2;
@@ -1182,6 +1181,7 @@ a {
   font-weight: 600;
   color: #543927;
   margin-bottom: 10px;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.75);
 }
 
 .hero-arch-title {
@@ -1192,6 +1192,7 @@ a {
   font-weight: 500;
   margin: 0;
   letter-spacing: -0.015em;
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.7);
 }
 
 .hero-arch-script {
@@ -1218,6 +1219,7 @@ a {
   line-height: 1.55;
   margin: 12px 0 18px 0;
   max-width: 200px;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.75);
 }
 
 .hero-arch-cta-btn {
@@ -1347,11 +1349,11 @@ a {
   inset: 0;
   background: linear-gradient(
     90deg,
-    rgba(250, 247, 242, 0.96) 0%,
-    rgba(250, 247, 242, 0.90) 28%,
-    rgba(250, 247, 242, 0.55) 45%,
-    rgba(250, 247, 242, 0.12) 64%,
-    transparent 80%
+    rgba(250, 247, 242, 0.82) 0%,
+    rgba(250, 247, 242, 0.65) 28%,
+    rgba(250, 247, 242, 0.28) 45%,
+    rgba(250, 247, 242, 0.06) 62%,
+    transparent 78%
   );
   pointer-events: none;
 }
@@ -2605,18 +2607,261 @@ a {
   transform: translateX(6px);
 }
 
-/* 2. Price Edit Grid */
-.price-edit-products-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+/* 2. The ₹1,299 Edit Clean Luxury Box */
+.price-edit-section {
+  position: relative;
+  background-color: #FAF7F2;
+  padding: 40px 16px 48px 16px;
+  border-bottom: 1px solid #E6DACF;
 }
 
 @media (min-width: 900px) {
-  .price-edit-products-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
+  .price-edit-section {
+    padding: 56px 24px 64px 24px;
   }
+}
+
+.price-edit-container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Luxury card box container */
+.price-edit-box-card {
+  display: block;
+  position: relative;
+  text-decoration: none;
+  background-color: #FAF7F2;
+  border: 1px solid rgba(197, 160, 89, 0.45);
+  box-shadow: 0 0 0 3px #FAF7F2, 0 0 0 4.5px rgba(197, 160, 89, 0.28), 0 16px 36px -10px rgba(38, 27, 19, 0.1);
+  border-radius: 14px;
+  padding: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+}
+
+@media (min-width: 768px) {
+  .price-edit-box-card {
+    padding: 14px;
+    border-radius: 16px;
+  }
+}
+
+.price-edit-box-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 3px #FAF7F2, 0 0 0 5px rgba(197, 160, 89, 0.45), 0 24px 50px -12px rgba(38, 27, 19, 0.16);
+  border-color: rgba(197, 160, 89, 0.7);
+}
+
+/* Gilded corner filigrees */
+.price-edit-corner {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  border-color: #C5A059;
+  border-style: solid;
+  opacity: 0.75;
+  z-index: 5;
+  transition: opacity 0.3s ease;
+}
+
+.price-edit-box-card:hover .price-edit-corner {
+  opacity: 1;
+}
+
+.price-edit-corner.top-left {
+  top: 5px;
+  left: 5px;
+  border-width: 1.5px 0 0 1.5px;
+}
+
+.price-edit-corner.top-right {
+  top: 5px;
+  right: 5px;
+  border-width: 1.5px 1.5px 0 0;
+}
+
+.price-edit-corner.bottom-left {
+  bottom: 5px;
+  left: 5px;
+  border-width: 0 0 1.5px 1.5px;
+}
+
+.price-edit-corner.bottom-right {
+  bottom: 5px;
+  right: 5px;
+  border-width: 0 1.5px 1.5px 0;
+}
+
+/* Inner layout */
+.price-edit-box-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .price-edit-box-inner {
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 32px;
+  }
+}
+
+/* Image column / window */
+.price-edit-image-col {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .price-edit-image-col {
+    width: 48%;
+    flex-shrink: 0;
+  }
+}
+
+.price-edit-image-window {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(197, 160, 89, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+@media (min-width: 768px) {
+  .price-edit-image-window {
+    height: 320px;
+    border-radius: 12px;
+  }
+}
+
+.price-edit-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.price-edit-box-card:hover .price-edit-img {
+  transform: scale(1.04);
+}
+
+/* Floating Price Tag */
+.price-edit-floating-tag {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(38, 27, 19, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #FAF7F2;
+  border: 1px solid rgba(197, 160, 89, 0.6);
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Content column */
+.price-edit-content-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4px 10px 10px 10px;
+  flex: 1;
+}
+
+@media (min-width: 768px) {
+  .price-edit-content-col {
+    padding: 24px 16px 24px 32px;
+  }
+}
+
+.price-edit-badge {
+  display: inline-flex;
+  align-items: center;
+  background-color: rgba(30, 94, 58, 0.08);
+  border: 1px solid rgba(30, 94, 58, 0.25);
+  color: #1E5E3A;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.price-edit-title {
+  font-family: var(--font-serif), var(--font-cormorant), Georgia, serif;
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 500;
+  color: #261B13;
+  line-height: 1.1;
+  margin: 0 0 10px 0;
+  letter-spacing: -0.015em;
+}
+
+.price-edit-subtitle {
+  font-size: 13.5px;
+  color: #6E5B4E;
+  line-height: 1.5;
+  margin: 0 0 20px 0;
+  max-width: 440px;
+}
+
+@media (min-width: 768px) {
+  .price-edit-subtitle {
+    font-size: 14.5px;
+    margin-bottom: 24px;
+  }
+}
+
+/* CTA Button */
+.price-edit-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #322115 0%, #22150D 100%);
+  color: #FAF7F2;
+  padding: 12px 24px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  border: 1px solid rgba(197, 160, 89, 0.4);
+  box-shadow: 0 4px 16px rgba(45, 29, 18, 0.25);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.price-edit-box-card:hover .price-edit-cta-btn {
+  background: linear-gradient(135deg, #24160E 0%, #150C07 100%);
+  border-color: rgba(197, 160, 89, 0.75);
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 20px rgba(45, 29, 18, 0.35), 0 0 12px rgba(197, 160, 89, 0.2);
+}
+
+.price-edit-box-card:hover .price-edit-cta-arrow {
+  transform: translateX(4px);
+}
+
+.price-edit-cta-arrow {
+  font-size: 13px;
+  transition: transform 0.25s ease;
 }
 
 /* 3. Product Carousel Track */
@@ -2668,12 +2913,70 @@ a {
   }
 }
 
+/* Quick Add Button beside Price */
+.product-card-quick-add-btn:hover {
+  background: linear-gradient(135deg, #1A110B 0%, #0D0704 100%) !important;
+  border-color: rgba(197, 160, 89, 0.75) !important;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 14px rgba(38, 27, 19, 0.28) !important;
+}
+
+.product-card-quick-add-btn:active {
+  transform: scale(0.95);
+}
+
 /* 5. Mobile Safe Area Spacing for Sticky Bottom Nav */
 @media (max-width: 899px) {
   body {
     padding-bottom: calc(68px + env(safe-area-inset-bottom, 12px));
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   6. AVSARAA MOBILE & EDITORIAL PRODUCT DETAIL PAGE
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (min-width: 900px) {
+  .product-layout-grid {
+    display: grid !important;
+    grid-template-columns: 1.15fr 1fr !important;
+    gap: 48px !important;
+    align-items: start !important;
+    padding: 32px 24px 60px 24px !important;
+  }
+
+  .product-gallery-section {
+    position: sticky !important;
+    top: 84px !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E8DED3 !important;
+    box-shadow: 0 10px 30px -10px rgba(38, 27, 19, 0.08) !important;
+  }
+
+  .product-main-image-frame {
+    aspect-ratio: 4 / 5 !important;
+    border-radius: 16px 16px 0 0 !important;
+  }
+
+  .product-mobile-sticky-bar {
+    display: none !important;
+  }
+
+  .product-info-section {
+    padding: 0 !important;
+  }
+}
+
+.product-mobile-sticky-bar {
+  box-shadow: 0 -4px 20px rgba(38, 27, 19, 0.12) !important;
+}
+
+.product-thumbnail-row::-webkit-scrollbar {
+  display: none;
+}
+
 
 
 

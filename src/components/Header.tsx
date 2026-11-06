@@ -49,6 +49,7 @@ function HeaderInner() {
   const isProductsActive = (pathname.startsWith("/products") || pathname.startsWith("/collection")) && (!currentCategory || currentCategory === "ALL");
   const isSareesActive = (pathname.startsWith("/products") || pathname.startsWith("/collection")) && currentCategory?.toLowerCase().includes("saree");
   const isDressesActive = (pathname.startsWith("/products") || pathname.startsWith("/collection")) && currentCategory?.toLowerCase().includes("dress");
+  const isUnder1299Active = pathname === "/under-1299";
   const isStoryActive = pathname === "/about";
 
   useEffect(() => {
@@ -181,8 +182,8 @@ function HeaderInner() {
               <Link href="/products?category=Dresses" className={`luxury-nav-link ${isDressesActive ? "active" : ""}`}>
                 Dresses
               </Link>
-              <Link href="/products/styles" className="luxury-nav-link">
-                Styles
+              <Link href="/under-1299" className={`luxury-nav-link ${isUnder1299Active ? "active" : ""}`}>
+                Under ₹1,299
               </Link>
               <Link href="/about" className={`luxury-nav-link ${isStoryActive ? "active" : ""}`}>
                 Our Story

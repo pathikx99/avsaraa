@@ -39,6 +39,13 @@ export default function MobileBottomNav() {
   const isProfile = pathname.startsWith("/account");
   const isAuth = pathname === "/login" || pathname === "/register";
 
+  // Hide mobile bottom navigation bar on dedicated product detail pages (/products/[id])
+  // so the bespoke product sticky purchase bar has full focus without double-stacked bars
+  const isProductDetailPage = pathname.startsWith("/products/") && pathname !== "/products";
+  if (isProductDetailPage) {
+    return null;
+  }
+
   return (
     <nav
       className="mobile-only mobile-bottom-bar"

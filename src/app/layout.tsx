@@ -25,6 +25,7 @@ const alexBrush = Alex_Brush({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://avsaraa.com"),
   title: "AVSARAA | Handcrafted Sarees, Ethnic Wear & Clothes Online | Surat, India",
   description: "Explore handcrafted sarees, ethnic dresses, and occasion wear from Surat's textile heart. Buy authentic Indian clothes online with nationwide delivery across India.",
   icons: {
@@ -32,6 +33,7 @@ export const metadata: Metadata = {
   },
 };
 
+import { Suspense } from "react";
 import { CartProvider } from "@/context/CartContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import CartDrawer from "@/components/CartDrawer";
@@ -55,7 +57,9 @@ export default function RootLayout({
             {children}
             <CartDrawer />
             <AuthRequiredModal />
-            <MobileBottomNav />
+            <Suspense fallback={null}>
+              <MobileBottomNav />
+            </Suspense>
           </WishlistProvider>
         </CartProvider>
         <Analytics />

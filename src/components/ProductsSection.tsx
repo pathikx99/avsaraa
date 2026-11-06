@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Product, ProductCategory } from "@/types/product";
-import { normalizeProducts, productMatchesOccasion, getOccasionTitleBySlug, formatINR } from "@/lib/productUtils";
+import { normalizeProducts, productMatchesOccasion, getOccasionTitleBySlug, formatINR, resolveProductImage } from "@/lib/productUtils";
 import { ShoppingBagIcon, HeartIcon } from "./Icons";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
@@ -604,7 +604,7 @@ export default function ProductsSection({
                   }}
                 >
                   <Image
-                    src={product.image_url || DEFAULT_FALLBACK_IMAGE}
+                    src={resolveProductImage(product.image_url) || DEFAULT_FALLBACK_IMAGE}
                     alt={product.name}
                     fill
                     sizes="(min-width: 900px) 25vw, 50vw"
@@ -709,8 +709,8 @@ export default function ProductsSection({
                     flex: 1,
                   }}
                 >
-                  <h3
-                    onClick={() => setSelectedProduct(product)}
+                  <Link
+                    href={`/products/${product.id}`}
                     className="product-card-title"
                     style={{
                       fontFamily: "var(--font-serif), Georgia, serif",
@@ -719,11 +719,12 @@ export default function ProductsSection({
                       color: "#261B13",
                       marginBottom: "6px",
                       lineHeight: 1.3,
-                      cursor: "pointer",
+                      textDecoration: "none",
+                      display: "block",
                     }}
                   >
                     {product.name}
-                  </h3>
+                  </Link>
 
                   {product.description && (
                     <p
@@ -904,7 +905,7 @@ export default function ProductsSection({
               }}
             >
               <Image
-                src={selectedProduct.image_url || DEFAULT_FALLBACK_IMAGE}
+                src={resolveProductImage(selectedProduct.image_url) || DEFAULT_FALLBACK_IMAGE}
                 alt={selectedProduct.name}
                 fill
                 sizes="380px"
@@ -1017,6 +1018,28 @@ export default function ProductsSection({
                   <ShoppingBagIcon size={16} color="#FAF7F2" />
                   <span>Add to Shopping Bag</span>
                 </button>
+
+                <Link
+                  href={`/products/${selectedProduct.id}`}
+                  onClick={() => setSelectedProduct(null)}
+                  className="avsaraa-btn-outline"
+                  style={{
+                    height: "44px",
+                    fontSize: "12.5px",
+                    backgroundColor: "#FAF7F2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    textDecoration: "none",
+                    borderRadius: "22px",
+                    border: "1.5px solid #261B13",
+                    color: "#261B13",
+                    fontWeight: 600,
+                  }}
+                >
+                  <span>View Complete Details &amp; Size Guide →</span>
+                </Link>
 
                 <Link
                   href={`/contact?inquire=${encodeURIComponent(selectedProduct.name)}`}

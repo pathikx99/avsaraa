@@ -1,4 +1,10 @@
-export type ProductCategory = "Sarees" | "Dresses" | "New Arrivals" | "Occasion Wear";
+export type ProductCategory =
+  | "Sarees"
+  | "Dresses"
+  | "Co-ords"
+  | "Men's Wear"
+  | "New Arrivals"
+  | "Occasion Wear";
 
 export type OccasionType =
   | "Everyday Essentials"

@@ -7,7 +7,6 @@ import HeroBanner from "@/components/home/HeroBanner";
 import ShopByOccasion from "@/components/home/ShopByOccasion";
 import PriceEdit from "@/components/home/PriceEdit";
 import NewArrivals from "@/components/home/NewArrivals";
-import AvsaraaStyle from "@/components/home/AvsaraaStyle";
 import Bestsellers from "@/components/home/Bestsellers";
 import ShoppingBenefits from "@/components/home/ShoppingBenefits";
 
@@ -38,13 +37,10 @@ export default function HomePage() {
         {/* 5. New Arrivals (Horizontal swipeable carousel on mobile) */}
         <NewArrivals />
 
-        {/* 6. AVSARAA Style (Mix & Match combinations studio link to /products/styles) */}
-        <AvsaraaStyle />
-
-        {/* 7. Our Bestsellers (Patron favorites & top ranked pieces) */}
+        {/* 6. Our Bestsellers (Patron favorites & top ranked pieces) */}
         <Bestsellers />
 
-        {/* 8. Shopping Benefits (Trust Strip: Free express delivery, COD, 7-day returns, keepsake box) */}
+        {/* 7. Shopping Benefits (Trust Strip: Free express delivery, COD, 7-day returns, keepsake box) */}
         <ShoppingBenefits />
       </main>
 

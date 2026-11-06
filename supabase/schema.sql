@@ -516,6 +516,10 @@ CREATE INDEX IF NOT EXISTS idx_inquiries_email ON public.contact_inquiries(email
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category);
 CREATE INDEX IF NOT EXISTS idx_products_user ON public.products(user_id);
 CREATE INDEX IF NOT EXISTS idx_products_created ON public.products(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_products_occasion_tags ON public.products USING GIN (occasion_tags);
+CREATE INDEX IF NOT EXISTS idx_products_price ON public.products (price);
+CREATE INDEX IF NOT EXISTS idx_products_sales_count ON public.products (sales_count DESC);
+CREATE INDEX IF NOT EXISTS idx_products_product_type ON public.products (product_type);
 CREATE INDEX IF NOT EXISTS idx_wishlists_user ON public.wishlists(user_id);
 CREATE INDEX IF NOT EXISTS idx_wishlists_product ON public.wishlists(product_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_product ON public.product_reviews(product_id);

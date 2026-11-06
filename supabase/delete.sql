@@ -97,9 +97,3 @@ COMMIT;
 SELECT table_name 
 FROM information_schema.tables 
 WHERE table_schema = 'public';
-
--- ==============================================================================
--- TARGETED MIGRATION: REMOVE VIDEOS FROM REVIEWS
--- Run this if you have an active database and only want to drop videos from reviews:
--- ALTER TABLE public.product_reviews DROP COLUMN IF EXISTS videos;
--- ==============================================================================

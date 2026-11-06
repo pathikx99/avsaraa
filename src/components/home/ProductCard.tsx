@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Product } from "@/types/product";
-import { formatINR } from "@/lib/productUtils";
+import { formatINR, resolveProductImage } from "@/lib/productUtils";
 import { HeartIcon, ShoppingBagIcon } from "@/components/Icons";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
@@ -30,10 +30,10 @@ export default function ProductCard({
   const [isAdded, setIsAdded] = useState(false);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgSrc, setImgSrc] = useState(product.image_url || DEFAULT_IMAGE);
+  const [imgSrc, setImgSrc] = useState(resolveProductImage(product.image_url) || DEFAULT_IMAGE);
 
   useEffect(() => {
-    setImgSrc(product.image_url || DEFAULT_IMAGE);
+    setImgSrc(resolveProductImage(product.image_url) || DEFAULT_IMAGE);
   }, [product.image_url]);
 
   const isFavorited = isInWishlist(product.id);
@@ -42,7 +42,7 @@ export default function ProductCard({
     if (onSelect) {
       onSelect(product);
     } else {
-      router.push(`/products?search=${encodeURIComponent(product.name)}`);
+      router.push(`/products/${product.id}`);
     }
   };
 
@@ -168,59 +168,12 @@ export default function ProductCard({
         >
           <HeartIcon size={18} fill={isFavorited ? "currentColor" : "none"} stroke="currentColor" />
         </button>
-
-        {/* Quick Add Overlay on Hover (Desktop) / Action Bar */}
-        <div
-          className="product-card-quick-add"
-          style={{
-            position: "absolute",
-            bottom: "10px",
-            left: "10px",
-            right: "10px",
-            zIndex: 3,
-          }}
-        >
-          <button
-            type="button"
-            onClick={handleQuickAdd}
-            style={{
-              width: "100%",
-              padding: "10px 14px",
-              borderRadius: "8px",
-              backgroundColor: isAdded ? "#1E5E3A" : "rgba(38, 27, 19, 0.92)",
-              backdropFilter: "blur(6px)",
-              WebkitBackdropFilter: "blur(6px)",
-              color: "#FAF7F2",
-              border: "1px solid rgba(197, 160, 89, 0.25)",
-              fontSize: "11px",
-              fontWeight: 600,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              transition: "all 0.2s ease",
-              boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
-            }}
-          >
-            {isAdded ? (
-              <span>✓ Added to Bag</span>
-            ) : (
-              <>
-                <ShoppingBagIcon size={14} />
-                <span>Quick Add</span>
-              </>
-            )}
-          </button>
-        </div>
       </div>
 
       {/* Product Information */}
       <div
         style={{
-          padding: "16px 14px 14px 14px",
+          padding: "14px 14px 14px 14px",
           display: "flex",
           flexDirection: "column",
           flex: 1,
@@ -275,7 +228,7 @@ export default function ProductCard({
             fontWeight: 500,
             color: "#261B13",
             lineHeight: 1.35,
-            marginBottom: "6px",
+            marginBottom: "8px",
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
@@ -286,34 +239,82 @@ export default function ProductCard({
           {product.name}
         </h3>
 
-        {/* Pricing */}
-        <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "auto" }}>
-          <span
-            style={{
-              fontSize: "16px",
-              fontWeight: 600,
-              color: "#261B13",
-              fontFamily: "var(--font-sans)",
-            }}
-          >
-            {formatINR(product.price)}
-          </span>
-          {product.price <= 1299 && (
+        {/* Pricing & Quick Add Row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "8px",
+            marginTop: "auto",
+            paddingTop: "6px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "baseline", gap: "6px", flexWrap: "wrap", minWidth: 0 }}>
             <span
               style={{
-                fontSize: "10px",
+                fontSize: "16px",
                 fontWeight: 600,
-                color: "#1E5E3A",
-                backgroundColor: "rgba(30, 94, 58, 0.08)",
-                padding: "2px 6px",
-                borderRadius: "4px",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
+                color: "#261B13",
+                fontFamily: "var(--font-sans)",
+                lineHeight: 1.2,
               }}
             >
-              Up to ₹1,299
+              {formatINR(product.price)}
             </span>
-          )}
+            {product.price <= 1299 && (
+              <span
+                style={{
+                  fontSize: "9.5px",
+                  fontWeight: 600,
+                  color: "#1E5E3A",
+                  backgroundColor: "rgba(30, 94, 58, 0.08)",
+                  padding: "2px 5px",
+                  borderRadius: "4px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Up to ₹1,299
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleQuickAdd}
+            aria-label={isAdded ? "Added to Bag" : `Quick add ${product.name} to bag`}
+            className="product-card-quick-add-btn btn-shine"
+            style={{
+              padding: "7px 11px",
+              borderRadius: "6px",
+              backgroundColor: isAdded ? "#1E5E3A" : "#261B13",
+              color: "#FAF7F2",
+              border: "1px solid rgba(197, 160, 89, 0.35)",
+              fontSize: "10.5px",
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "5px",
+              transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+              boxShadow: "0 2px 8px rgba(38,27,19,0.14)",
+              flexShrink: 0,
+            }}
+          >
+            {isAdded ? (
+              <span>✓ Added</span>
+            ) : (
+              <>
+                <ShoppingBagIcon size={13} />
+                <span>Add</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

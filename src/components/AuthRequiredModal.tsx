@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 
 import { HeartIcon } from "./Icons";
+import { resolveProductImage } from "@/lib/productUtils";
 
 export default function AuthRequiredModal() {
   const { isAuthModalOpen, closeAuthModal, pendingProduct, authModalReason } = useCart();
@@ -149,7 +150,7 @@ export default function AuthRequiredModal() {
               }}
             >
               <Image
-                src={pendingProduct.image_url || "/images/banarasi_silk_saree.jpg"}
+                src={resolveProductImage(pendingProduct.image_url) || "/images/banarasi_silk_saree.jpg"}
                 alt={pendingProduct.name}
                 fill
                 sizes="52px"

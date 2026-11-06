@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { ShoppingBagIcon } from "./Icons";
+import { resolveProductImage } from "@/lib/productUtils";
 
 export default function CartDrawer() {
   const {
@@ -224,7 +225,7 @@ export default function CartDrawer() {
                   }}
                 >
                   <Image
-                    src={item.product.image_url || "/images/banarasi_silk_saree.jpg"}
+                    src={resolveProductImage(item.product.image_url) || "/images/banarasi_silk_saree.jpg"}
                     alt={item.product.name}
                     fill
                     sizes="80px"
