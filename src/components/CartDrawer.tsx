@@ -423,7 +423,7 @@ export default function CartDrawer() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <Link
-                href="/contact"
+                href="/checkout"
                 onClick={closeCart}
                 className="avsaraa-btn-primary btn-shine"
                 style={{

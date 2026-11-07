@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Product } from "@/types/product";
@@ -30,11 +30,8 @@ export default function ProductCard({
   const [isAdded, setIsAdded] = useState(false);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgSrc, setImgSrc] = useState(resolveProductImage(product.image_url) || DEFAULT_IMAGE);
-
-  useEffect(() => {
-    setImgSrc(resolveProductImage(product.image_url) || DEFAULT_IMAGE);
-  }, [product.image_url]);
+  const [imgError, setImgError] = useState(false);
+  const imgSrc = imgError ? DEFAULT_IMAGE : (resolveProductImage(product.image_url) || DEFAULT_IMAGE);
 
   const isFavorited = isInWishlist(product.id);
 
@@ -108,7 +105,7 @@ export default function ProductCard({
           }}
           onLoad={() => setImgLoaded(true)}
           onError={() => {
-            setImgSrc(DEFAULT_IMAGE);
+            setImgError(true);
             setImgLoaded(true);
           }}
         />

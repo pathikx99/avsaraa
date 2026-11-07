@@ -1,5 +1,5 @@
 import { Product, ProductCategory, ColorVariant } from "@/types/product";
-import { resolveProductImage, formatINR } from "@/lib/productUtils";
+import { resolveProductImage } from "@/lib/productUtils";
 import { supabase } from "@/lib/supabaseClient";
 
 export interface DetailedProduct extends Product {

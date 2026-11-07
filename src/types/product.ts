@@ -22,6 +22,12 @@ export interface ColorVariant {
   image_url?: string;
 }
 
+export interface ProductHighlight {
+  icon?: string;
+  title: string;
+  description?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -36,6 +42,14 @@ export interface Product {
   color_variants?: ColorVariant[];
   sales_count?: number;
   product_type?: ProductType;
+  gallery_images?: string[];
+  available_sizes?: string[];
+  specifications?: Record<string, string>;
+  stock_count?: number;
+  mrp?: number;
+  discount_percent?: number;
+  video_url?: string;
+  highlights?: Array<string | ProductHighlight>;
 }
 
 export interface OccasionCategory {

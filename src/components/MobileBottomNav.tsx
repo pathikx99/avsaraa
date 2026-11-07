@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/context/CartContext";
@@ -9,15 +9,16 @@ import { ShoppingBagIcon, HeartIcon, UserIcon } from "./Icons";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
+const emptySubscribe = () => () => {};
+
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const { totalItems, openCart } = useCart();
   const { totalWishlist } = useWishlist();
   const [user, setUser] = useState<User | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
 
   useEffect(() => {
-    setMounted(true);
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
     });

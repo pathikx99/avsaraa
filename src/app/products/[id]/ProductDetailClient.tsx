@@ -262,7 +262,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
     const success = addToCart(cartProduct, quantity);
     if (success) {
-      openCart();
+      router.push("/checkout");
     }
   };
 

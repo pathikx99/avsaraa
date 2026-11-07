@@ -22,9 +22,14 @@ import {
   MailIcon,
   CameraIcon,
   StarIcon,
+  DeliveryVanIcon,
+  TagIcon,
 } from "@/components/Icons";
 import { AdminUser, CustomerProfile, ContactInquiry, NewsletterSubscriber, ProductReview } from "@/types/admin";
 import { Product, ProductCategory } from "@/types/product";
+import { Order } from "@/types/order";
+import OrdersAdminTab from "@/components/admin/OrdersAdminTab";
+import CouponsAdminTab from "@/components/admin/CouponsAdminTab";
 import { ADMIN_EMAIL, isSuperAdminUser } from "@/lib/adminConstants";
 
 const PRESET_PRODUCT_IMAGES = [
@@ -59,10 +64,10 @@ const DEFAULT_SUPER_ADMIN: AdminUser = {
 };
 
 export default function AdminDashboardPage() {
-  // Navigation tabs - Customer Accounts is the primary view for Auth & Admin management
+  // Navigation tabs - Orders & Fulfillment, Customer Accounts, etc.
   const [activeTab, setActiveTab] = useState<
-    "customers" | "reviews" | "super_admin" | "sql_guide" | "products" | "inquiries"
-  >("customers");
+    "orders" | "customers" | "reviews" | "super_admin" | "sql_guide" | "products" | "inquiries" | "coupons"
+  >("orders");
 
   // Authentication & Security State
   const [sessionUser, setSessionUser] = useState<User | null>(null);
@@ -80,6 +85,7 @@ export default function AdminDashboardPage() {
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [inquiries, setInquiries] = useState<ContactInquiry[]>([]);
   const [subscribers, setSubscribers] = useState<NewsletterSubscriber[]>([]);
+  const [adminOrders, setAdminOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
 
@@ -226,6 +232,15 @@ export default function AdminDashboardPage() {
           setReviews(reviewsJson.reviews);
         }
       }
+
+      // 5. Fetch Orders & Fulfillment
+      const ordersRes = await fetch("/api/admin/orders", { headers });
+      if (ordersRes.ok) {
+        const ordersJson = await ordersRes.json();
+        if (ordersJson.success && ordersJson.orders) {
+          setAdminOrders(ordersJson.orders);
+        }
+      }
     } catch (err) {
       console.warn("API load error:", err);
     } finally {
@@ -254,11 +269,12 @@ export default function AdminDashboardPage() {
             // Fetch data securely for authenticated admin
             const headers = await getAuthHeaders();
 
-            const [usersRes, productsRes, inqRes, reviewsRes] = await Promise.all([
+            const [usersRes, productsRes, inqRes, reviewsRes, ordersRes] = await Promise.all([
               fetch("/api/admin/users", { headers }),
               fetch("/api/admin/products", { headers }),
               fetch("/api/admin/inquiries", { headers }),
               fetch("/api/admin/reviews", { headers }),
+              fetch("/api/admin/orders", { headers }),
             ]);
 
             if (!active) return;
@@ -294,6 +310,13 @@ export default function AdminDashboardPage() {
               const reviewsJson = await reviewsRes.json();
               if (reviewsJson.success && reviewsJson.reviews) {
                 setReviews(reviewsJson.reviews);
+              }
+            }
+
+            if (ordersRes.ok) {
+              const ordersJson = await ordersRes.json();
+              if (ordersJson.success && ordersJson.orders) {
+                setAdminOrders(ordersJson.orders);
               }
             }
           }
@@ -1563,6 +1586,50 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
             </div>
           </div>
 
+          {/* Card: Orders & Fulfillment */}
+          <div
+            onClick={() => setActiveTab("orders")}
+            style={{
+              backgroundColor: activeTab === "orders" ? "#F9F6F0" : "#FFFFFF",
+              border: activeTab === "orders" ? "2px solid #866951" : "1px solid #E8DED3",
+              borderRadius: "14px",
+              padding: "20px",
+              boxShadow: "0 4px 16px rgba(38,27,19,0.03)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              cursor: "pointer",
+            }}
+          >
+            <div>
+              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 600 }}>
+                Orders & Fulfillment
+              </span>
+              <div style={{ fontSize: "26px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
+                {adminOrders.length}
+              </div>
+              <span style={{ fontSize: "11px", color: adminOrders.some(o => o.order_status === "Exchange Requested") ? "#d97706" : "#28a745", fontWeight: 600 }}>
+                {adminOrders.some(o => o.order_status === "Exchange Requested")
+                  ? `${adminOrders.filter(o => o.order_status === "Exchange Requested").length} Exchange Pending`
+                  : "Active Logistics Pipeline"}
+              </span>
+            </div>
+            <div
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "12px",
+                backgroundColor: "#F7F2EE",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#866951",
+              }}
+            >
+              <DeliveryVanIcon size={24} color="#866951" />
+            </div>
+          </div>
+
           {/* Card 2: Products */}
           <div
             onClick={() => setActiveTab("products")}
@@ -1703,6 +1770,52 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
           }}
         >
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {/* Tab: Orders & Fulfillment */}
+            <button
+              onClick={() => {
+                setActiveTab("orders");
+                setSearchQuery("");
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "12px 18px",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: activeTab === "orders" ? "#261B13" : "#866951",
+                borderBottom: activeTab === "orders" ? "3px solid #866951" : "3px solid transparent",
+                marginBottom: "-2px",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <ShoppingBagIcon size={18} color={activeTab === "orders" ? "#866951" : "#AC9885"} />
+              <span>Orders & Fulfillment ({adminOrders.length})</span>
+            </button>
+
+            {/* Tab: Promotional Coupons */}
+            <button
+              onClick={() => {
+                setActiveTab("coupons");
+                setSearchQuery("");
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "12px 18px",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: activeTab === "coupons" ? "#261B13" : "#866951",
+                borderBottom: activeTab === "coupons" ? "3px solid #866951" : "3px solid transparent",
+                marginBottom: "-2px",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <TagIcon size={18} color={activeTab === "coupons" ? "#866951" : "#AC9885"} />
+              <span>Promotions & Coupons</span>
+            </button>
+
             {/* Tab 1: Customer Accounts */}
             <button
               onClick={() => {
@@ -1880,7 +1993,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
         </div>
 
         {/* Search & Filter Toolbar */}
-        {activeTab !== "super_admin" && activeTab !== "sql_guide" && (
+        {activeTab !== "orders" && activeTab !== "coupons" && activeTab !== "super_admin" && activeTab !== "sql_guide" && (
           <div
             style={{
               backgroundColor: "#FFFFFF",
@@ -1969,6 +2082,28 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               )}
             </div>
           </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* VIEW 0: ORDERS & FULFILLMENT MANAGEMENT                           */}
+        {/* ================================================================= */}
+        {activeTab === "orders" && (
+          <OrdersAdminTab
+            orders={adminOrders}
+            onRefresh={fetchData}
+            showToast={(text, type) => showToast(text, type)}
+            getAuthHeaders={getAuthHeaders}
+          />
+        )}
+
+        {/* ================================================================= */}
+        {/* VIEW 0B: PROMOTIONAL COUPONS & OFFERS                             */}
+        {/* ================================================================= */}
+        {activeTab === "coupons" && (
+          <CouponsAdminTab
+            showToast={(text, type) => showToast(text, type)}
+            getAuthHeaders={getAuthHeaders}
+          />
         )}
 
         {/* ================================================================= */}

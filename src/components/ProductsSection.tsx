@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Product, ProductCategory } from "@/types/product";
-import { normalizeProducts, productMatchesOccasion, getOccasionTitleBySlug, formatINR, resolveProductImage } from "@/lib/productUtils";
+import { normalizeProducts, productMatchesOccasion, getOccasionTitleBySlug, resolveProductImage } from "@/lib/productUtils";
 import { ShoppingBagIcon, HeartIcon } from "./Icons";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
@@ -76,32 +76,21 @@ export default function ProductsSection({
     };
   }, []);
 
-  // React to searchParams changes from navigation links across the app
-  useEffect(() => {
-    if (!searchParams) return;
-    const categoryQuery = searchParams.get("category");
-    const searchParam = searchParams.get("search");
-    const occasionParam = searchParams.get("occasion");
-    const maxPriceParam = searchParams.get("maxPrice");
-    const sortParam = searchParams.get("sort");
+  // Synchronize state when URL searchParams change
+  const currentParamsKey = searchParams ? searchParams.toString() : "";
+  const [prevParamsKey, setPrevParamsKey] = useState(currentParamsKey);
 
-    if (searchParam !== null) {
-      setSearchQuery(searchParam);
-    } else {
-      setSearchQuery("");
-    }
+  if (currentParamsKey !== prevParamsKey) {
+    setPrevParamsKey(currentParamsKey);
+    const categoryQuery = searchParams?.get("category");
+    const searchParam = searchParams?.get("search");
+    const occasionParam = searchParams?.get("occasion");
+    const maxPriceParam = searchParams?.get("maxPrice");
+    const sortParam = searchParams?.get("sort");
 
-    if (occasionParam) {
-      setActiveOccasion(occasionParam);
-    } else {
-      setActiveOccasion(null);
-    }
-
-    if (maxPriceParam && !isNaN(Number(maxPriceParam))) {
-      setActiveMaxPrice(Number(maxPriceParam));
-    } else {
-      setActiveMaxPrice(null);
-    }
+    setSearchQuery(searchParam !== null && searchParam !== undefined ? searchParam : "");
+    setActiveOccasion(occasionParam || null);
+    setActiveMaxPrice(maxPriceParam && !isNaN(Number(maxPriceParam)) ? Number(maxPriceParam) : null);
 
     if (sortParam) {
       if (["featured", "bestsellers", "newest", "price-asc", "price-desc"].includes(sortParam)) {
@@ -119,7 +108,7 @@ export default function ProductsSection({
     } else {
       setActiveCategory(initialCategory);
     }
-  }, [searchParams, initialCategory]);
+  }
 
   const categoriesList: (ProductCategory | "ALL")[] = [
     "ALL",

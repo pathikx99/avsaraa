@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Product } from "@/types/product";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
@@ -34,6 +34,9 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+const GUEST_CART_KEY = "avsaraa_guest_cart";
+const DEBOUNCE_DELAY_MS = 400;
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -43,6 +46,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // References for Debounce & Request Cancellation
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -50,25 +57,123 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, 3600);
   }, []);
 
-  // Sync user state and load persistent cart for authenticated member
+  /**
+   * Debounced Server Cart Persistence with AbortController Request Cancellation
+   * Cancels in-flight requests to eliminate out-of-order race conditions.
+   */
+  const syncServerCart = useCallback((items: CartItem[], currentUser: User | null) => {
+    if (!currentUser) return;
+
+    // Clear existing pending timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(async () => {
+      // Cancel any ongoing network request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      try {
+        await fetch("/api/customer/cart", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items }),
+          signal: controller.signal,
+        });
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") {
+          // Expected aborted request
+          return;
+        }
+        console.warn("Server cart sync note:", err);
+      }
+    }, DEBOUNCE_DELAY_MS);
+  }, []);
+
+  /**
+   * Helper to persist cart locally (localStorage) and trigger server sync
+   */
+  const persistCartLocally = useCallback(
+    (items: CartItem[], currentUser: User | null) => {
+      try {
+        if (currentUser) {
+          localStorage.setItem(`avsaraa_cart_${currentUser.id}`, JSON.stringify(items));
+          syncServerCart(items, currentUser);
+        } else {
+          localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
+        }
+      } catch (err) {
+        console.warn("Storage sync notice:", err);
+      }
+    },
+    [syncServerCart]
+  );
+
+  /**
+   * Synchronize user state, load local/server cart, and perform Guest Cart Merging
+   */
   useEffect(() => {
     let isMounted = true;
 
-    const handleUserCartLoad = (currentUser: User | null) => {
+    const handleUserCartLoad = async (currentUser: User | null) => {
       setUser(currentUser);
+
       if (currentUser) {
-        // 1. Load saved cart
-        let existingCart: CartItem[] = [];
-        const saved = localStorage.getItem(`avsaraa_cart_${currentUser.id}`);
-        if (saved) {
+        // 1. Load user's saved cart from local storage
+        let userCart: CartItem[] = [];
+        const savedUserCart = localStorage.getItem(`avsaraa_cart_${currentUser.id}`);
+        if (savedUserCart) {
           try {
-            existingCart = JSON.parse(saved);
+            userCart = JSON.parse(savedUserCart);
           } catch {
-            existingCart = [];
+            userCart = [];
           }
         }
 
-        // 2. Check if there was a pending product waiting for authentication
+        // 2. Fetch server cart if available
+        try {
+          const res = await fetch("/api/customer/cart");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && Array.isArray(data.items) && data.items.length > 0) {
+              userCart = data.items;
+            }
+          }
+        } catch {
+          // Use local userCart
+        }
+
+        // 3. Guest Cart Merging Upon Login
+        const savedGuestCart = localStorage.getItem(GUEST_CART_KEY);
+        if (savedGuestCart) {
+          try {
+            const guestItems: CartItem[] = JSON.parse(savedGuestCart);
+            if (Array.isArray(guestItems) && guestItems.length > 0) {
+              guestItems.forEach((gItem) => {
+                const existingIdx = userCart.findIndex(
+                  (uItem) => uItem.product.id === gItem.product.id
+                );
+                if (existingIdx > -1) {
+                  userCart[existingIdx].quantity += gItem.quantity;
+                } else {
+                  userCart.push(gItem);
+                }
+              });
+
+              localStorage.removeItem(GUEST_CART_KEY);
+              showToast("Your guest cart items have been merged with your account bag!");
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        // 4. Pending product from session storage
         try {
           const pendingRaw = sessionStorage.getItem("avsaraa_pending_product");
           if (pendingRaw) {
@@ -76,29 +181,39 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             sessionStorage.removeItem("avsaraa_pending_product");
             setPendingProduct(null);
 
-            const existingIndex = existingCart.findIndex(
+            const existingIndex = userCart.findIndex(
               (item) => item.product.id === pendingProd.id
             );
             if (existingIndex > -1) {
-              existingCart[existingIndex].quantity += 1;
+              userCart[existingIndex].quantity += 1;
             } else {
-              existingCart = [{ product: pendingProd, quantity: 1 }, ...existingCart];
+              userCart = [{ product: pendingProd, quantity: 1 }, ...userCart];
             }
-
-            localStorage.setItem(
-              `avsaraa_cart_${currentUser.id}`,
-              JSON.stringify(existingCart)
-            );
             showToast(`Added "${pendingProd.name}" to your shopping bag!`);
             setIsCartOpen(true);
           }
-        } catch (e) {
-          console.warn("Pending product parse note:", e);
+        } catch {
+          // ignore
         }
 
-        setCartItems(existingCart);
+        if (isMounted) {
+          setCartItems(userCart);
+          persistCartLocally(userCart, currentUser);
+        }
       } else {
-        setCartItems([]);
+        // Guest user: load from guest cart
+        let guestCart: CartItem[] = [];
+        const savedGuest = localStorage.getItem(GUEST_CART_KEY);
+        if (savedGuest) {
+          try {
+            guestCart = JSON.parse(savedGuest);
+          } catch {
+            guestCart = [];
+          }
+        }
+        if (isMounted) {
+          setCartItems(guestCart);
+        }
       }
     };
 
@@ -117,39 +232,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-  }, [showToast]);
-
-  // Persist cart whenever it changes for the logged-in user
-  const persistCart = useCallback((items: CartItem[], currentUser: User | null) => {
-    if (currentUser) {
-      try {
-        localStorage.setItem(`avsaraa_cart_${currentUser.id}`, JSON.stringify(items));
-      } catch (err) {
-        console.warn("Failed to persist cart to localStorage:", err);
-      }
-    }
-  }, []);
+  }, [persistCartLocally, showToast]);
 
   /**
-   * Add to Cart Gate:
-   * Customers can view products freely, but MUST be logged in to add to cart.
+   * Add to Cart:
+   * Instant local UI mutation with zero lag for both guests and authenticated users.
    */
   const addToCart = useCallback(
     (product: Product, quantity = 1): boolean => {
-      if (!user) {
-        // Customer is a guest / not logged in
-        setPendingProduct(product);
-        try {
-          sessionStorage.setItem("avsaraa_pending_product", JSON.stringify(product));
-        } catch {
-          // ignore storage failure
-        }
-        setIsAuthModalOpen(true);
-        showToast("Please sign in to add items to your shopping bag.");
-        return false;
-      }
-
       setCartItems((prevItems) => {
         const existingIndex = prevItems.findIndex((item) => item.product.id === product.id);
         let updated: CartItem[];
@@ -164,7 +257,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           updated = [{ product, quantity }, ...prevItems];
         }
 
-        persistCart(updated, user);
+        persistCartLocally(updated, user);
         return updated;
       });
 
@@ -172,19 +265,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setIsCartOpen(true);
       return true;
     },
-    [user, persistCart, showToast]
+    [user, persistCartLocally, showToast]
   );
 
   const removeFromCart = useCallback(
     (productId: string) => {
       setCartItems((prev) => {
         const updated = prev.filter((item) => item.product.id !== productId);
-        persistCart(updated, user);
+        persistCartLocally(updated, user);
         return updated;
       });
       showToast("Item removed from your shopping bag.");
     },
-    [user, persistCart, showToast]
+    [user, persistCartLocally, showToast]
   );
 
   const updateQuantity = useCallback(
@@ -198,20 +291,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const updated = prev.map((item) =>
           item.product.id === productId ? { ...item, quantity } : item
         );
-        persistCart(updated, user);
+        persistCartLocally(updated, user);
         return updated;
       });
     },
-    [user, persistCart, removeFromCart]
+    [user, persistCartLocally, removeFromCart]
   );
 
   const clearCart = useCallback(() => {
     setCartItems([]);
     if (user) {
       localStorage.removeItem(`avsaraa_cart_${user.id}`);
+      syncServerCart([], user);
+    } else {
+      localStorage.removeItem(GUEST_CART_KEY);
     }
     showToast("Shopping bag cleared.");
-  }, [user, showToast]);
+  }, [user, showToast, syncServerCart]);
 
   const totalItems = useMemo(() => {
     return cartItems.reduce((acc, curr) => acc + curr.quantity, 0);
@@ -222,13 +318,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [cartItems]);
 
   const openCart = useCallback(() => {
-    if (!user) {
-      setIsAuthModalOpen(true);
-      showToast("Please sign in to access your shopping bag.");
-      return;
-    }
     setIsCartOpen(true);
-  }, [user, showToast]);
+  }, []);
 
   const closeCart = useCallback(() => {
     setIsCartOpen(false);

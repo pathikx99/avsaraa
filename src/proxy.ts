@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSuperAdminUser } from "@/lib/adminConstants";
 import { getSupabaseUrl, getSupabasePublishableKey } from "@/lib/env";
+import { verifyAdminToken, ADMIN_COOKIE_NAME } from "@/lib/jwtAdmin";
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -26,29 +27,40 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  // IMPORTANT: Avoid calling auth methods between createServerClient and getUser.
-  // A simple call to getUser() triggers refresh-token rotation and sets updated cookies.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
-  // 1. Protected Route: /admin requires authenticated Super Admin session
+  // 1. Protected Route: /admin requires standalone 'admin-auth' JWT OR Super Admin session
   if (pathname.startsWith("/admin")) {
-    if (!user) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/login";
-      redirectUrl.searchParams.set("redirectTo", pathname);
-      return NextResponse.redirect(redirectUrl);
+    const adminCookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+    let isAdminJwtValid = false;
+
+    if (adminCookie) {
+      const jwtResult = await verifyAdminToken(adminCookie);
+      if (jwtResult.valid && jwtResult.payload?.role === "admin") {
+        isAdminJwtValid = true;
+      }
     }
 
-    const isSuperAdmin = isSuperAdminUser(user);
-    if (!isSuperAdmin) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/account";
-      redirectUrl.searchParams.set("error", "Access Denied: Super Admin authority required.");
-      return NextResponse.redirect(redirectUrl);
+    // If no valid admin JWT, fallback to Supabase user session check
+    if (!isAdminJwtValid) {
+      if (!user) {
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = "/login";
+        redirectUrl.searchParams.set("redirectTo", pathname);
+        return NextResponse.redirect(redirectUrl);
+      }
+
+      const isSuperAdmin = isSuperAdminUser(user);
+      if (!isSuperAdmin) {
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = "/account";
+        redirectUrl.searchParams.set("error", "Access Denied: Super Admin authority required.");
+        return NextResponse.redirect(redirectUrl);
+      }
     }
   }
 
@@ -61,7 +73,6 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Security requirement (Check 9): Confirm email verification before granting access
     const isGoogleOAuth = user.app_metadata?.provider === "google";
     const isEmailVerified = Boolean(user.email_confirmed_at || isGoogleOAuth);
 
@@ -76,7 +87,17 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 3. Redirect logged-in users away from /login and /register unless explicitly specified
+  // 3. Protected Route: /checkout requires an active customer session
+  if (pathname.startsWith("/checkout")) {
+    if (!user) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      redirectUrl.searchParams.set("redirectTo", pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
+  // 4. Redirect logged-in users away from /login and /register unless explicitly specified
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const hasRedirectTo = request.nextUrl.searchParams.has("redirectTo");
   if (isAuthPage && user && !hasRedirectTo) {

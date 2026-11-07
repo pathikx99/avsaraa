@@ -300,7 +300,7 @@ CREATE POLICY "Users can delete their own addresses"
 CREATE TABLE IF NOT EXISTS public.products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
-    category TEXT NOT NULL CHECK (category IN ('Sarees', 'Dresses', 'New Arrivals', 'Occasion Wear')),
+    category TEXT NOT NULL CHECK (category IN ('Sarees', 'Dresses', 'Co-ords', 'Men''s Wear', 'New Arrivals', 'Occasion Wear')),
     price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
     image_url TEXT NOT NULL,
     description TEXT,
@@ -309,7 +309,15 @@ CREATE TABLE IF NOT EXISTS public.products (
     occasion_tags TEXT[] DEFAULT '{}',
     color_variants JSONB DEFAULT '[]',
     sales_count INTEGER DEFAULT 0,
-    product_type TEXT DEFAULT 'standalone' CHECK (product_type IN ('standalone', 'top', 'bottom', 'set'))
+    product_type TEXT DEFAULT 'standalone' CHECK (product_type IN ('standalone', 'top', 'bottom', 'set')),
+    gallery_images JSONB DEFAULT '[]'::jsonb,
+    available_sizes TEXT[] DEFAULT ARRAY['XS', 'S', 'M', 'L', 'XL', 'Free Size'],
+    specifications JSONB DEFAULT '{}'::jsonb,
+    stock_count INTEGER DEFAULT 10 CHECK (stock_count >= 0),
+    mrp NUMERIC(10, 2),
+    discount_percent INTEGER DEFAULT 0,
+    video_url TEXT,
+    highlights TEXT[] DEFAULT '{}'
 );
 
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
@@ -520,6 +528,8 @@ CREATE INDEX IF NOT EXISTS idx_products_occasion_tags ON public.products USING G
 CREATE INDEX IF NOT EXISTS idx_products_price ON public.products (price);
 CREATE INDEX IF NOT EXISTS idx_products_sales_count ON public.products (sales_count DESC);
 CREATE INDEX IF NOT EXISTS idx_products_product_type ON public.products (product_type);
+CREATE INDEX IF NOT EXISTS idx_products_stock_count ON public.products(stock_count);
+CREATE INDEX IF NOT EXISTS idx_products_available_sizes ON public.products USING GIN (available_sizes);
 CREATE INDEX IF NOT EXISTS idx_wishlists_user ON public.wishlists(user_id);
 CREATE INDEX IF NOT EXISTS idx_wishlists_product ON public.wishlists(product_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_product ON public.product_reviews(product_id);
@@ -581,4 +591,460 @@ CREATE POLICY "Allow Authenticated Delete on Items"
 ON storage.objects FOR DELETE
 TO authenticated, service_role
 USING (bucket_id = 'items');
+
+
+
+-- ==============================================================================
+-- 10. ORDERS, ORDER ITEMS, COUPONS & PAYMENTS (Phase 1: Transactional Core)
+-- ==============================================================================
+
+-- 10.1 COUPONS
+CREATE TABLE IF NOT EXISTS public.coupons (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code TEXT UNIQUE NOT NULL,
+    discount_type TEXT NOT NULL CHECK (discount_type IN ('percentage', 'fixed')),
+    discount_value NUMERIC(10, 2) NOT NULL CHECK (discount_value > 0),
+    min_order_amount NUMERIC(10, 2) DEFAULT 0 CHECK (min_order_amount >= 0),
+    max_discount_amount NUMERIC(10, 2),
+    is_active BOOLEAN DEFAULT true NOT NULL,
+    usage_limit INTEGER,
+    used_count INTEGER DEFAULT 0 NOT NULL,
+    valid_from TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    valid_until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Active coupons are viewable by everyone" ON public.coupons;
+CREATE POLICY "Active coupons are viewable by everyone"
+    ON public.coupons FOR SELECT
+    USING (is_active = true OR public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can insert coupons" ON public.coupons;
+CREATE POLICY "Super admin can insert coupons"
+    ON public.coupons FOR INSERT
+    WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can update coupons" ON public.coupons;
+CREATE POLICY "Super admin can update coupons"
+    ON public.coupons FOR UPDATE
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can delete coupons" ON public.coupons;
+CREATE POLICY "Super admin can delete coupons"
+    ON public.coupons FOR DELETE
+    USING (public.is_admin());
+
+-- Seed promotional coupon 'AVSARAA10'
+INSERT INTO public.coupons (
+    code,
+    discount_type,
+    discount_value,
+    min_order_amount,
+    max_discount_amount,
+    is_active
+)
+VALUES (
+    'AVSARAA10',
+    'percentage',
+    10.00,
+    0,
+    10000.00,
+    true
+)
+ON CONFLICT (code) DO UPDATE SET
+    is_active = true,
+    discount_value = 10.00;
+
+-- 10.2 ORDERS
+CREATE TABLE IF NOT EXISTS public.orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    shipping_address_id UUID REFERENCES public.addresses(id) ON DELETE SET NULL,
+    shipping_address_snapshot JSONB NOT NULL,
+    order_number TEXT UNIQUE NOT NULL,
+    subtotal NUMERIC(10, 2) NOT NULL CHECK (subtotal >= 0),
+    discount_amount NUMERIC(10, 2) DEFAULT 0 CHECK (discount_amount >= 0),
+    shipping_fee NUMERIC(10, 2) DEFAULT 0 CHECK (shipping_fee >= 0),
+    total_amount NUMERIC(10, 2) NOT NULL CHECK (total_amount >= 0),
+    coupon_code TEXT,
+    order_status TEXT NOT NULL DEFAULT 'Confirmed' CHECK (
+        order_status IN (
+            'Pending',
+            'Confirmed',
+            'Processing',
+            'Dispatched',
+            'Out for Delivery',
+            'Delivered',
+            'Cancelled',
+            'Exchange Requested',
+            'Exchanged'
+        )
+    ),
+    payment_status TEXT NOT NULL DEFAULT 'Pending' CHECK (
+        payment_status IN ('Pending', 'Paid', 'Failed', 'Refunded')
+    ),
+    payment_method TEXT NOT NULL CHECK (
+        payment_method IN ('Online Card / UPI', 'Razorpay', 'Cashfree', 'COD')
+    ),
+    notes TEXT,
+    tracking_number TEXT,
+    courier_partner TEXT,
+    estimated_delivery TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own orders or admin can view all" ON public.orders;
+CREATE POLICY "Users can view their own orders or admin can view all"
+    ON public.orders FOR SELECT
+    USING (auth.uid() = user_id OR public.is_admin());
+
+DROP POLICY IF EXISTS "Users can place their own orders" ON public.orders;
+CREATE POLICY "Users can place their own orders"
+    ON public.orders FOR INSERT
+    WITH CHECK (auth.uid() = user_id OR public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can update any order" ON public.orders;
+CREATE POLICY "Super admin can update any order"
+    ON public.orders FOR UPDATE
+    USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Super admin can delete orders" ON public.orders;
+CREATE POLICY "Super admin can delete orders"
+    ON public.orders FOR DELETE
+    USING (public.is_admin());
+
+-- 10.3 ORDER ITEMS
+CREATE TABLE IF NOT EXISTS public.order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES public.products(id) ON DELETE SET NULL,
+    product_name TEXT NOT NULL,
+    image_url TEXT NOT NULL,
+    size TEXT,
+    color TEXT,
+    tailored_blouse BOOLEAN DEFAULT false,
+    unit_price NUMERIC(10, 2) NOT NULL CHECK (unit_price >= 0),
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    total_price NUMERIC(10, 2) NOT NULL CHECK (total_price >= 0),
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own order items or admin can view all" ON public.order_items;
+CREATE POLICY "Users can view their own order items or admin can view all"
+    ON public.order_items FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.orders 
+            WHERE orders.id = order_items.order_id 
+              AND (orders.user_id = auth.uid() OR public.is_admin())
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can insert their own order items" ON public.order_items;
+CREATE POLICY "Users can insert their own order items"
+    ON public.order_items FOR INSERT
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.orders 
+            WHERE orders.id = order_items.order_id 
+              AND (orders.user_id = auth.uid() OR public.is_admin())
+        )
+    );
+
+DROP POLICY IF EXISTS "Super admin can manage order items" ON public.order_items;
+CREATE POLICY "Super admin can manage order items"
+    ON public.order_items FOR ALL
+    USING (public.is_admin());
+
+-- 10.4 PAYMENTS
+CREATE TABLE IF NOT EXISTS public.payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+    gateway TEXT NOT NULL,
+    transaction_id TEXT NOT NULL,
+    amount NUMERIC(10, 2) NOT NULL CHECK (amount >= 0),
+    currency TEXT DEFAULT 'INR' NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Paid', 'Failed', 'Refunded')),
+    raw_payload JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their order payments or admin can view all" ON public.payments;
+CREATE POLICY "Users can view their order payments or admin can view all"
+    ON public.payments FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.orders 
+            WHERE orders.id = payments.order_id 
+              AND (orders.user_id = auth.uid() OR public.is_admin())
+        )
+    );
+
+DROP POLICY IF EXISTS "Users can record payments for their orders" ON public.payments;
+CREATE POLICY "Users can record payments for their orders"
+    ON public.payments FOR INSERT
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.orders 
+            WHERE orders.id = payments.order_id 
+              AND (orders.user_id = auth.uid() OR public.is_admin())
+        )
+    );
+
+DROP POLICY IF EXISTS "Super admin can update payments" ON public.payments;
+CREATE POLICY "Super admin can update payments"
+    ON public.payments FOR UPDATE
+    USING (public.is_admin());
+
+-- 10.5 INDEXES
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_order_number ON public.orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(order_status);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON public.orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON public.order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_order_id ON public.payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_coupons_code ON public.coupons(code);
+
+-- ==============================================================================
+-- 11. USER CARTS, WEBHOOK DEDUPLICATION, INVENTORY LOCKING & CLEANUP
+-- ==============================================================================
+
+-- 11.1 USER CARTS (Server-side Cart Persistence)
+CREATE TABLE IF NOT EXISTS public.user_carts (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    items JSONB DEFAULT '[]'::jsonb NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.user_carts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can manage their own cart" ON public.user_carts;
+CREATE POLICY "Users can manage their own cart"
+    ON public.user_carts FOR ALL
+    USING (auth.uid() = user_id OR public.is_admin());
+
+-- 11.2 WEBHOOK DEDUPLICATION (Handles Code 23505 Unique Constraint Violations)
+CREATE TABLE IF NOT EXISTS public.processed_webhooks (
+    webhook_id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    payload JSONB DEFAULT '{}'::jsonb,
+    processed_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+ALTER TABLE public.processed_webhooks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Service role and admin can manage webhooks" ON public.processed_webhooks;
+CREATE POLICY "Service role and admin can manage webhooks"
+    ON public.processed_webhooks FOR ALL
+    USING (public.is_admin());
+
+CREATE INDEX IF NOT EXISTS idx_processed_webhooks_processed_at ON public.processed_webhooks(processed_at DESC);
+
+-- 11.3 ATOMIC CHECKOUT RPC (Inventory Row Locks & Deadlock Prevention)
+CREATE OR REPLACE FUNCTION public.create_checkout_order(
+    p_user_id UUID,
+    p_order_number TEXT,
+    p_shipping_address_id UUID,
+    p_shipping_address_snapshot JSONB,
+    p_items JSONB,
+    p_subtotal NUMERIC,
+    p_discount_amount NUMERIC,
+    p_shipping_fee NUMERIC,
+    p_total_amount NUMERIC,
+    p_coupon_code TEXT DEFAULT NULL,
+    p_payment_method TEXT DEFAULT 'Online Card / UPI',
+    p_notes TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_order_id UUID;
+    v_item RECORD;
+    v_product_id UUID;
+    v_qty INTEGER;
+    v_current_stock INTEGER;
+    v_product_name TEXT;
+    v_unit_price NUMERIC;
+    v_total_price NUMERIC;
+    v_image_url TEXT;
+    v_size TEXT;
+    v_color TEXT;
+BEGIN
+    -- 1. Inventory Locking & Concurrency Guard:
+    -- Deterministic sorting (ORDER BY product_id ASC) eliminates PostgreSQL deadlocks.
+    -- SELECT ... FOR UPDATE acquires row-level locks on stock items.
+    FOR v_item IN
+        SELECT 
+            (elem->>'product_id')::uuid AS p_id,
+            COALESCE((elem->>'quantity')::integer, 1) AS p_qty,
+            elem->>'product_name' AS p_name,
+            COALESCE((elem->>'unit_price')::numeric, 0) AS p_unit_price,
+            elem->>'image_url' AS p_image_url,
+            COALESCE(elem->>'size', 'Standard Size') AS p_size,
+            COALESCE(elem->>'color', 'Default') AS p_color
+        FROM jsonb_array_elements(p_items) AS elem
+        WHERE elem->>'product_id' IS NOT NULL
+        ORDER BY (elem->>'product_id')::uuid ASC
+    LOOP
+        -- Lock product row and verify stock
+        SELECT stock_count, name INTO v_current_stock, v_product_name
+        FROM public.products
+        WHERE id = v_item.p_id
+        FOR UPDATE;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Product % does not exist in catalog', v_item.p_id;
+        END IF;
+
+        IF v_current_stock < v_item.p_qty THEN
+            RAISE EXCEPTION 'Insufficient stock for product "%": requested %, available %',
+                v_product_name, v_item.p_qty, v_current_stock;
+        END IF;
+
+        -- Decrement stock atomically
+        UPDATE public.products
+        SET stock_count = stock_count - v_item.p_qty
+        WHERE id = v_item.p_id;
+    END LOOP;
+
+    -- 2. Insert Order Record
+    INSERT INTO public.orders (
+        user_id,
+        shipping_address_id,
+        shipping_address_snapshot,
+        order_number,
+        subtotal,
+        discount_amount,
+        shipping_fee,
+        total_amount,
+        coupon_code,
+        order_status,
+        payment_status,
+        payment_method,
+        notes
+    ) VALUES (
+        p_user_id,
+        p_shipping_address_id,
+        p_shipping_address_snapshot,
+        p_order_number,
+        p_subtotal,
+        p_discount_amount,
+        p_shipping_fee,
+        p_total_amount,
+        p_coupon_code,
+        'Confirmed',
+        CASE WHEN p_payment_method = 'COD' THEN 'Pending' ELSE 'Paid' END,
+        p_payment_method,
+        p_notes
+    )
+    RETURNING id INTO v_order_id;
+
+    -- 3. Insert Order Items
+    FOR v_item IN
+        SELECT 
+            (elem->>'product_id')::uuid AS p_id,
+            COALESCE((elem->>'quantity')::integer, 1) AS p_qty,
+            elem->>'product_name' AS p_name,
+            COALESCE((elem->>'unit_price')::numeric, 0) AS p_unit_price,
+            elem->>'image_url' AS p_image_url,
+            COALESCE(elem->>'size', 'Standard Size') AS p_size,
+            COALESCE(elem->>'color', 'Default') AS p_color,
+            COALESCE((elem->>'tailored_blouse')::boolean, false) AS p_tailored
+        FROM jsonb_array_elements(p_items) AS elem
+    LOOP
+        INSERT INTO public.order_items (
+            order_id,
+            product_id,
+            product_name,
+            image_url,
+            size,
+            color,
+            tailored_blouse,
+            unit_price,
+            quantity,
+            total_price
+        ) VALUES (
+            v_order_id,
+            v_item.p_id,
+            v_item.p_name,
+            COALESCE(v_item.p_image_url, '/images/placeholder.jpg'),
+            v_item.p_size,
+            v_item.p_color,
+            v_item.p_tailored,
+            v_item.p_unit_price,
+            v_item.p_qty,
+            v_item.p_unit_price * v_item.p_qty
+        );
+    END LOOP;
+
+    -- 4. Increment Coupon Redemption Count
+    IF p_coupon_code IS NOT NULL THEN
+        UPDATE public.coupons
+        SET used_count = used_count + 1
+        WHERE ilike(code, p_coupon_code);
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'order_id', v_order_id,
+        'order_number', p_order_number
+    );
+END;
+$$;
+
+-- 11.4 INVENTORY RESTORATION CRON LOGIC (Releases stock from unpaid orders older than 30 mins)
+CREATE OR REPLACE FUNCTION public.cleanup_abandoned_orders()
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_order RECORD;
+    v_item RECORD;
+    v_restored_count INTEGER := 0;
+BEGIN
+    FOR v_order IN
+        SELECT id, order_number
+        FROM public.orders
+        WHERE payment_status = 'Pending'
+          AND order_status = 'Pending'
+          AND created_at < (TIMEZONE('utc', NOW()) - INTERVAL '30 minutes')
+        FOR UPDATE
+    LOOP
+        -- Restore inventory for each item
+        FOR v_item IN
+            SELECT product_id, quantity
+            FROM public.order_items
+            WHERE order_id = v_order.id
+              AND product_id IS NOT NULL
+        LOOP
+            UPDATE public.products
+            SET stock_count = stock_count + v_item.quantity
+            WHERE id = v_item.product_id;
+        END LOOP;
+
+        -- Transition order status to Cancelled
+        UPDATE public.orders
+        SET order_status = 'Cancelled',
+            notes = COALESCE(notes || ' | ', '') || 'Auto-cancelled due to payment timeout (30m expired). Inventory released.',
+            updated_at = TIMEZONE('utc', NOW())
+        WHERE id = v_order.id;
+
+        v_restored_count := v_restored_count + 1;
+    END LOOP;
+
+    RETURN v_restored_count;
+END;
+$$;
 

@@ -15,20 +15,9 @@ export function useScrollReveal(threshold = 0.01) {
     const el = ref.current;
     if (!el) return;
 
-    // Check if element is already in or near viewport on mount
-    try {
-      const rect = el.getBoundingClientRect();
-      if (rect.top <= (window.innerHeight || document.documentElement.clientHeight) + 120) {
-        setIsRevealed(true);
-        return;
-      }
-    } catch {
-      // Fallback
-    }
-
     // Fallback if IntersectionObserver is unsupported
     if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
-      setIsRevealed(true);
+      requestAnimationFrame(() => setIsRevealed(true));
       return;
     }
 

@@ -371,7 +371,11 @@ export default function Under1299Page() {
               {/* Sort selector */}
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) =>
+                  setSortBy(
+                    e.target.value as "featured" | "price-asc" | "price-desc" | "newest"
+                  )
+                }
                 aria-label="Sort products"
                 style={{
                   height: "38px",

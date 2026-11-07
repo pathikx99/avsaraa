@@ -50,6 +50,42 @@ export default async function ProductPage({ params }: PageProps) {
     notFound();
   }
 
-  return <ProductDetailClient initialProduct={product} />;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    image: product.image_url,
+    description: product.description || "Handcrafted Indian luxury couture and sarees from Surat atelier.",
+    brand: {
+      "@type": "Brand",
+      name: "AVSARAA",
+    },
+    offers: {
+      "@type": "Offer",
+      url: `https://avsaraa.com/products/${product.id}`,
+      priceCurrency: "INR",
+      price: product.price,
+      priceValidUntil: "2027-12-31",
+      itemCondition: "https://schema.org/NewCondition",
+      availability:
+        (product.stock_count ?? 10) > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+      seller: {
+        "@type": "Organization",
+        name: "AVSARAA Atelier",
+      },
+    },
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <ProductDetailClient initialProduct={product} />
+    </>
+  );
 }
 

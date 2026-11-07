@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
 
-const VALID_CATEGORIES = ["Sarees", "Dresses", "New Arrivals", "Occasion Wear"];
+const VALID_CATEGORIES = [
+  "Sarees",
+  "Dresses",
+  "Co-ords",
+  "Men's Wear",
+  "New Arrivals",
+  "Occasion Wear",
+];
 const SAFE_URL_REGEX = /^(\/|https?:\/\/)/i;
 
 export async function GET() {
@@ -82,17 +89,33 @@ export async function POST(request: Request) {
 
     const sanitizedDesc = description ? String(description).trim().slice(0, 2000) : null;
 
+    const insertPayload: Record<string, unknown> = {
+      name: name.trim(),
+      category,
+      price: numericPrice,
+      image_url: image_url.trim(),
+      description: sanitizedDesc,
+      user_id: auth.user?.id || null,
+      created_at: new Date().toISOString(),
+    };
+
+    if (body.product_type) insertPayload.product_type = body.product_type;
+    if (Array.isArray(body.occasion_tags)) insertPayload.occasion_tags = body.occasion_tags;
+    if (Array.isArray(body.color_variants)) insertPayload.color_variants = body.color_variants;
+    if (Array.isArray(body.gallery_images)) insertPayload.gallery_images = body.gallery_images;
+    if (Array.isArray(body.available_sizes)) insertPayload.available_sizes = body.available_sizes;
+    if (body.specifications && typeof body.specifications === "object") {
+      insertPayload.specifications = body.specifications;
+    }
+    if (body.stock_count !== undefined) insertPayload.stock_count = Number(body.stock_count);
+    if (body.mrp !== undefined) insertPayload.mrp = Number(body.mrp);
+    if (body.discount_percent !== undefined) insertPayload.discount_percent = Number(body.discount_percent);
+    if (body.video_url) insertPayload.video_url = String(body.video_url).trim();
+    if (Array.isArray(body.highlights)) insertPayload.highlights = body.highlights;
+
     const { data, error } = await supabaseAdmin
       .from("products")
-      .insert({
-        name: name.trim(),
-        category,
-        price: numericPrice,
-        image_url: image_url.trim(),
-        description: sanitizedDesc,
-        user_id: auth.user?.id || null,
-        created_at: new Date().toISOString(),
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
@@ -177,6 +200,20 @@ export async function PUT(request: Request) {
     if (description !== undefined) {
       updatePayload.description = description ? String(description).trim().slice(0, 2000) : null;
     }
+
+    if (body.product_type !== undefined) updatePayload.product_type = body.product_type;
+    if (Array.isArray(body.occasion_tags)) updatePayload.occasion_tags = body.occasion_tags;
+    if (Array.isArray(body.color_variants)) updatePayload.color_variants = body.color_variants;
+    if (Array.isArray(body.gallery_images)) updatePayload.gallery_images = body.gallery_images;
+    if (Array.isArray(body.available_sizes)) updatePayload.available_sizes = body.available_sizes;
+    if (body.specifications && typeof body.specifications === "object") {
+      updatePayload.specifications = body.specifications;
+    }
+    if (body.stock_count !== undefined) updatePayload.stock_count = Number(body.stock_count);
+    if (body.mrp !== undefined) updatePayload.mrp = Number(body.mrp);
+    if (body.discount_percent !== undefined) updatePayload.discount_percent = Number(body.discount_percent);
+    if (body.video_url !== undefined) updatePayload.video_url = body.video_url ? String(body.video_url).trim() : null;
+    if (Array.isArray(body.highlights)) updatePayload.highlights = body.highlights;
 
     const { data, error } = await supabaseAdmin
       .from("products")

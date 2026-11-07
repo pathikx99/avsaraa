@@ -1,4 +1,5 @@
-import { Product, ColorVariant, ProductType, OCCASIONS_LIST } from "@/types/product";
+import type { Product, ColorVariant, ProductType } from "../types/product.ts";
+import { OCCASIONS_LIST } from "../types/product.ts";
 
 interface ExtractedMeta {
   occasion_tags?: string[];

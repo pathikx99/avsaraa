@@ -8,6 +8,8 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabaseClient";
 import { Product } from "@/types/product";
+import { Order } from "@/types/order";
+import OrdersAccountTab from "@/components/account/OrdersAccountTab";
 import { normalizePhoneNumber } from "@/lib/phoneUtils";
 import { isSuperAdminUser } from "@/lib/adminConstants";
 
@@ -49,7 +51,7 @@ interface AddressItem {
 
 export default function AccountPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"profile" | "addresses" | "products" | "support">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "orders" | "addresses" | "products" | "support">("profile");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -57,6 +59,8 @@ export default function AccountPage() {
   const [authUser, setAuthUser] = useState<{ id: string; email?: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [addresses, setAddresses] = useState<AddressItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // Products Catalog (Viewable by Super Admin)
@@ -184,6 +188,20 @@ export default function AccountPage() {
         setProducts(prodData);
       } else {
         setProducts([]);
+      }
+
+      // 4. Fetch Patron Orders
+      try {
+        setLoadingOrders(true);
+        const ordRes = await fetch("/api/orders");
+        const ordData = await ordRes.json();
+        if (ordData.success && Array.isArray(ordData.orders)) {
+          setOrders(ordData.orders);
+        }
+      } catch (ordErr) {
+        console.warn("Orders fetch warning:", ordErr);
+      } finally {
+        setLoadingOrders(false);
       }
     } catch (err) {
       console.error("Error loading account data:", err);
@@ -848,6 +866,7 @@ export default function AccountPage() {
           >
             {[
               { id: "profile", label: "My Profile" },
+              { id: "orders", label: `My Orders (${orders.length})` },
               { id: "addresses", label: `Addresses (${addresses.length})` },
               ...(isSuperAdmin ? [{ id: "products", label: `Catalog (${products.length})` }] : []),
               { id: "support", label: "Help & Support" },
@@ -920,6 +939,7 @@ export default function AccountPage() {
 
               {[
                 { id: "profile", label: "My Profile", icon: "✦" },
+                { id: "orders", label: `My Orders (${orders.length})`, icon: "🛍️" },
                 { id: "addresses", label: `Addresses (${addresses.length})`, icon: "📍" },
                 ...(isSuperAdmin ? [{ id: "products", label: `Catalog (${products.length})`, icon: "👗" }] : []),
                 { id: "support", label: "Help & Support", icon: "💬" },
@@ -1144,7 +1164,16 @@ export default function AccountPage() {
               </div>
             )}
 
-            {/* 2. SAVED ADDRESSES TAB */}
+            {/* 2. MY ORDERS TAB & 7-DAY EXCHANGE */}
+            {activeTab === "orders" && (
+              <OrdersAccountTab
+                orders={orders}
+                loadingOrders={loadingOrders}
+                onOrdersUpdate={(updated) => setOrders(updated)}
+                showToast={showToast}
+              />
+            )}
+            {/* 3. SAVED ADDRESSES TAB */}
             {activeTab === "addresses" && (
               <div className="fade-in-up">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>

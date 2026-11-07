@@ -1,6 +1,6 @@
 /**
  * In-Memory Sliding-Window Rate Limiter
- * Tracks request attempts by client identifier (e.g. IP address).
+ * Enforces brute-force defense across authentication, OTP, coupons, and tracking.
  */
 
 interface RateLimitRecord {
@@ -10,16 +10,20 @@ interface RateLimitRecord {
 
 const rateLimitStore = new Map<string, RateLimitRecord>();
 
-// Clean up expired entries every 5 minutes
+// Clean up expired entries periodically
 if (typeof setInterval !== "undefined") {
-  setInterval(() => {
+  const timer = setInterval(() => {
     const now = Date.now();
     for (const [key, record] of rateLimitStore.entries()) {
       if (now > record.resetAt) {
         rateLimitStore.delete(key);
       }
     }
-  }, 5 * 60 * 1000);
+  }, 60 * 1000);
+
+  if (timer.unref) {
+    timer.unref();
+  }
 }
 
 export interface RateLimitResult {
@@ -31,7 +35,7 @@ export interface RateLimitResult {
 export function checkRateLimit(
   identifier: string,
   maxAttempts: number = 5,
-  windowSeconds: number = 900 // default 15 minutes
+  windowSeconds: number = 900
 ): RateLimitResult {
   const now = Date.now();
   const windowMs = windowSeconds * 1000;
@@ -69,4 +73,25 @@ export function checkRateLimit(
 
 export function resetRateLimit(identifier: string): void {
   rateLimitStore.delete(identifier);
+}
+
+// Specialized Rate Limit Helpers
+export function rateLimitOtpSend(phoneOrEmail: string): RateLimitResult {
+  return checkRateLimit(`otp-send:${phoneOrEmail.toLowerCase().trim()}`, 3, 300);
+}
+
+export function rateLimitOtpVerify(phoneOrEmail: string): RateLimitResult {
+  return checkRateLimit(`otp-verify:${phoneOrEmail.toLowerCase().trim()}`, 5, 300);
+}
+
+export function rateLimitCustomerLogin(ip: string): RateLimitResult {
+  return checkRateLimit(`customer-login:${ip}`, 5, 900);
+}
+
+export function rateLimitCouponValidation(ip: string): RateLimitResult {
+  return checkRateLimit(`coupon-validate:${ip}`, 15, 60);
+}
+
+export function rateLimitOrderTracking(ip: string): RateLimitResult {
+  return checkRateLimit(`order-track:${ip}`, 10, 60);
 }

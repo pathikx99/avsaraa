@@ -4,16 +4,31 @@ import crypto from "crypto";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { ADMIN_EMAIL } from "@/lib/adminConstants";
 import { checkRateLimit, resetRateLimit } from "@/lib/rateLimit";
+import { signAdminToken, verifyAdminSession, ADMIN_COOKIE_NAME } from "@/lib/jwtAdmin";
 
 function safeTimingCompare(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "utf-8");
   const bufB = Buffer.from(b, "utf-8");
   if (bufA.length !== bufB.length) {
-    // Perform dummy timing safe compare to avoid timing leak on length
     crypto.timingSafeEqual(bufA, bufA);
     return false;
   }
   return crypto.timingSafeEqual(bufA, bufB);
+}
+
+export async function GET() {
+  try {
+    const session = await verifyAdminSession();
+    if (!session.authorized || !session.admin) {
+      return NextResponse.json({ authenticated: false }, { status: 401 });
+    }
+    return NextResponse.json({
+      authenticated: true,
+      admin: session.admin,
+    });
+  } catch {
+    return NextResponse.json({ authenticated: false }, { status: 401 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -23,7 +38,7 @@ export async function POST(request: Request) {
     const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
     const rateLimitKey = `admin-auth:${ip}`;
 
-    // 1. Rate Limiting Check (Check 18: Maximum 5 attempts per 15 minutes)
+    // 1. Rate Limiting Check (Maximum 5 attempts per 15 minutes)
     const rateCheck = checkRateLimit(rateLimitKey, 5, 900);
     if (!rateCheck.allowed) {
       return NextResponse.json(
@@ -66,17 +81,23 @@ export async function POST(request: Request) {
       // Successful authentication: Reset rate limit for this IP
       resetRateLimit(rateLimitKey);
 
+      // Sign Cryptographic Admin JWT with strict role: "admin"
+      const jwtToken = await signAdminToken({
+        email: configuredEmail,
+        role: "admin",
+        full_name: "Super Admin",
+        department: "Executive Leadership",
+      });
+
+      // Synchronize Supabase Auth & admin_users record in the background
       try {
         const supabaseAdmin = getAdminSupabaseClient();
-
-        // Check if user already exists in Supabase Auth
         const { data: userListData } = await supabaseAdmin.auth.admin.listUsers();
         const existingUser = userListData?.users?.find(
           (u) => u.email?.toLowerCase().trim() === configuredEmail
         );
 
         if (!existingUser) {
-          // Provision the user in Supabase Auth using environment credentials
           await supabaseAdmin.auth.admin.createUser({
             email: configuredEmail,
             password: envPassword,
@@ -84,23 +105,8 @@ export async function POST(request: Request) {
             user_metadata: { role: "super_admin", full_name: "Kratos Lord" },
             app_metadata: { role: "super_admin" },
           });
-        } else {
-          // Update password and roles if user already exists
-          await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
-            password: envPassword,
-            email_confirm: true,
-            user_metadata: {
-              ...(existingUser.user_metadata || {}),
-              role: "super_admin",
-            },
-            app_metadata: {
-              ...(existingUser.app_metadata || {}),
-              role: "super_admin",
-            },
-          });
         }
 
-        // Ensure record in public.admin_users exists
         await supabaseAdmin.from("admin_users").upsert(
           {
             email: configuredEmail,
@@ -120,14 +126,27 @@ export async function POST(request: Request) {
           { onConflict: "email" }
         );
       } catch (provisionErr) {
-        console.error("Supabase auth sync error:", provisionErr);
+        console.warn("Notice: Background admin profile sync note:", provisionErr);
       }
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
-        message: "Admin credentials verified against environment configuration.",
-        synced: true,
+        message: "Admin credentials verified against cryptographic authority.",
+        token: jwtToken,
       });
+
+      // Set standalone HttpOnly JWT cookie 'admin-auth'
+      response.cookies.set({
+        name: ADMIN_COOKIE_NAME,
+        value: jwtToken,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 12 * 60 * 60, // 12 hours
+      });
+
+      return response;
     }
 
     return NextResponse.json(
@@ -144,4 +163,23 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function DELETE() {
+  const response = NextResponse.json({
+    success: true,
+    message: "Admin session terminated.",
+  });
+
+  response.cookies.set({
+    name: ADMIN_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+
+  return response;
 }
