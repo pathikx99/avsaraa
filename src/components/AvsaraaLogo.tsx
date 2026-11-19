@@ -7,7 +7,7 @@ interface AvsaraaLogoProps {
   width?: number;
   height?: number;
   priority?: boolean;
-  variant?: "crest" | "wordmark";
+  variant?: "wordmark" | "crest";
 }
 
 export default function AvsaraaLogo({
@@ -16,17 +16,17 @@ export default function AvsaraaLogo({
   width,
   height,
   priority = true,
-  variant = "crest",
+  variant = "wordmark",
 }: AvsaraaLogoProps) {
-  if (variant === "wordmark") {
-    // Wordmark logo from Vicky Sagun reference: 194 x 51 ratio (~3.8:1)
-    const defaultWordmarkWidth = size === "sm" ? 135 : size === "lg" ? 190 : 160;
-    const finalW = width || defaultWordmarkWidth;
-    const finalH = height || Math.round(finalW * (51 / 194));
+  if (variant === "crest") {
+    // Official emblem/crest logo (1518 x 989)
+    const defaultWidth = size === "sm" ? 125 : size === "lg" ? 220 : 165;
+    const finalWidth = width || defaultWidth;
+    const finalHeight = height || Math.round(finalWidth * (989 / 1518));
 
     return (
       <div
-        className={`avsaraa-brand-wordmark ${className}`}
+        className={`avsaraa-brand-logo ${className}`}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -35,14 +35,12 @@ export default function AvsaraaLogo({
         }}
       >
         <Image
-          src="/images/avsaraa_wordmark.png"
+          src="/images/avsaraa-logo.png"
           alt="AVSARAA - Wear The Moment"
-          width={finalW}
-          height={finalH}
-          className="avsaraa-wordmark-img"
+          width={finalWidth}
+          height={finalHeight}
           style={{
-            width: width ? `${width}px` : undefined,
-            maxWidth: "100%",
+            width: `${finalWidth}px`,
             height: "auto",
             objectFit: "contain",
             display: "block",
@@ -53,14 +51,14 @@ export default function AvsaraaLogo({
     );
   }
 
-  // Official logo dimensions from Docs/4E334A70-2DB1-4B02-9CF4-4064C7C7A495.PNG (1518 x 989)
-  const defaultWidth = size === "sm" ? 125 : size === "lg" ? 220 : 165;
-  const finalWidth = width || defaultWidth;
-  const finalHeight = height || Math.round(finalWidth * (989 / 1518));
+  // HD Luxury Wordmark logo: 1940 x 510 master ratio (3.8039:1)
+  const defaultWordmarkWidth = size === "sm" ? 135 : size === "lg" ? 190 : 160;
+  const finalW = width || defaultWordmarkWidth;
+  const finalH = height || Math.round(finalW * (510 / 1940));
 
   return (
     <div
-      className={`avsaraa-brand-logo ${className}`}
+      className={`avsaraa-brand-wordmark ${className}`}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -69,12 +67,14 @@ export default function AvsaraaLogo({
       }}
     >
       <Image
-        src="/images/avsaraa-logo.png"
+        src="/images/avsaraa_wordmark.png"
         alt="AVSARAA - Wear The Moment"
-        width={finalWidth}
-        height={finalHeight}
+        width={finalW}
+        height={finalH}
+        className="avsaraa-wordmark-img"
         style={{
-          width: `${finalWidth}px`,
+          width: width ? `${width}px` : undefined,
+          maxWidth: "100%",
           height: "auto",
           objectFit: "contain",
           display: "block",

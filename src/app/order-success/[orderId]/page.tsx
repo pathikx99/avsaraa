@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 import { Order } from "@/types/order";
 import { formatINR, resolveProductImage } from "@/lib/productUtils";
 import { computeInclusiveGst } from "@/lib/financials";
+import AvsaraaLogo from "@/components/AvsaraaLogo";
 import {
   CheckIcon,
   ShoppingBagIcon,
@@ -704,20 +705,7 @@ function OrderSuccessContent() {
               }}
             >
               <div>
-                <h1
-                  style={{
-                    fontFamily: "var(--font-cinzel), serif",
-                    fontSize: "24px",
-                    letterSpacing: "0.15em",
-                    margin: 0,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  AVSARAA
-                </h1>
-                <p style={{ margin: "2px 0 0", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.1em", color: "#555" }}>
-                  Surat Handloom Atelier · Wear The Moment
-                </p>
+                <AvsaraaLogo width={150} />
                 <div style={{ marginTop: "8px", fontSize: "11px", color: "#333", lineHeight: "1.4" }}>
                   <strong>AVSARAA LOOMS & ATELIER PVT. LTD.</strong><br />
                   Ring Road Textile Hub, Surat, Gujarat — 395002<br />
