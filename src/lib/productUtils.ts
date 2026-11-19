@@ -30,38 +30,35 @@ const LOCAL_IMAGE_FILES = new Set([
   "account_hero.jpg",
   "avsaraa-logo.png",
   "avsaraa_wordmark.png",
-  "banarasi_silk_saree.jpg",
   "botanical_flowers.jpg",
   "desktop_hero_cinematic_1.jpg",
   "desktop_hero_cinematic_2.jpg",
   "desktop_hero_cinematic_3.jpg",
-  "festive_chanderi_dress.jpg",
-  "handloom_silk_saree.jpg",
   "occasion_everyday.jpg",
   "occasion_festive.jpg",
   "occasion_haldi.jpg",
   "occasion_party.jpg",
   "occasion_traditional.jpg",
   "occasion_wedding.jpg",
-  "product_dupatta_under1299.jpg",
-  "product_kurta_under1299.jpg",
-  "product_kurti_under1299.jpg",
-  "product_suit_under1299.jpg",
-  "royal_occasion_dress.jpg",
-  "royal_organza_saree.jpg",
   "saree_model_hero.jpg",
 ]);
 
 /**
- * Resolves remote Supabase storage image URLs to high-speed local assets if present,
- * preventing upstream network timeouts (504s).
+ * Dedicated product placeholder
+ */
+const PRODUCT_FALLBACK_IMAGE = "/images/botanical_flowers.jpg";
+
+/**
+ * Resolves product image URLs. Cloudflare, Supabase CDN, and external HTTPS URLs are returned directly.
  */
 export function resolveProductImage(url?: string): string {
-  if (!url) return "/images/banarasi_silk_saree.jpg";
+  if (!url) return PRODUCT_FALLBACK_IMAGE;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
   if (url.startsWith("/")) return url;
 
   try {
     const filename = url.split("/").pop()?.split("?")[0] || "";
+    // Only resolve local app files if explicitly a local filename without path
     if (filename && LOCAL_IMAGE_FILES.has(filename)) {
       return `/images/${filename}`;
     }

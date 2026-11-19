@@ -12,6 +12,7 @@ export const ADMIN_EMAIL: string = (
 
 export interface AdminUserLike {
   email?: string | null;
+  email_confirmed_at?: string | null;
   app_metadata?: Record<string, unknown> | null;
   user_metadata?: Record<string, unknown> | null;
 }
@@ -33,7 +34,7 @@ export function isSuperAdminEmail(email?: string | null): boolean {
 /**
  * Validates whether a Supabase user entity possesses Super Admin authority.
  * Checks against Supabase auth roles (app_metadata only) which are tamper-proof.
- * Falls back to server-side email verification if running on server.
+ * Falls back to verified server-side email verification with confirmed email check.
  */
 export function isSuperAdminUser(user?: AdminUserLike | null): boolean {
   if (!user) return false;
@@ -46,7 +47,12 @@ export function isSuperAdminUser(user?: AdminUserLike | null): boolean {
     return true;
   }
 
-  // Server-side check against ADMIN_EMAIL
+  // Reject explicitly unconfirmed accounts (unless Google OAuth verified)
+  const isGoogleOAuth = user.app_metadata?.provider === "google";
+  if (user.email_confirmed_at === null && !isGoogleOAuth) {
+    return false;
+  }
+
   if (typeof window === "undefined" && isSuperAdminEmail(user.email)) {
     return true;
   }

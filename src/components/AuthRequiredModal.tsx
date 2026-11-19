@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
@@ -10,6 +10,7 @@ import { resolveProductImage } from "@/lib/productUtils";
 
 export default function AuthRequiredModal() {
   const { isAuthModalOpen, closeAuthModal, pendingProduct, authModalReason } = useCart();
+  const [imgError, setImgError] = useState(false);
 
   if (!isAuthModalOpen) return null;
 
@@ -92,7 +93,7 @@ export default function AuthRequiredModal() {
           className="luxury-badge"
           style={{ marginBottom: "10px", display: "inline-block" }}
         >
-          {isWishlist ? "✦ ATELIER WISHLIST ACCESS ✦" : "✦ MEMBER SIGN IN REQUIRED ✦"}
+          {isWishlist ? "✦ WISHLIST ✦" : "✦ SIGN IN REQUIRED ✦"}
         </span>
 
         <h3
@@ -105,7 +106,7 @@ export default function AuthRequiredModal() {
             lineHeight: 1.25,
           }}
         >
-          {isWishlist ? "Sign In to Save Heirlooms" : "Sign In to Add to Bag"}
+          {isWishlist ? "Sign In to Save Items" : "Sign In to Add to Bag"}
         </h3>
 
         <p
@@ -119,8 +120,8 @@ export default function AuthRequiredModal() {
           }}
         >
           {isWishlist
-            ? "You are welcome to explore all our handcrafted sarees freely. To save pieces to your personal wishlist and curate your bridal trousseau, please sign in."
-            : "You are welcome to browse and view all our handcrafted sarees and luxury ensembles freely. To add items to your shopping bag and place an order, please sign in."}
+            ? "Sign in to save items to your wishlist so you can find them anytime."
+            : "Sign in to add items to your shopping bag and place an order."}
         </p>
 
         {/* Selected Product Preview */}
@@ -150,11 +151,16 @@ export default function AuthRequiredModal() {
               }}
             >
               <Image
-                src={resolveProductImage(pendingProduct.image_url) || "/images/banarasi_silk_saree.jpg"}
+                src={
+                  imgError || !pendingProduct.image_url
+                    ? "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=300&q=80"
+                    : resolveProductImage(pendingProduct.image_url)
+                }
                 alt={pendingProduct.name}
                 fill
                 sizes="52px"
                 style={{ objectFit: "cover" }}
+                onError={() => setImgError(true)}
               />
             </div>
             <div style={{ overflow: "hidden", flex: 1 }}>
@@ -195,7 +201,7 @@ export default function AuthRequiredModal() {
               textDecoration: "none",
             }}
           >
-            <span>{isWishlist ? "Sign In to Save Heirlooms" : "Sign In to Your Account"}</span>
+            <span>{isWishlist ? "Sign In to Save" : "Sign In to Your Account"}</span>
             <span>→</span>
           </Link>
 

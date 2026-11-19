@@ -17,7 +17,7 @@ import {
   PlusIcon,
   BackArrowIcon,
 } from "@/components/Icons";
-import { AddressSnapshot, PaymentMethod } from "@/types/order";
+import { AddressSnapshot, PaymentMethod, Order, RazorpayFailureResponse } from "@/types/order";
 import type { User } from "@supabase/supabase-js";
 import { isValidGujaratPincode, calculateOrderTotals } from "@/lib/financials";
 
@@ -71,7 +71,7 @@ const INDIAN_STATES = [
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cartItems, subtotal, clearCart } = useCart();
+  const { cartItems, totalItems, subtotal, clearCart } = useCart();
 
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -87,11 +87,12 @@ export default function CheckoutPage() {
   const [newAddress, setNewAddress] = useState({
     recipient_name: "",
     phone_number: "",
+    email: "",
     address_line1: "",
     address_line2: "",
     landmark: "",
     city: "",
-    state: "Delhi NCR",
+    state: "Gujarat",
     postal_code: "",
     address_type: "Home",
     is_default: false,
@@ -123,6 +124,17 @@ export default function CheckoutPage() {
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [otpSuccessMessage, setOtpSuccessMessage] = useState<string | null>(null);
+
+  // Razorpay Sandbox Test State (Activated for demo test keys)
+  const [razorpaySandboxData, setRazorpaySandboxData] = useState<{
+    orderId: string;
+    orderNumber: string;
+    razorpayOrderId: string;
+    amount: number;
+    paymentId: string;
+    signature: string;
+    order: Order;
+  } | null>(null);
 
   // 1. Authenticate user & load addresses
   const loadAddresses = useCallback(async (userId: string) => {
@@ -158,9 +170,15 @@ export default function CheckoutPage() {
     supabase.auth.getUser().then(({ data }) => {
       if (!mounted) return;
       if (!data.user) {
-        router.push("/login?redirectTo=/checkout");
+        setUser(null);
+        setAuthLoading(false);
+        setLoadingAddresses(false);
+        setIsAddingNewAddress(true);
       } else {
         setUser(data.user);
+        if (data.user.email) {
+          setNewAddress((prev) => ({ ...prev, email: data.user.email || "" }));
+        }
         setAuthLoading(false);
         loadAddresses(data.user.id);
       }
@@ -169,7 +187,7 @@ export default function CheckoutPage() {
     return () => {
       mounted = false;
     };
-  }, [router, loadAddresses]);
+  }, [loadAddresses]);
 
   // Handle Apply Coupon
   const handleApplyCoupon = async (codeToApply?: string) => {
@@ -191,6 +209,9 @@ export default function CheckoutPage() {
         setAppliedCoupon(data.coupon);
         setCouponCodeInput("");
         setCouponError(null);
+        try {
+          localStorage.setItem("avsaraa_applied_coupon", data.coupon.code);
+        } catch {}
       } else {
         setCouponError(data.message || "Invalid coupon code.");
       }
@@ -204,16 +225,32 @@ export default function CheckoutPage() {
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setCouponError(null);
+    try {
+      localStorage.removeItem("avsaraa_applied_coupon");
+    } catch {}
   };
+
+  // Auto-apply stored coupon from product page or previous session
+  useEffect(() => {
+    try {
+      const savedCoupon = localStorage.getItem("avsaraa_applied_coupon");
+      if (savedCoupon && !appliedCoupon && subtotal > 0 && !validatingCoupon) {
+        const timer = setTimeout(() => {
+          handleApplyCoupon(savedCoupon);
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+    } catch {}
+  }, [subtotal, appliedCoupon, validatingCoupon]);
 
   // Handle Save New Address
   const handleSaveAddress = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
 
     if (
       !newAddress.recipient_name.trim() ||
       !newAddress.phone_number.trim() ||
+      (!user && !newAddress.email.trim()) ||
       !newAddress.address_line1.trim() ||
       !newAddress.city.trim() ||
       !newAddress.postal_code.trim()
@@ -227,6 +264,29 @@ export default function CheckoutPage() {
       setErrorMessage(
         `Delivery restriction: Pincode "${newAddress.postal_code}" is outside Gujarat. Avsaraa delivers exclusively within Gujarat (pincodes 360000–399999).`
       );
+      return;
+    }
+
+    if (!user) {
+      const guestAddressItem: AddressItem = {
+        id: "guest-address-id",
+        user_id: "guest-user",
+        recipient_name: newAddress.recipient_name.trim(),
+        phone_number: newAddress.phone_number.trim(),
+        address_line1: newAddress.address_line1.trim(),
+        address_line2: newAddress.address_line2.trim() || null,
+        landmark: newAddress.landmark.trim() || null,
+        city: newAddress.city.trim(),
+        state: newAddress.state,
+        postal_code: newAddress.postal_code.trim(),
+        country: "India",
+        address_type: newAddress.address_type || "Home",
+        is_default: true,
+      };
+      setAddresses([guestAddressItem]);
+      setSelectedAddressId(guestAddressItem.id);
+      setIsAddingNewAddress(false);
+      setErrorMessage(null);
       return;
     }
 
@@ -266,11 +326,12 @@ export default function CheckoutPage() {
         setNewAddress({
           recipient_name: "",
           phone_number: "",
+          email: "",
           address_line1: "",
           address_line2: "",
           landmark: "",
           city: "",
-          state: "Delhi NCR",
+          state: "Gujarat",
           postal_code: "",
           address_type: "Home",
           is_default: false,
@@ -296,7 +357,7 @@ export default function CheckoutPage() {
     return appliedCoupon.discount_amount;
   }, [appliedCoupon, subtotal]);
 
-  // Comprehensive financials: Dynamic courier fee, ₹500 free threshold, ₹10 COD surcharge, 5% GST
+  // Comprehensive financials: Dynamic courier fee, ₹500 free threshold, ₹20 COD surcharge, 5% GST
   const financials = useMemo(() => {
     return calculateOrderTotals({
       subtotal,
@@ -309,6 +370,18 @@ export default function CheckoutPage() {
 
   // Selected Address Snapshot
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
+
+  // Address completeness check for both registered users & guests
+  const isGuestAddressFilled = Boolean(
+    newAddress.recipient_name.trim() &&
+    newAddress.phone_number.trim() &&
+    (!user ? newAddress.email.trim() : true) &&
+    newAddress.address_line1.trim() &&
+    newAddress.city.trim() &&
+    newAddress.postal_code.trim()
+  );
+
+  const hasValidAddress = Boolean(selectedAddressId || (isAddingNewAddress && isGuestAddressFilled));
 
   // Send WhatsApp / Dual-Contact OTP
   const handleSendOtp = async (contactNumber?: string) => {
@@ -377,13 +450,77 @@ export default function CheckoutPage() {
     }
   };
 
+  // Helper to dynamically load Razorpay checkout modal script
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (typeof window === "undefined") return resolve(false);
+      if (window.Razorpay) return resolve(true);
+
+      const existingScript = document.querySelector(
+        'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+      );
+      if (existingScript) {
+        existingScript.addEventListener("load", () => resolve(true));
+        existingScript.addEventListener("error", () => resolve(false));
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleSandboxPaymentSuccess = async () => {
+    if (!razorpaySandboxData) return;
+    try {
+      setSubmittingOrder(true);
+      const verifyRes = await fetch("/api/razorpay/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          razorpay_order_id: razorpaySandboxData.razorpayOrderId,
+          razorpay_payment_id: razorpaySandboxData.paymentId,
+          razorpay_signature: razorpaySandboxData.signature,
+          order_id: razorpaySandboxData.orderId,
+          amount: razorpaySandboxData.amount / 100,
+        }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.success) {
+        throw new Error(verifyData.error || "Payment verification could not be completed.");
+      }
+
+      clearCart();
+      const finalOrder = verifyData.order || razorpaySandboxData.order;
+      try {
+        sessionStorage.setItem("avsaraa_latest_order", JSON.stringify(finalOrder));
+      } catch {
+        // ignore
+      }
+      setRazorpaySandboxData(null);
+      router.push(`/order-success/${finalOrder?.id || razorpaySandboxData.orderId}`);
+    } catch (vErr: unknown) {
+      const vMsg = vErr instanceof Error ? vErr.message : "Payment verification failed.";
+      setErrorMessage(vMsg);
+      setSubmittingOrder(false);
+    }
+  };
+
+  const handleSandboxPaymentDismiss = () => {
+    setRazorpaySandboxData(null);
+    setSubmittingOrder(false);
+    setErrorMessage(
+      "Payment window was closed. Your shopping bag and address are preserved so you can retry whenever ready."
+    );
+  };
+
   // Core Order Placement Execution
   const executePlaceOrder = async () => {
-    if (!user) {
-      router.push("/login?redirectTo=/checkout");
-      return;
-    }
-
     if (cartItems.length === 0) {
       setErrorMessage("Your shopping bag is empty.");
       return;
@@ -394,6 +531,8 @@ export default function CheckoutPage() {
       addressSnapshot = {
         recipient_name: selectedAddress.recipient_name,
         phone_number: selectedAddress.phone_number,
+        email: user?.email || newAddress.email.trim() || null,
+        is_guest: !user,
         address_line1: selectedAddress.address_line1,
         address_line2: selectedAddress.address_line2,
         landmark: selectedAddress.landmark,
@@ -411,9 +550,15 @@ export default function CheckoutPage() {
       newAddress.city &&
       newAddress.postal_code
     ) {
+      if (!user && (!newAddress.email || !newAddress.email.includes("@"))) {
+        setErrorMessage("Please provide a valid email address for your order confirmation.");
+        return;
+      }
       addressSnapshot = {
         recipient_name: newAddress.recipient_name.trim(),
         phone_number: newAddress.phone_number.trim(),
+        email: newAddress.email.trim() || user?.email || null,
+        is_guest: !user,
         address_line1: newAddress.address_line1.trim(),
         address_line2: newAddress.address_line2.trim() || null,
         landmark: newAddress.landmark.trim() || null,
@@ -451,7 +596,7 @@ export default function CheckoutPage() {
       }));
 
       const payload = {
-        shipping_address_id: selectedAddress?.id || null,
+        shipping_address_id: selectedAddress?.id && selectedAddress.id !== "guest-address-id" ? selectedAddress.id : null,
         shipping_address_snapshot: addressSnapshot,
         items: orderItemsPayload,
         coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
@@ -459,6 +604,122 @@ export default function CheckoutPage() {
         notes: orderNotes.trim() || undefined,
       };
 
+      // Online Card / UPI Payment via Razorpay Gateway
+      if (paymentMethod === "Online Card / UPI") {
+        const scriptLoaded = await loadRazorpayScript();
+        if (!scriptLoaded || !window.Razorpay) {
+          throw new Error(
+            "Could not load secure payment gateway. Please check your network connection, disable ad-blockers, or select Cash on Delivery."
+          );
+        }
+
+        const createRes = await fetch("/api/razorpay/create-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const createData = await createRes.json();
+        if (!createRes.ok || !createData.success || !createData.razorpay_order_id) {
+          throw new Error(createData.message || "Could not initialize payment gateway. Please try again.");
+        }
+
+        // Seamless In-App Sandbox Simulation for Demo/Test mode
+        const isDemo = createData.key_id?.includes("demo") || !createData.key_id;
+        if (isDemo && createData.test_signature) {
+          setSubmittingOrder(false);
+          setRazorpaySandboxData({
+            orderId: createData.order_id,
+            orderNumber: createData.order_number,
+            razorpayOrderId: createData.razorpay_order_id,
+            amount: createData.amount,
+            paymentId: createData.test_payment_id,
+            signature: createData.test_signature,
+            order: createData.order,
+          });
+          return;
+        }
+
+        const rzpOptions = {
+          key: createData.key_id,
+          amount: createData.amount,
+          currency: createData.currency || "INR",
+          name: "AVSARAA",
+          description: `Order #${createData.order_number} · Surat Handloom Atelier`,
+          image: "/favicon.ico",
+          order_id: createData.razorpay_order_id,
+          prefill: {
+            name: addressSnapshot.recipient_name,
+            email: addressSnapshot.email || "",
+            contact: addressSnapshot.phone_number,
+          },
+          theme: {
+            color: "#261B13",
+          },
+          modal: {
+            confirm_close: true,
+            ondismiss: () => {
+              setSubmittingOrder(false);
+              setErrorMessage(
+                "Payment was not completed. Your shopping bag and address are preserved so you can retry whenever ready."
+              );
+            },
+          },
+          handler: async (response: {
+            razorpay_payment_id: string;
+            razorpay_order_id: string;
+            razorpay_signature: string;
+          }) => {
+            try {
+              setSubmittingOrder(true);
+              const verifyRes = await fetch("/api/razorpay/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...response,
+                  order_id: createData.order_id,
+                  amount: createData.amount / 100,
+                }),
+              });
+
+              const verifyData = await verifyRes.json();
+              if (!verifyRes.ok || !verifyData.success) {
+                throw new Error(verifyData.error || "Payment verification could not be completed.");
+              }
+
+              // 1. Clear shopping bag
+              clearCart();
+
+              // 2. Cache latest order in session storage
+              const finalOrder = verifyData.order || createData.order;
+              try {
+                sessionStorage.setItem("avsaraa_latest_order", JSON.stringify(finalOrder));
+              } catch {
+                // ignore
+              }
+
+              // 3. Navigate to Order Success page
+              router.push(`/order-success/${finalOrder?.id || createData.order_id}`);
+            } catch (vErr: unknown) {
+              const vMsg = vErr instanceof Error ? vErr.message : "Payment verification failed. Please contact concierge support.";
+              setErrorMessage(vMsg);
+              setSubmittingOrder(false);
+            }
+          },
+        };
+
+        const rzp = new window.Razorpay(rzpOptions);
+        rzp.on("payment.failed", (failedRes: RazorpayFailureResponse) => {
+          setErrorMessage(
+            failedRes.error?.description || "Payment was rejected by bank. Please try another card or UPI option."
+          );
+          setSubmittingOrder(false);
+        });
+        rzp.open();
+        return;
+      }
+
+      // Cash on Delivery (COD) Direct Placement
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -526,7 +787,7 @@ export default function CheckoutPage() {
       >
         <SpinnerIcon size={32} color="#866951" />
         <p style={{ fontSize: "14px", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-          Preparing your atelier checkout...
+          Preparing your checkout...
         </p>
       </div>
     );
@@ -600,7 +861,7 @@ export default function CheckoutPage() {
             color: "#FAF7F2",
           }}
         >
-          Explore Heirlooms
+          Explore Collection
         </Link>
       </div>
     );
@@ -682,7 +943,7 @@ export default function CheckoutPage() {
               marginTop: "6px",
             }}
           >
-            AVSARAA Atelier · Wear the moment
+            AVSARAA · Wear the moment
           </p>
         </div>
 
@@ -732,6 +993,45 @@ export default function CheckoutPage() {
         >
           {/* LEFT COLUMN: Delivery Address & Payment Method */}
           <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+            {/* Guest Checkout Notice if unauthenticated */}
+            {!user && (
+              <div
+                style={{
+                  backgroundColor: "rgba(197, 160, 89, 0.12)",
+                  border: "1px solid rgba(197, 160, 89, 0.35)",
+                  borderRadius: "14px",
+                  padding: "14px 18px",
+                  marginBottom: "20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13" }}>
+                    ✦ Checkout as Guest
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#6E5B4E", marginTop: "2px" }}>
+                    No account required. Fill in your delivery details below to place your order directly.
+                  </div>
+                </div>
+                <Link
+                  href="/login?redirectTo=/checkout"
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#866951",
+                    textDecoration: "underline",
+                    textUnderlineOffset: "3px",
+                  }}
+                >
+                  Already have an account? Sign In →
+                </Link>
+              </div>
+            )}
+
             {/* Step 1: Shipping Address */}
             <div
               style={{
@@ -808,7 +1108,7 @@ export default function CheckoutPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "16px 0" }}>
                   <SpinnerIcon size={18} color="#866951" />
                   <span style={{ fontSize: "13px", color: "#866951" }}>
-                    Loading saved patron addresses...
+                    Loading saved addresses...
                   </span>
                 </div>
               ) : (
@@ -953,10 +1253,12 @@ export default function CheckoutPage() {
 
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                         <div>
-                          <label style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
+                          <label htmlFor="checkout_recipient_name" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
                             Recipient Name *
                           </label>
                           <input
+                            id="checkout_recipient_name"
+                            name="recipient_name"
                             type="text"
                             required
                             placeholder="Full Name"
@@ -974,15 +1276,19 @@ export default function CheckoutPage() {
                         </div>
 
                         <div>
-                          <label style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
+                          <label htmlFor="checkout_phone_number" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
                             Phone Number *
                           </label>
                           <input
+                            id="checkout_phone_number"
+                            name="phone_number"
                             type="tel"
                             required
+                            pattern="[0-9]{10}"
+                            maxLength={10}
                             placeholder="10-digit mobile"
                             value={newAddress.phone_number}
-                            onChange={(e) => setNewAddress({ ...newAddress, phone_number: e.target.value })}
+                            onChange={(e) => setNewAddress({ ...newAddress, phone_number: e.target.value.replace(/\D/g, "").slice(0, 10) })}
                             style={{
                               width: "100%",
                               padding: "10px 12px",
@@ -996,10 +1302,35 @@ export default function CheckoutPage() {
                       </div>
 
                       <div>
-                        <label style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
+                        <label htmlFor="checkout_email" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
+                          Email Address {!user && "*"}
+                        </label>
+                        <input
+                          id="checkout_email"
+                          name="email"
+                          type="email"
+                          required={!user}
+                          placeholder="name@example.com (for order invoice & tracking updates)"
+                          value={newAddress.email}
+                          onChange={(e) => setNewAddress({ ...newAddress, email: e.target.value })}
+                          style={{
+                            width: "100%",
+                            padding: "10px 12px",
+                            borderRadius: "8px",
+                            border: "1px solid rgba(38, 27, 19, 0.18)",
+                            fontSize: "13px",
+                            backgroundColor: "#FAF7F2",
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="checkout_address_line1" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
                           Address (House / Flat / Building No.) *
                         </label>
                         <input
+                          id="checkout_address_line1"
+                          name="address_line1"
                           type="text"
                           required
                           placeholder="e.g. Flat 402, Royal Palms Apartment"
@@ -1368,7 +1699,7 @@ export default function CheckoutPage() {
                   marginBottom: "8px",
                 }}
               >
-                Special Delivery Instructions / Atelier Gift Message (Optional)
+                Special Delivery Instructions / Gift Message (Optional)
               </label>
               <textarea
                 rows={2}
@@ -1411,7 +1742,7 @@ export default function CheckoutPage() {
                   borderBottom: "1px solid rgba(38, 27, 19, 0.08)",
                 }}
               >
-                Order Summary ({cartItems.length} {cartItems.length === 1 ? "Piece" : "Pieces"})
+                Order Summary ({totalItems} {totalItems === 1 ? "Piece" : "Pieces"})
               </h2>
 
               {/* Items List */}
@@ -1494,7 +1825,7 @@ export default function CheckoutPage() {
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                   <span style={{ fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5A4535" }}>
-                    Atelier Promotion
+                    Promo Code
                   </span>
                   {!appliedCoupon && (
                     <button
@@ -1665,20 +1996,20 @@ export default function CheckoutPage() {
               <button
                 type="button"
                 onClick={handlePlaceOrder}
-                disabled={submittingOrder || !selectedAddressId}
+                disabled={submittingOrder || !hasValidAddress}
                 className="avsaraa-btn-primary btn-shine"
                 style={{
                   width: "100%",
                   height: "50px",
                   borderRadius: "25px",
                   border: "none",
-                  backgroundColor: !selectedAddressId ? "#866951" : "#261B13",
+                  backgroundColor: !hasValidAddress ? "#866951" : "#261B13",
                   color: "#FAF7F2",
                   fontSize: "13px",
                   fontWeight: 600,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  cursor: submittingOrder || !selectedAddressId ? "not-allowed" : "pointer",
+                  cursor: submittingOrder || !hasValidAddress ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -1690,7 +2021,7 @@ export default function CheckoutPage() {
                 {submittingOrder ? (
                   <>
                     <SpinnerIcon size={16} color="#FAF7F2" />
-                    <span>Confirming Atelier Order...</span>
+                    <span>Confirming Your Order...</span>
                   </>
                 ) : (
                   <>
@@ -1703,11 +2034,23 @@ export default function CheckoutPage() {
                 )}
               </button>
 
-              {!selectedAddressId && (
+              {!hasValidAddress && (
                 <p style={{ textAlign: "center", fontSize: "11px", color: "#866951", margin: "8px 0 0" }}>
-                  * Please select or enter a delivery address above to confirm your order.
+                  * Please enter or select a delivery address above to confirm your order.
                 </p>
               )}
+
+              <p style={{ textAlign: "center", fontSize: "11px", color: "#6E5B4E", margin: "12px 0 0", lineHeight: 1.5 }}>
+                By placing your order, you agree to Avsaraa&apos;s{" "}
+                <Link href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#261B13", textDecoration: "underline", fontWeight: 600 }}>
+                  Terms &amp; Conditions
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "#261B13", textDecoration: "underline", fontWeight: 600 }}>
+                  Privacy Policy
+                </Link>
+                .
+              </p>
 
               {/* Brand Assurances */}
               <div
@@ -1784,7 +2127,7 @@ export default function CheckoutPage() {
                 Verify Delivery Contact
               </h3>
               <p style={{ fontSize: "13px", color: "#6A5C52", margin: 0, lineHeight: 1.5 }}>
-                To secure your atelier order, please enter the 6-digit verification code dispatched to{" "}
+                To verify your order, please enter the 6-digit verification code sent to{" "}
                 <strong>{selectedAddress?.phone_number || newAddress.phone_number || "your contact"}</strong>.
               </p>
             </div>
@@ -1924,6 +2267,155 @@ export default function CheckoutPage() {
               >
                 {sendingOtp ? "Resending code..." : "Resend WhatsApp / SMS code"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Razorpay Sandbox Test Mode Modal (Activated for test variables) */}
+      {razorpaySandboxData && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(12, 35, 64, 0.75)",
+            backdropFilter: "blur(5px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 3500,
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: "16px",
+              padding: "0",
+              maxWidth: "460px",
+              width: "100%",
+              overflow: "hidden",
+              boxShadow: "0 24px 48px rgba(0, 0, 0, 0.35)",
+              border: "1px solid #E2E8F0",
+            }}
+          >
+            {/* Razorpay Brand Header */}
+            <div
+              style={{
+                backgroundColor: "#0C2340",
+                color: "#FFFFFF",
+                padding: "24px 28px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    color: "#528FF0",
+                    display: "block",
+                  }}
+                >
+                  Razorpay Sandbox · Test Mode
+                </span>
+                <h3 style={{ fontSize: "18px", margin: "4px 0 0", fontWeight: 600 }}>
+                  AVSARAA Checkout
+                </h3>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <span style={{ fontSize: "11px", color: "#A0AEC0", display: "block" }}>Payable</span>
+                <strong style={{ fontSize: "18px", color: "#FFFFFF" }}>
+                  {formatINR(razorpaySandboxData.amount / 100)}
+                </strong>
+              </div>
+            </div>
+
+            {/* Test Simulation Content */}
+            <div style={{ padding: "24px 28px" }}>
+              <div
+                style={{
+                  backgroundColor: "#F7FAFC",
+                  border: "1px solid #EDF2F7",
+                  borderRadius: "8px",
+                  padding: "14px 16px",
+                  marginBottom: "20px",
+                  fontSize: "12px",
+                  color: "#4A5568",
+                  lineHeight: 1.6,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                  <span>Order Number:</span>
+                  <strong>{razorpaySandboxData.orderNumber}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                  <span>Test Gateway ID:</span>
+                  <code style={{ fontSize: "11px" }}>{razorpaySandboxData.paymentId}</code>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Verification:</span>
+                  <span style={{ color: "#2E7D32", fontWeight: 600 }}>HMAC-SHA256 Ready</span>
+                </div>
+              </div>
+
+              <p style={{ fontSize: "13px", color: "#4A5568", margin: "0 0 20px", lineHeight: 1.5 }}>
+                You are in <strong>Razorpay Test Sandbox</strong> mode. Clicking below simulates bank authorization, generates a cryptographic payment signature, confirms the order, and dispatches the GST tax invoice via Resend.
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={handleSandboxPaymentSuccess}
+                  disabled={submittingOrder}
+                  style={{
+                    height: "46px",
+                    borderRadius: "8px",
+                    border: "none",
+                    backgroundColor: "#0C2340",
+                    color: "#FFFFFF",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: submittingOrder ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    boxShadow: "0 4px 12px rgba(12, 35, 64, 0.2)",
+                  }}
+                >
+                  {submittingOrder ? (
+                    <>
+                      <SpinnerIcon size={18} color="#FFFFFF" />
+                      <span>Verifying & Sending Invoice...</span>
+                    </>
+                  ) : (
+                    <span>Simulate Successful Payment →</span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSandboxPaymentDismiss}
+                  disabled={submittingOrder}
+                  style={{
+                    height: "40px",
+                    borderRadius: "8px",
+                    border: "1px solid #CBD5E0",
+                    backgroundColor: "transparent",
+                    color: "#718096",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    cursor: submittingOrder ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Cancel / Close Payment Window
+                </button>
+              </div>
             </div>
           </div>
         </div>

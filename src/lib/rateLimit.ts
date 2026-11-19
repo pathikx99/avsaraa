@@ -95,3 +95,7 @@ export function rateLimitCouponValidation(ip: string): RateLimitResult {
 export function rateLimitOrderTracking(ip: string): RateLimitResult {
   return checkRateLimit(`order-track:${ip}`, 10, 60);
 }
+
+export function rateLimitReviews(ipOrUserId: string): RateLimitResult {
+  return checkRateLimit(`review:${ipOrUserId.toLowerCase().trim()}`, 5, 300);
+}

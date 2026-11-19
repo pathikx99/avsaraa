@@ -15,8 +15,8 @@ import type { User } from "@supabase/supabase-js";
 const ANNOUNCEMENTS = [
   "FREE SHIPPING ON ALL ORDERS ABOVE ₹999",
   "100% PURE HANDLOOM SILK & WEAVES",
-  "COMPLIMENTARY BLOUSE TAILORING",
-  "SURAT ATELIER • PAN-INDIA SHIPPING",
+  "COMPLIMENTARY FALL & PICO PRE-STITCHED",
+  "HANDCRAFTED IN SURAT • PAN-INDIA SHIPPING",
 ];
 
 const QUICK_SEARCH_TERMS = [
@@ -46,10 +46,23 @@ function HeaderInner() {
   const scrolled = useScrolled(35);
 
   const isHomeActive = pathname === "/" && !currentCategory;
-  const isProductsActive = (pathname.startsWith("/products") || pathname.startsWith("/collection")) && (!currentCategory || currentCategory === "ALL");
-  const isSareesActive = (pathname.startsWith("/products") || pathname.startsWith("/collection")) && currentCategory?.toLowerCase().includes("saree");
-  const isDressesActive = (pathname.startsWith("/products") || pathname.startsWith("/collection")) && currentCategory?.toLowerCase().includes("dress");
-  const isUnder1299Active = pathname === "/under-1299";
+  const isUnder1299Active =
+    pathname === "/under-1299" ||
+    searchParams.get("maxPrice") === "1299" ||
+    currentCategory?.toLowerCase().includes("1299") ||
+    currentCategory?.toLowerCase().includes("under");
+  const isProductsActive =
+    (pathname.startsWith("/products") || pathname.startsWith("/collection")) &&
+    (!currentCategory || currentCategory === "ALL") &&
+    !isUnder1299Active;
+  const isSareesActive =
+    (pathname.startsWith("/products") || pathname.startsWith("/collection")) &&
+    currentCategory?.toLowerCase().includes("saree") &&
+    !isUnder1299Active;
+  const isDressesActive =
+    (pathname.startsWith("/products") || pathname.startsWith("/collection")) &&
+    currentCategory?.toLowerCase().includes("dress") &&
+    !isUnder1299Active;
   const isStoryActive = pathname === "/about";
 
   useEffect(() => {
@@ -139,7 +152,9 @@ function HeaderInner() {
         </button>
 
         <div className="announcement-text-slider">
-          {ANNOUNCEMENTS[announcementIdx]}
+          <span style={{ color: "#ECC880", marginRight: "6px", fontSize: "9px" }}>✦</span>
+          <span>{ANNOUNCEMENTS[announcementIdx]}</span>
+          <span style={{ color: "#ECC880", marginLeft: "6px", fontSize: "9px" }}>✦</span>
         </div>
 
         <button
@@ -182,7 +197,7 @@ function HeaderInner() {
               <Link href="/products?category=Dresses" className={`luxury-nav-link ${isDressesActive ? "active" : ""}`}>
                 Dresses
               </Link>
-              <Link href="/under-1299" className={`luxury-nav-link ${isUnder1299Active ? "active" : ""}`}>
+              <Link href="/products?maxPrice=1299" className={`luxury-nav-link ${isUnder1299Active ? "active" : ""}`}>
                 Under ₹1,299
               </Link>
               <Link href="/about" className={`luxury-nav-link ${isStoryActive ? "active" : ""}`}>
@@ -293,6 +308,9 @@ function HeaderInner() {
               <SearchIcon size={18} color="#C5A059" />
               <input
                 ref={searchInputRef}
+                id="header-search-input"
+                name="search"
+                aria-label="Search collection"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

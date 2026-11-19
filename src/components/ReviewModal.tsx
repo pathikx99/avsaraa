@@ -41,7 +41,7 @@ export default function ReviewModal({
       return;
     }
     if (!comment.trim() || comment.trim().length < 5) {
-      setErrorMsg("Please write at least a sentence about your heirloom experience.");
+      setErrorMsg("Please write at least a sentence about your experience.");
       return;
     }
 
@@ -69,7 +69,7 @@ export default function ReviewModal({
 
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast("Your review and media have been shared with our atelier!");
+        showToast("Thank you! Your review has been submitted successfully.");
         if (onReviewSubmitted && data.review) {
           onReviewSubmitted(data.review as ProductReview);
         }
@@ -126,10 +126,10 @@ export default function ReviewModal({
                 fontWeight: 700,
               }}
             >
-              ✦ Patron Voices & Heirlooms
+              ✦ Customer Reviews
             </span>
             <h3 style={{ fontSize: "20px", fontWeight: 700, color: "#261B13", fontFamily: "var(--font-serif), Georgia, serif", marginTop: "4px" }}>
-              Share Your Drape Story
+              Share Your Experience
             </h3>
           </div>
           <button
@@ -190,7 +190,7 @@ export default function ReviewModal({
                 </button>
               ))}
               <span style={{ fontSize: "13px", color: "#866951", fontWeight: 600, marginLeft: "8px" }}>
-                {rating === 5 ? "Exceptional Heirloom (5/5)" : `${rating} of 5 Stars`}
+                {rating === 5 ? "Excellent (5/5)" : `${rating} of 5 Stars`}
               </span>
             </div>
           </div>
@@ -294,7 +294,7 @@ export default function ReviewModal({
               rows={4}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Describe how the drape felt, the zari luster in evening light, craftsmanship, or the atelier presentation..."
+              placeholder="Share details about the fabric, color, fit, and overall quality..."
               style={{
                 width: "100%",
                 padding: "10px 12px",
@@ -324,7 +324,7 @@ export default function ReviewModal({
               }}
             >
               <CameraIcon size={13} color="#866951" />
-              <span>Patron Photo (URL)</span>
+              <span>Customer Photo (URL)</span>
             </label>
             <input
               type="text"

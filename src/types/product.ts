@@ -20,6 +20,14 @@ export interface ColorVariant {
   name: string;
   hex: string;
   image_url?: string;
+  primary_image?: string;
+  gallery_images?: string[];
+  sizes?: Array<{
+    size: string;
+    sku?: string;
+    stock?: number;
+    price?: number;
+  }>;
 }
 
 export interface ProductHighlight {
@@ -48,6 +56,8 @@ export interface Product {
   stock_count?: number;
   mrp?: number;
   discount_percent?: number;
+  fabric?: string;
+  weave?: string;
   video_url?: string;
   highlights?: Array<string | ProductHighlight>;
 }
@@ -66,41 +76,41 @@ export const OCCASIONS_LIST: OccasionCategory[] = [
     title: "Everyday Essentials",
     subtitle: "Breathable Kurtas & Pure Cottons",
     slug: "everyday",
-    image: "/images/occasion_everyday.jpg",
+    image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=800&q=85",
   },
   {
     id: "festive",
     title: "Festive Edit",
     subtitle: "Zari Silks & Handcrafted Ensembles",
     slug: "festive",
-    image: "/images/occasion_festive.jpg",
+    image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=85",
   },
   {
     id: "wedding-guest",
     title: "Wedding Guest",
     subtitle: "Romantic Organzas & Embroidered Drapes",
     slug: "wedding-guest",
-    image: "/images/occasion_wedding.jpg",
+    image: "https://images.unsplash.com/photo-1659293554631-d7a38642c5e3?auto=format&fit=crop&w=800&q=85",
   },
   {
     id: "haldi-mehendi",
     title: "Haldi & Mehendi",
     subtitle: "Marigold Yellows & Mirror-Work Sets",
     slug: "haldi-mehendi",
-    image: "/images/occasion_haldi.jpg",
+    image: "https://images.unsplash.com/photo-1610189000544-1f0885c4bbeb?auto=format&fit=crop&w=800&q=85",
   },
   {
     id: "traditional",
     title: "Traditional & Ceremonial",
     subtitle: "Heritage Banarasi Weaves & Gold Kadhwa",
     slug: "traditional",
-    image: "/images/occasion_traditional.jpg",
+    image: "https://images.unsplash.com/photo-1641699862936-be9f49b1c38d?auto=format&fit=crop&w=800&q=85",
   },
   {
     id: "party",
     title: "Party & Special Occasions",
     subtitle: "Cocktail Drapes & Midnight Couture",
     slug: "party",
-    image: "/images/occasion_party.jpg",
+    image: "https://images.unsplash.com/photo-1610189013429-a703f4b245cf?auto=format&fit=crop&w=800&q=85",
   },
 ];

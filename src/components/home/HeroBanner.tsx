@@ -8,7 +8,7 @@ export const HERO_SLIDES = [
   {
     id: "new-arrivals",
     badge: "NEW COLLECTION",
-    atelierTag: "Handloom Silk • Surat Atelier",
+    atelierTag: "Handloom Silk • Surat Craft",
     titleLine1: "Every",
     titleLine2: "Moment",
     titleLine3: "A Little More",
@@ -19,15 +19,15 @@ export const HERO_SLIDES = [
     ctaLink: "/products?category=New%20Arrivals",
     secondaryText: "EXPLORE SAREES",
     secondaryLink: "/products?category=Sarees",
-    mobileBanner: "/images/handloom_silk_saree.jpg",
-    desktopBanner: "/images/desktop_hero_cinematic_1.jpg",
+    mobileBanner: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=900&q=85",
+    desktopBanner: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1920&q=85",
     alt: "Avsaraa New Collection - Handcrafted Saree in Natural Sunlight",
     pieceNo: "№ 108",
     craft: "Pure Katan Silk & Zari Weave",
   },
   {
     id: "banarasi-silks",
-    badge: "HANDLOOM ATELIER",
+    badge: "HANDLOOM HERITAGE",
     atelierTag: "Varanasi Heritage Looms",
     titleLine1: "Woven",
     titleLine2: "With Pure",
@@ -39,8 +39,8 @@ export const HERO_SLIDES = [
     ctaLink: "/products?category=Sarees",
     secondaryText: "VIEW ALL PRODUCTS",
     secondaryLink: "/products",
-    mobileBanner: "/images/banarasi_silk_saree.jpg",
-    desktopBanner: "/images/desktop_hero_cinematic_2.jpg",
+    mobileBanner: "https://images.unsplash.com/photo-1641699862936-be9f49b1c38d?auto=format&fit=crop&w=900&q=85",
+    desktopBanner: "https://images.unsplash.com/photo-1641699862936-be9f49b1c38d?auto=format&fit=crop&w=1920&q=85",
     alt: "Handcrafted Banarasi Silk Sarees",
     pieceNo: "№ 247",
     craft: "Varanasi Pit Loom Katan Silk",
@@ -59,8 +59,8 @@ export const HERO_SLIDES = [
     ctaLink: "/products?category=Dresses",
     secondaryText: "VIEW ALL PRODUCTS",
     secondaryLink: "/products",
-    mobileBanner: "/images/royal_occasion_dress.jpg",
-    desktopBanner: "/images/desktop_hero_cinematic_3.jpg",
+    mobileBanner: "https://images.unsplash.com/photo-1756483510859-c0ab4c45782c?auto=format&fit=crop&w=900&q=85",
+    desktopBanner: "https://images.unsplash.com/photo-1756483510859-c0ab4c45782c?auto=format&fit=crop&w=1920&q=85",
     alt: "Royal Occasion Wear & Handcrafted Festive Dresses",
     pieceNo: "№ 312",
     craft: "Handwoven Chanderi & Gota Patti",
@@ -69,24 +69,34 @@ export const HERO_SLIDES = [
 
 export default function HeroBanner() {
   const [heroSlide, setHeroSlide] = useState(0);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
 
   const handleMobileTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0].clientX);
+    if (e.touches.length > 0) {
+      setTouchStart({
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      });
+    }
   };
 
   const handleMobileTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX === null) return;
+    if (!touchStart || e.changedTouches.length === 0) return;
     const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartX - touchEndX;
-    if (Math.abs(diff) > 35) {
-      if (diff > 0) {
+    const touchEndY = e.changedTouches[0].clientY;
+    const diffX = touchStart.x - touchEndX;
+    const diffY = touchStart.y - touchEndY;
+
+    // Only swipe slides if the gesture is predominantly horizontal (at least 1.5x larger than vertical)
+    // and exceeds minimum threshold of 45px
+    if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+      if (diffX > 0) {
         setHeroSlide((prev) => (prev === HERO_SLIDES.length - 1 ? 0 : prev + 1));
       } else {
         setHeroSlide((prev) => (prev === 0 ? HERO_SLIDES.length - 1 : prev - 1));
       }
     }
-    setTouchStartX(null);
+    setTouchStart(null);
   };
 
   useEffect(() => {
@@ -133,6 +143,30 @@ export default function HeroBanner() {
 
             {/* Directional Soft Limestone Gradient Scrim */}
             <div className="hero-arch-scrim" />
+
+            {/* Top Right Atelier Piece Pill */}
+            <div
+              style={{
+                position: "absolute",
+                top: "14px",
+                right: "14px",
+                backgroundColor: "rgba(20, 13, 8, 0.72)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                color: "#ECC880",
+                border: "1px solid rgba(236, 200, 128, 0.4)",
+                padding: "4px 10px",
+                borderRadius: "20px",
+                fontSize: "9.5px",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                zIndex: 4,
+                boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
+              }}
+            >
+              <span>{HERO_SLIDES[heroSlide].pieceNo}</span>
+            </div>
 
             {/* Left-Aligned Editorial Typography */}
             <div className="hero-arch-content">
@@ -206,7 +240,7 @@ export default function HeroBanner() {
           {/* Atelier Gilded Badge */}
           <div style={{ marginBottom: "16px" }}>
             <span className="hero-cinematic-badge">
-              ✦ {HERO_SLIDES[heroSlide].badge} • ATELIER 2026 ✦
+              ✦ {HERO_SLIDES[heroSlide].badge} • COLLECTION 2026 ✦
             </span>
           </div>
 

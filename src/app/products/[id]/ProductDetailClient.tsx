@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DetailedProduct, fetchRelatedProducts } from "@/lib/productDetailData";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { formatINR } from "@/lib/productUtils";
+import { isValidGujaratPincode } from "@/lib/financials";
 import { ProductReview } from "@/types/review";
 import Footer from "@/components/Footer";
 import NavigationDrawer from "@/components/NavigationDrawer";
@@ -31,6 +32,8 @@ import {
   CloseIcon,
   ClockIcon,
   SparkleStarIcon,
+  SpinnerIcon,
+  PlusIcon,
 } from "@/components/Icons";
 
 interface ProductDetailClientProps {
@@ -42,11 +45,19 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const { addToCart, openCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
 
-  const [product, setProduct] = useState<DetailedProduct>(initialProduct);
+  const searchParams = useSearchParams();
+  const urlColor = searchParams?.get("color");
+  const initialColor =
+    (urlColor &&
+      initialProduct.color_variants?.find(
+        (v) => v.name.toLowerCase() === urlColor.toLowerCase()
+      )?.name) ||
+    initialProduct.color_variants?.[0]?.name ||
+    "Default";
+
+  const product = initialProduct;
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [selectedColor, setSelectedColor] = useState<string>(
-    initialProduct.color_variants?.[0]?.name || "Default"
-  );
+  const [selectedColor, setSelectedColor] = useState<string>(initialColor);
   const [selectedSize, setSelectedSize] = useState<string>(
     initialProduct.available_sizes?.[0] || "Free Size"
   );
@@ -71,15 +82,15 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   // PIN code checker state
   const [pinCode, setPinCode] = useState("");
   const [pinResult, setPinResult] = useState<{
-    status: "idle" | "valid" | "invalid";
+    status: "idle" | "valid" | "invalid" | "unserviceable";
     deliveryDate?: string;
     city?: string;
+    message?: string;
   }>({ status: "idle" });
 
-  // Coupon code copy state
-  const [copiedCoupon, setCopiedCoupon] = useState(false);
+  // Promotional coupon applied state
+  const [isCouponApplied, setIsCouponApplied] = useState(false);
   const [shareFeedback, setShareFeedback] = useState(false);
-  const [blouseChoice, setBlouseChoice] = useState<"unstitched" | "custom_tailored">("unstitched");
 
   // Accordion state
   const [openAccordion, setOpenAccordion] = useState<string | null>("specifications");
@@ -93,24 +104,45 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   // Reviews state
   const [reviews, setReviews] = useState<ProductReview[]>([]);
-  const [newReviewForm, setNewReviewForm] = useState({
+  const [newReviewForm, setNewReviewForm] = useState<{
+    name: string;
+    city: string;
+    rating: number;
+    title: string;
+    comment: string;
+    photos: string[];
+  }>({
     name: "",
     city: "",
     rating: 5,
     title: "",
     comment: "",
+    photos: [],
   });
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const reviewFileInputRef = useRef<HTMLInputElement>(null);
 
   // Touch swipe support for gallery
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
   const isFavorited = isInWishlist(product.id);
-  const currentPrice =
-    product.fall_pico_included && blouseChoice === "custom_tailored"
-      ? product.price + 1499
-      : product.price;
+  const currentPrice = product.price;
   const savingsAmount = product.mrp > currentPrice ? product.mrp - currentPrice : 0;
+
+  // Load saved coupon state
+  useEffect(() => {
+    try {
+      const savedCoupon = localStorage.getItem("avsaraa_applied_coupon");
+      if (savedCoupon === "AVSARAA10") {
+        const timer = setTimeout(() => {
+          setIsCouponApplied(true);
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+    } catch {}
+  }, []);
 
   // Load related products & reviews
   useEffect(() => {
@@ -135,8 +167,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               rating: 5,
               title: "Breathtaking Handloom Finish & Authentic Royal Drape",
               comment:
-                "Received this piece in Surat atelier heirloom packaging within 48 hours. The gold zari luster and fabric softness are beyond anything available in typical retail. Truly an exquisite piece.",
-              photos: ["/images/occasion_wedding.jpg", "/images/handloom_silk_saree.jpg"],
+                "Received this piece in signature packaging within 48 hours. The gold zari luster and fabric softness are beyond anything available in typical retail. Truly an exquisite piece.",
+              photos: [
+                "https://images.unsplash.com/photo-1756483509177-bbabd67a3234?auto=format&fit=crop&w=600&q=80",
+                "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=80"
+              ],
               verified_purchase: true,
               helpful_count: 28,
               status: "published",
@@ -151,7 +186,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               title: "Fit and Fall are Flawless — Endless Compliments",
               comment:
                 "Wore this to a family wedding reception. The silhouette feels light yet majestic. The measurement guide helped me choose the ideal fit effortlessly.",
-              photos: ["/images/occasion_festive.jpg"],
+              photos: ["https://images.unsplash.com/photo-1679006831648-7c9ea12e5807?auto=format&fit=crop&w=600&q=80"],
               verified_purchase: true,
               helpful_count: 19,
               status: "published",
@@ -182,32 +217,46 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const activeColorVariant = useMemo(() => {
+    return (
+      product.color_variants?.find((v) => v.name === selectedColor) ||
+      product.color_variants?.[0]
+    );
+  }, [product.color_variants, selectedColor]);
+
+  const activeGalleryImages = useMemo(() => {
+    if (activeColorVariant?.gallery_images && activeColorVariant.gallery_images.length > 0) {
+      return activeColorVariant.gallery_images;
+    }
+    const colorPrimary = activeColorVariant?.primary_image || activeColorVariant?.image_url;
+    if (colorPrimary) {
+      const rest = (product.gallery_images || []).filter((img) => img !== colorPrimary);
+      return [colorPrimary, ...rest];
+    }
+    return product.gallery_images && product.gallery_images.length > 0
+      ? product.gallery_images
+      : [product.image_url];
+  }, [activeColorVariant, product.gallery_images, product.image_url]);
+
+  const safeImageIndex = selectedImageIndex < activeGalleryImages.length ? selectedImageIndex : 0;
+  const currentGalleryImg = activeGalleryImages[safeImageIndex] || product.image_url;
+
   // Update image when color changes
   const handleColorChange = (variantName: string) => {
     setSelectedColor(variantName);
-    const variant = product.color_variants?.find((v) => v.name === variantName);
-    if (variant && variant.image_url) {
-      const existingIdx = product.gallery_images.findIndex((img) => img === variant.image_url);
-      if (existingIdx !== -1) {
-        setSelectedImageIndex(existingIdx);
-      } else {
-        const newGallery = [variant.image_url, ...product.gallery_images];
-        setProduct({ ...product, gallery_images: newGallery });
-        setSelectedImageIndex(0);
-      }
-    }
+    setSelectedImageIndex(0);
   };
 
   // Gallery Navigation
   const handlePrevImage = () => {
     setSelectedImageIndex((prev) =>
-      prev === 0 ? product.gallery_images.length - 1 : prev - 1
+      prev === 0 ? activeGalleryImages.length - 1 : prev - 1
     );
   };
 
   const handleNextImage = () => {
     setSelectedImageIndex((prev) =>
-      prev === product.gallery_images.length - 1 ? 0 : prev + 1
+      prev === activeGalleryImages.length - 1 ? 0 : prev + 1
     );
   };
 
@@ -229,15 +278,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   // Add to Cart
   const handleAddToCart = () => {
-    const finalPrice =
-      product.fall_pico_included && blouseChoice === "custom_tailored"
-        ? product.price + 1499
-        : product.price;
-
     const cartProduct: DetailedProduct = {
       ...product,
-      price: finalPrice,
-      name: `${product.name} · ${selectedSize}${selectedColor && selectedColor !== "Default" && selectedColor !== "Royal Edition" ? ` · ${selectedColor}` : ""}${blouseChoice === "custom_tailored" ? " (Atelier Tailored)" : ""}`,
+      price: product.price,
+      image_url: currentGalleryImg,
+      name: `${product.name} · ${selectedSize}${selectedColor && selectedColor !== "Default" && selectedColor !== "Royal Edition" ? ` · ${selectedColor}` : ""}`,
     };
 
     const success = addToCart(cartProduct, quantity);
@@ -249,15 +294,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   // Buy Now
   const handleBuyNow = () => {
-    const finalPrice =
-      product.fall_pico_included && blouseChoice === "custom_tailored"
-        ? product.price + 1499
-        : product.price;
-
     const cartProduct: DetailedProduct = {
       ...product,
-      price: finalPrice,
-      name: `${product.name} · ${selectedSize}${selectedColor && selectedColor !== "Default" && selectedColor !== "Royal Edition" ? ` · ${selectedColor}` : ""}${blouseChoice === "custom_tailored" ? " (Atelier Tailored)" : ""}`,
+      price: product.price,
+      image_url: currentGalleryImg,
+      name: `${product.name} · ${selectedSize}${selectedColor && selectedColor !== "Default" && selectedColor !== "Royal Edition" ? ` · ${selectedColor}` : ""}`,
     };
 
     const success = addToCart(cartProduct, quantity);
@@ -266,33 +307,50 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     }
   };
 
-  // PIN Code check logic
+  // PIN Code check logic (Gujarat territory: 360000–399999)
   const checkPinValue = (pinString: string) => {
     const cleanPin = pinString.trim();
-    if (/^\d{6}$/.test(cleanPin)) {
-      const date = new Date();
-      date.setDate(date.getDate() + 4);
-      const options: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" };
-      const formattedDate = date.toLocaleDateString("en-IN", options);
-
-      const detectedCity = cleanPin.startsWith("39")
-        ? "Surat Atelier Region"
-        : cleanPin.startsWith("11")
-        ? "Delhi NCR"
-        : cleanPin.startsWith("40")
-        ? "Mumbai Metropolitan"
-        : cleanPin.startsWith("56")
-        ? "Bengaluru"
-        : "Your Area";
-
+    if (!/^\d{6}$/.test(cleanPin)) {
       setPinResult({
-        status: "valid",
-        deliveryDate: formattedDate,
-        city: detectedCity,
+        status: "invalid",
+        message: "Please enter a valid 6-digit Indian PIN code.",
       });
-    } else {
-      setPinResult({ status: "invalid" });
+      return;
     }
+
+    if (!isValidGujaratPincode(cleanPin)) {
+      setPinResult({
+        status: "unserviceable",
+        message: "Currently delivering exclusively across Gujarat (Pincodes 360000–399999). Rest of India launching soon.",
+      });
+      return;
+    }
+
+    const isSurat = cleanPin.startsWith("395");
+    const isAhmedabad = cleanPin.startsWith("380");
+    const isVadodara = cleanPin.startsWith("390");
+    const isRajkot = cleanPin.startsWith("360");
+
+    const date = new Date();
+    date.setDate(date.getDate() + (isSurat ? 1 : isAhmedabad ? 2 : 3));
+    const options: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" };
+    const formattedDate = date.toLocaleDateString("en-IN", options);
+
+    const detectedCity = isSurat
+      ? "Surat Local Region (Next-day)"
+      : isAhmedabad
+      ? "Ahmedabad"
+      : isVadodara
+      ? "Vadodara"
+      : isRajkot
+      ? "Rajkot"
+      : "Gujarat Central";
+
+    setPinResult({
+      status: "valid",
+      deliveryDate: formattedDate,
+      city: detectedCity,
+    });
   };
 
   const handleCheckPin = (e: React.FormEvent) => {
@@ -300,12 +358,21 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     checkPinValue(pinCode);
   };
 
-  // Copy coupon code
-  const handleCopyCoupon = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText("AVSARAA10");
-      setCopiedCoupon(true);
-      setTimeout(() => setCopiedCoupon(false), 2500);
+  // Apply / Unapply promotional coupon code
+  const handleToggleCoupon = () => {
+    if (isCouponApplied) {
+      try {
+        localStorage.removeItem("avsaraa_applied_coupon");
+      } catch {}
+      setIsCouponApplied(false);
+    } else {
+      try {
+        localStorage.setItem("avsaraa_applied_coupon", "AVSARAA10");
+      } catch {}
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText("AVSARAA10").catch(() => {});
+      }
+      setIsCouponApplied(true);
     }
   };
 
@@ -326,33 +393,90 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     }
   };
 
+  // Photo upload handlers for customer reviews
+  const handlePhotoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (newReviewForm.photos.length >= 3) {
+      setUploadError("Maximum 3 photographs allowed per review.");
+      return;
+    }
+
+    const file = files[0];
+    setUploadingPhoto(true);
+    setUploadError(null);
+
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const res = await fetch("/api/reviews/upload", {
+        method: "POST",
+        body: fd,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.url) {
+        setNewReviewForm((prev) => ({
+          ...prev,
+          photos: [...prev.photos, data.url],
+        }));
+      } else {
+        setUploadError(data.error || "Failed to upload photo.");
+      }
+    } catch (err) {
+      console.error("Photo upload error:", err);
+      setUploadError("Network error while uploading photo.");
+    } finally {
+      setUploadingPhoto(false);
+      if (reviewFileInputRef.current) reviewFileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemovePhoto = (indexToRemove: number) => {
+    setNewReviewForm((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((_, idx) => idx !== indexToRemove),
+    }));
+  };
+
   // Review submission
-  const handleSubmitReview = (e: React.FormEvent) => {
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReviewForm.name || !newReviewForm.comment) return;
 
-    const createdReview: ProductReview = {
-      id: `rev-${Date.now()}`,
-      product_id: product.id,
-      customer_name: newReviewForm.name,
-      customer_city: newReviewForm.city || "Verified Patron",
-      rating: newReviewForm.rating,
-      title: newReviewForm.title || "Exceptional Garment Quality",
-      comment: newReviewForm.comment,
-      photos: [],
-      verified_purchase: true,
-      helpful_count: 1,
-      status: "published",
-      created_at: new Date().toISOString(),
-    };
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: product.id,
+          product_name: product.name,
+          customer_name: newReviewForm.name,
+          customer_city: newReviewForm.city || undefined,
+          rating: newReviewForm.rating,
+          title: newReviewForm.title || undefined,
+          comment: newReviewForm.comment,
+          photos: newReviewForm.photos,
+        }),
+      });
 
-    setReviews([createdReview, ...reviews]);
+      const data = await res.json();
+      if (res.ok && data.success && data.review) {
+        setReviews((prev) => [data.review, ...prev]);
+      }
+    } catch (err) {
+      console.warn("Review submission background notice:", err);
+    }
+
     setReviewSubmitted(true);
     setTimeout(() => {
       setIsWriteReviewOpen(false);
       setReviewSubmitted(false);
-      setNewReviewForm({ name: "", city: "", rating: 5, title: "", comment: "" });
-    }, 1800);
+      setNewReviewForm({ name: "", city: "", rating: 5, title: "", comment: "", photos: [] });
+      setUploadError(null);
+    }, 2200);
   };
 
   // Size measurement chart data
@@ -365,8 +489,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     { size: "XXL", bust: isUnitInches ? "42″" : "106 cm", waist: isUnitInches ? "36″" : "91 cm", hip: isUnitInches ? "46″" : "116 cm", length: isUnitInches ? "48″" : "122 cm" },
     { size: "XXXL", bust: isUnitInches ? "44″" : "111 cm", waist: isUnitInches ? "38″" : "96 cm", hip: isUnitInches ? "48″" : "121 cm", length: isUnitInches ? "48″" : "122 cm" },
   ];
-
-  const currentGalleryImg = product.gallery_images[selectedImageIndex] || product.image_url;
 
   return (
     <div className="product-page-wrapper" style={{ backgroundColor: "#FAF7F2", minHeight: "100vh" }}>
@@ -598,6 +720,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 alt={`${product.name} - View ${selectedImageIndex + 1}`}
                 fill
                 priority
+                unoptimized={Boolean(currentGalleryImg && currentGalleryImg.includes("supabase.co"))}
                 sizes="(max-width: 768px) 100vw, 50vw"
                 style={{
                   objectFit: "cover",
@@ -667,7 +790,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               </button>
 
               {/* Left Navigation Arrow */}
-              {product.gallery_images.length > 1 && (
+              {activeGalleryImages.length > 1 && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -700,7 +823,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               )}
 
               {/* Right Navigation Arrow */}
-              {product.gallery_images.length > 1 && (
+              {activeGalleryImages.length > 1 && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -815,12 +938,12 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   zIndex: 10,
                 }}
               >
-                {selectedImageIndex + 1} / {product.gallery_images.length}
+                {safeImageIndex + 1} / {activeGalleryImages.length}
               </div>
             </div>
 
             {/* Mobile Pagination Capsule Dots */}
-            {product.gallery_images.length > 1 && (
+            {activeGalleryImages.length > 1 && (
               <div
                 style={{
                   display: "flex",
@@ -830,8 +953,8 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   padding: "10px 0 4px 0",
                 }}
               >
-                {product.gallery_images.map((_, dotIdx) => {
-                  const isActive = selectedImageIndex === dotIdx;
+                {activeGalleryImages.map((_, dotIdx) => {
+                  const isActive = safeImageIndex === dotIdx;
                   return (
                     <button
                       key={dotIdx}
@@ -866,7 +989,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 backgroundColor: "#FAF7F2",
               }}
             >
-              {product.gallery_images.map((img, idx) => (
+              {activeGalleryImages.map((img, idx) => (
                 <button
                   key={`${img}-${idx}`}
                   type="button"
@@ -893,6 +1016,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     src={img}
                     alt={`Thumbnail ${idx + 1}`}
                     fill
+                    unoptimized={Boolean(img && img.includes("supabase.co"))}
                     sizes="66px"
                     style={{ objectFit: "cover", objectPosition: "center 20%" }}
                   />
@@ -949,7 +1073,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   color: "#866951",
                 }}
               >
-                ✦ SURAT ATELIER · {product.category.toUpperCase()} ✦
+                ✦ HANDCRAFTED IN SURAT · {product.category.toUpperCase()} ✦
               </span>
             </div>
 
@@ -1200,11 +1324,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
               {/* Size Buttons */}
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {product.available_sizes.map((sz) => {
+                {Array.from(new Set(product.available_sizes)).map((sz, idx) => {
                   const isSelected = selectedSize === sz;
                   return (
                     <button
-                      key={sz}
+                      key={`${sz}-${idx}`}
                       type="button"
                       onClick={() => setSelectedSize(sz)}
                       aria-label={`Select size ${sz}`}
@@ -1238,8 +1362,8 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             <div
               className="product-offer-banner"
               style={{
-                backgroundColor: "#F7F2EE",
-                border: "1px dashed #C5A059",
+                backgroundColor: isCouponApplied ? "#F2F8F4" : "#F7F2EE",
+                border: isCouponApplied ? "1px solid #1E5E3A" : "1px dashed #C5A059",
                 borderRadius: "14px",
                 padding: "14px 16px",
                 display: "flex",
@@ -1247,30 +1371,35 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 justifyContent: "space-between",
                 gap: "12px",
                 marginBottom: "24px",
+                transition: "all 0.25s ease",
               }}
             >
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#8A181A", textTransform: "uppercase" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: isCouponApplied ? "#1E5E3A" : "#8A181A", textTransform: "uppercase" }}>
                     ✦ First Order Privilege ✦
                   </span>
                 </div>
                 <div style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
                   Get 10% OFF on Your First Order
                 </div>
-                <div style={{ fontSize: "11.5px", color: "#6E5B4E", marginTop: "2px" }}>
-                  Use code: <strong style={{ color: "#261B13" }}>AVSARAA10</strong> at checkout
+                <div style={{ fontSize: "11.5px", color: isCouponApplied ? "#1E5E3A" : "#6E5B4E", marginTop: "2px", fontWeight: isCouponApplied ? 600 : 400 }}>
+                  {isCouponApplied ? (
+                    <>Code <strong style={{ color: "#1E5E3A" }}>AVSARAA10</strong> applied to checkout</>
+                  ) : (
+                    <>Use code: <strong style={{ color: "#261B13" }}>AVSARAA10</strong> at checkout</>
+                  )}
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={handleCopyCoupon}
-                aria-label="Copy coupon code AVSARAA10"
+                onClick={handleToggleCoupon}
+                aria-label={isCouponApplied ? "Promocode AVSARAA10 applied" : "Apply promocode AVSARAA10"}
                 style={{
-                  padding: "8px 14px",
+                  padding: "8px 16px",
                   borderRadius: "6px",
-                  backgroundColor: copiedCoupon ? "#1E5E3A" : "#261B13",
+                  backgroundColor: isCouponApplied ? "#1E5E3A" : "#261B13",
                   color: "#FAF7F2",
                   border: "none",
                   fontSize: "11px",
@@ -1279,9 +1408,12 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   cursor: "pointer",
                   whiteSpace: "nowrap",
                   transition: "background-color 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
                 }}
               >
-                {copiedCoupon ? "COPIED! ✓" : "COPY CODE"}
+                {isCouponApplied ? "APPLIED ✓" : "APPLY"}
               </button>
             </div>
 
@@ -1312,8 +1444,8 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      border: "1px solid #D8CABE",
-                      borderRadius: "6px",
+                      border: "1.5px solid #D8CABE",
+                      borderRadius: "8px",
                       overflow: "hidden",
                       backgroundColor: "#FAF7F2",
                     }}
@@ -1321,28 +1453,31 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     <button
                       type="button"
                       onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      disabled={quantity <= 1}
                       aria-label="Decrease quantity"
                       style={{
-                        width: "32px",
-                        height: "32px",
+                        width: "36px",
+                        height: "36px",
                         border: "none",
                         backgroundColor: "transparent",
-                        color: "#261B13",
-                        fontSize: "16px",
-                        cursor: "pointer",
+                        color: quantity <= 1 ? "#C0B2A4" : "#261B13",
+                        fontSize: "18px",
+                        fontWeight: 700,
+                        cursor: quantity <= 1 ? "not-allowed" : "pointer",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        transition: "color 0.15s ease",
                       }}
                     >
-                      –
+                      -
                     </button>
                     <span
                       style={{
-                        width: "34px",
+                        width: "36px",
                         textAlign: "center",
-                        fontSize: "13px",
-                        fontWeight: 600,
+                        fontSize: "14px",
+                        fontWeight: 700,
                         color: "#261B13",
                       }}
                     >
@@ -1350,19 +1485,34 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     </span>
                     <button
                       type="button"
-                      onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                      onClick={() =>
+                        setQuantity((q) => {
+                          const maxStock =
+                            product.stock_count && product.stock_count > 0 ? product.stock_count : 10;
+                          return Math.min(maxStock, q + 1);
+                        })
+                      }
+                      disabled={Boolean(product.stock_count && quantity >= product.stock_count)}
                       aria-label="Increase quantity"
                       style={{
-                        width: "32px",
-                        height: "32px",
+                        width: "36px",
+                        height: "36px",
                         border: "none",
                         backgroundColor: "transparent",
-                        color: "#261B13",
-                        fontSize: "16px",
-                        cursor: "pointer",
+                        color:
+                          product.stock_count && quantity >= product.stock_count
+                            ? "#C0B2A4"
+                            : "#261B13",
+                        fontSize: "18px",
+                        fontWeight: 700,
+                        cursor:
+                          product.stock_count && quantity >= product.stock_count
+                            ? "not-allowed"
+                            : "pointer",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        transition: "color 0.15s ease",
                       }}
                     >
                       +
@@ -1404,11 +1554,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 }}
               >
                 <ClockIcon size={14} color="#866951" />
-                <span>Order within next <strong>3 hrs 40 mins</strong> for dispatch today from Surat Atelier</span>
+                <span>Order within next <strong>3 hrs 40 mins</strong> for dispatch today from Surat</span>
               </div>
             </div>
 
-            {/* Saree Tailoring & Fall-Pico Finishing Selector (Category Specific) */}
+            {/* Saree Finishing & Blouse Fabric Information (Category Specific) */}
             {product.fall_pico_included && (
               <div
                 style={{
@@ -1419,53 +1569,16 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   borderRadius: "14px",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-                  <CheckIcon size={14} color="#1E5E3A" />
-                  <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#1E5E3A", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                    Complimentary Fall &amp; Pico Pre-Stitched
-                  </span>
-                </div>
-                <div style={{ fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "8px" }}>
-                  Blouse Piece Choice:
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setBlouseChoice("unstitched")}
-                    style={{
-                      padding: "10px",
-                      borderRadius: "8px",
-                      border: blouseChoice === "unstitched" ? "2px solid #261B13" : "1px solid #D8CABE",
-                      backgroundColor: blouseChoice === "unstitched" ? "#261B13" : "#FFFFFF",
-                      color: blouseChoice === "unstitched" ? "#FAF7F2" : "#261B13",
-                      textAlign: "left",
-                      fontSize: "11.5px",
-                      cursor: "pointer",
-                      transition: "all 0.18s ease",
-                    }}
-                  >
-                    <div style={{ fontWeight: 600 }}>Unstitched Fabric</div>
-                    <div style={{ fontSize: "10px", opacity: 0.85 }}>0.8m Included (₹0)</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setBlouseChoice("custom_tailored")}
-                    style={{
-                      padding: "10px",
-                      borderRadius: "8px",
-                      border: blouseChoice === "custom_tailored" ? "2px solid #261B13" : "1px solid #D8CABE",
-                      backgroundColor: blouseChoice === "custom_tailored" ? "#261B13" : "#FFFFFF",
-                      color: blouseChoice === "custom_tailored" ? "#FAF7F2" : "#261B13",
-                      textAlign: "left",
-                      fontSize: "11.5px",
-                      cursor: "pointer",
-                      transition: "all 0.18s ease",
-                    }}
-                  >
-                    <div style={{ fontWeight: 600 }}>Atelier Tailoring</div>
-                    <div style={{ fontSize: "10px", opacity: 0.85 }}>Custom Fit (+₹1,499)</div>
-                  </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <CheckIcon size={16} color="#1E5E3A" />
+                  <div>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#1E5E3A", letterSpacing: "0.04em", textTransform: "uppercase", display: "block" }}>
+                      Complimentary Fall &amp; Pico Pre-Stitched
+                    </span>
+                    <span style={{ fontSize: "11.5px", color: "#6E5B4E", marginTop: "2px", display: "block" }}>
+                      Includes 0.8m unstitched matching blouse fabric (₹0)
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -1568,8 +1681,12 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 transition: "all 0.2s ease",
               }}
             >
-              <span style={{ fontSize: "16px" }}>💬</span>
-              <span>Chat with Surat Stylist on WhatsApp</span>
+              <span style={{ fontSize: "16px" }}>{product.price >= 15000 ? "📹" : "💬"}</span>
+              <span>
+                {product.price >= 15000
+                  ? "Book Private Video Drape Consultation • WhatsApp Stylist"
+                  : "Chat with Surat Stylist on WhatsApp"}
+              </span>
             </a>
 
             {/* =========================================================================
@@ -1698,6 +1815,8 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
               <form onSubmit={handleCheckPin} style={{ display: "flex", gap: "8px" }}>
                 <input
+                  id="pincode-check-input"
+                  name="pincode"
                   type="text"
                   maxLength={6}
                   value={pinCode}
@@ -1736,13 +1855,13 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 </button>
               </form>
 
-              {/* Quick Select Popular Cities */}
+              {/* Quick Select Gujarat Cities */}
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
                 {[
                   { city: "Surat", pin: "395007" },
-                  { city: "Mumbai", pin: "400001" },
-                  { city: "Delhi NCR", pin: "110001" },
-                  { city: "Bengaluru", pin: "560001" },
+                  { city: "Ahmedabad", pin: "380001" },
+                  { city: "Vadodara", pin: "390001" },
+                  { city: "Rajkot", pin: "360001" },
                 ].map((item) => (
                   <button
                     key={item.pin}
@@ -1782,14 +1901,32 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   </div>
                   <div style={{ fontSize: "11.5px", color: "#3B5244", marginTop: "4px", lineHeight: 1.4 }}>
                     ✦ Cash on Delivery (COD) available<br />
-                    ✦ Free Express Pan-India Air Shipping from Surat Atelier
+                    ✦ Free Express Delivery across Gujarat directly from Surat
                   </div>
+                </div>
+              )}
+
+              {pinResult.status === "unserviceable" && (
+                <div
+                  style={{
+                    marginTop: "12px",
+                    padding: "10px 12px",
+                    backgroundColor: "rgba(184, 80, 66, 0.08)",
+                    border: "1px solid rgba(184, 80, 66, 0.25)",
+                    borderRadius: "8px",
+                    color: "#8A181A",
+                    fontSize: "12px",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: "2px" }}>Delivery Territory Notice</div>
+                  {pinResult.message || "Currently delivering exclusively across Gujarat (Pincodes 360000–399999)."}
                 </div>
               )}
 
               {pinResult.status === "invalid" && (
                 <div style={{ marginTop: "10px", fontSize: "12px", color: "#8A181A" }}>
-                  Please enter a valid 6-digit Indian PIN code.
+                  {pinResult.message || "Please enter a valid 6-digit Indian PIN code."}
                 </div>
               )}
             </div>
@@ -2006,6 +2143,15 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                       <li>Exchange request must be raised within 7 days of delivery.</li>
                       <li>Exchange is subject to product availability.</li>
                     </ul>
+
+                    <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px dashed #E6DACF", display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "12px" }}>
+                      <Link href="/returns" target="_blank" rel="noopener noreferrer" style={{ color: "#866951", fontWeight: 600, textDecoration: "underline" }}>
+                        View Return &amp; Exchange Policy →
+                      </Link>
+                      <Link href="/shipping" target="_blank" rel="noopener noreferrer" style={{ color: "#866951", fontWeight: 600, textDecoration: "underline" }}>
+                        View Shipping Policy →
+                      </Link>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2026,7 +2172,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                       color: "#866951",
                     }}
                   >
-                    ✦ CURATED PAIRINGS ✦
+                    ✦ COMPLETE THE LOOK ✦
                   </span>
                   <h2
                     style={{
@@ -2122,11 +2268,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                 <SparkleStarIcon size={18} color="#DFBA73" />
                 <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.14em", color: "#DFBA73", textTransform: "uppercase" }}>
-                  ✦ Signature Atelier Unboxing ✦
+                  ✦ Signature Packaging ✦
                 </span>
               </div>
               <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "19px", fontWeight: 500, margin: "0 0 10px 0", color: "#FAF7F2" }}>
-                Heirloom Keepsake Presentation
+                Signature Box Presentation
               </h3>
               <p style={{ fontSize: "12.5px", color: "#D8CABE", lineHeight: 1.65, margin: "0 0 16px 0" }}>
                 Every AVSARAA silhouette is delivered in our signature gold-embossed rigid keepsake box, wrapped in breathable pure muslin fabric to preserve genuine zari sheen, accompanied by an authentic Surat master-weaver certificate.
@@ -2177,7 +2323,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                       color: "#866951",
                     }}
                   >
-                    ✦ VERIFIED PATRON VOICES ✦
+                    ✦ CUSTOMER REVIEWS ✦
                   </span>
                   <h2
                     style={{
@@ -2369,7 +2515,14 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                               cursor: "pointer",
                             }}
                           >
-                            <Image src={pUrl} alt="Review attachment" fill sizes="54px" style={{ objectFit: "cover" }} />
+                            <Image
+                              src={pUrl}
+                              alt="Review attachment"
+                              fill
+                              sizes="54px"
+                              style={{ objectFit: "cover" }}
+                              unoptimized={Boolean(pUrl && pUrl.includes("supabase.co"))}
+                            />
                           </div>
                         ))}
                       </div>
@@ -2454,29 +2607,133 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleAddToCart}
-          aria-label="Add to Cart Sticky"
-          className="btn-shine"
-          style={{
-            height: "44px",
-            padding: "0 18px",
-            borderRadius: "6px",
-            backgroundColor: isAddedToCart ? "#1E5E3A" : "#261B13",
-            color: "#FAF7F2",
-            border: "none",
-            fontSize: "11.5px",
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            cursor: "pointer",
-            flexShrink: 0,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {isAddedToCart ? "ADDED ✓" : "ADD TO CART"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+          {/* Sticky Bar Quantity Stepper */}
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              border: "1px solid #CFBEAD",
+              borderRadius: "10px",
+              backgroundColor: "#FAF7F2",
+              height: "44px",
+              overflow: "hidden",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              disabled={quantity <= 1}
+              aria-label="Decrease quantity"
+              style={{
+                width: "30px",
+                height: "100%",
+                border: "none",
+                background: "none",
+                color: quantity <= 1 ? "#C0B2A4" : "#261B13",
+                fontSize: "16px",
+                fontWeight: 700,
+                cursor: quantity <= 1 ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              -
+            </button>
+            <span
+              style={{
+                minWidth: "22px",
+                textAlign: "center",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#261B13",
+              }}
+            >
+              {quantity}
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setQuantity((q) => {
+                  const maxStock =
+                    product.stock_count && product.stock_count > 0 ? product.stock_count : 10;
+                  return Math.min(maxStock, q + 1);
+                })
+              }
+              disabled={Boolean(product.stock_count && quantity >= product.stock_count)}
+              aria-label="Increase quantity"
+              style={{
+                width: "30px",
+                height: "100%",
+                border: "none",
+                background: "none",
+                color:
+                  product.stock_count && quantity >= product.stock_count
+                    ? "#C0B2A4"
+                    : "#261B13",
+                fontSize: "16px",
+                fontWeight: 700,
+                cursor:
+                  product.stock_count && quantity >= product.stock_count
+                    ? "not-allowed"
+                    : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              +
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            aria-label="Add to Cart Sticky"
+            className="btn-shine"
+            style={{
+              height: "44px",
+              padding: "0 12px",
+              borderRadius: "10px",
+              backgroundColor: isAddedToCart ? "#1E5E3A" : "#FFFFFF",
+              color: isAddedToCart ? "#FAF7F2" : "#261B13",
+              border: "1px solid #CFBEAD",
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              transition: "all 0.2s ease",
+            }}
+          >
+            {isAddedToCart ? "ADDED ✓" : "ADD TO BAG"}
+          </button>
+          <button
+            type="button"
+            onClick={handleBuyNow}
+            aria-label="Buy Now Sticky"
+            className="btn-shine"
+            style={{
+              height: "44px",
+              padding: "0 14px",
+              borderRadius: "10px",
+              backgroundColor: "#261B13",
+              color: "#FAF7F2",
+              border: "1px solid rgba(197, 160, 89, 0.45)",
+              fontSize: "11px",
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              boxShadow: "0 2px 10px rgba(38,27,19,0.18)",
+            }}
+          >
+            BUY NOW
+          </button>
+        </div>
       </div>
 
       {/* =========================================================================
@@ -2518,7 +2775,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
               <div>
                 <span style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#866951" }}>
-                  ✦ AVSARAA ATELIER FIT GUIDE ✦
+                  ✦ SIZE & FIT GUIDE ✦
                 </span>
                 <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "22px", fontWeight: 500, color: "#261B13", margin: "2px 0 0 0" }}>
                   Size &amp; Measurement Guide
@@ -2680,7 +2937,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 <div>✦ <strong>Saree Length:</strong> 5.5 Meters standard graceful drape</div>
                 <div>✦ <strong>Saree Width:</strong> 44–45 Inches (fits all heights comfortably)</div>
                 <div>✦ <strong>Blouse Piece:</strong> 0.8 Meters unstitched matching running fabric</div>
-                <div>✦ <strong>Finishing:</strong> Fall and Pico pre-stitched at Surat Atelier</div>
+                <div>✦ <strong>Finishing:</strong> Fall and Pico pre-stitched with care</div>
               </div>
             )}
 
@@ -2709,24 +2966,48 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 Not sure about your size? Watch our easy measurement guide and find your perfect fit.
               </p>
 
-              {/* Embedded YouTube Video (Requirement 6) */}
+              {/* Atelier Visual Measurement Guide Card */}
               <div
                 style={{
                   position: "relative",
                   width: "100%",
-                  aspectRatio: "16 / 9",
                   borderRadius: "10px",
                   overflow: "hidden",
                   backgroundColor: "#261B13",
+                  color: "#FAF7F2",
+                  padding: "18px 16px",
+                  border: "1px solid #C4AB94",
                 }}
               >
-                <iframe
-                  src="https://www.youtube.com/embed/5mGUdDq42iI?rel=0&modestbranding=1"
-                  title="How to Measure Yourself for the Perfect Fit"
-                  style={{ width: "100%", height: "100%", border: "none" }}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", borderBottom: "1px solid rgba(196, 171, 148, 0.3)", paddingBottom: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "16px" }}>📏</span>
+                    <span style={{ fontSize: "12.5px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#E0CDBC" }}>
+                      Bespoke Fitting Standard
+                    </span>
+                  </div>
+                  <span style={{ fontSize: "11px", color: "#C4AB94", fontStyle: "italic" }}>
+                    Surat Master Craftsmen
+                  </span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "11.5px", lineHeight: 1.45 }}>
+                  <div style={{ backgroundColor: "rgba(255,255,255,0.06)", padding: "10px 12px", borderRadius: "6px" }}>
+                    <div style={{ fontWeight: 600, color: "#E0CDBC", marginBottom: "3px" }}>1. Bust & Torso</div>
+                    <div style={{ color: "rgba(255,255,255,0.8)" }}>Keep tape comfortably snug across fullest bust line.</div>
+                  </div>
+                  <div style={{ backgroundColor: "rgba(255,255,255,0.06)", padding: "10px 12px", borderRadius: "6px" }}>
+                    <div style={{ fontWeight: 600, color: "#E0CDBC", marginBottom: "3px" }}>2. Natural Waist</div>
+                    <div style={{ color: "rgba(255,255,255,0.8)" }}>Measure 1 inch above navel where blouse waistband rests.</div>
+                  </div>
+                  <div style={{ backgroundColor: "rgba(255,255,255,0.06)", padding: "10px 12px", borderRadius: "6px" }}>
+                    <div style={{ fontWeight: 600, color: "#E0CDBC", marginBottom: "3px" }}>3. Petticoat / Hip</div>
+                    <div style={{ color: "rgba(255,255,255,0.8)" }}>Stand feet together; measure around widest hips.</div>
+                  </div>
+                  <div style={{ backgroundColor: "rgba(255,255,255,0.06)", padding: "10px 12px", borderRadius: "6px" }}>
+                    <div style={{ fontWeight: 600, color: "#E0CDBC", marginBottom: "3px" }}>4. Blouse Length</div>
+                    <div style={{ color: "rgba(255,255,255,0.8)" }}>Shoulder apex down to back hem (standard 14–15 in).</div>
+                  </div>
+                </div>
               </div>
 
               {/* Quick Measure Guidelines */}
@@ -2790,7 +3071,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             }}
           >
             <span style={{ color: "#FAF7F2", fontSize: "13px", fontWeight: 600 }}>
-              {selectedImageIndex + 1} / {product.gallery_images.length}
+              {safeImageIndex + 1} / {activeGalleryImages.length}
             </span>
 
             {/* Scale toggle controls */}
@@ -2852,6 +3133,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               src={currentGalleryImg}
               alt={product.name}
               fill
+              unoptimized={Boolean(currentGalleryImg && currentGalleryImg.includes("supabase.co"))}
               sizes="100vw"
               style={{
                 objectFit: "contain",
@@ -2969,7 +3251,14 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             >
               ✕
             </button>
-            <Image src={viewingPhotoUrl} alt="Patron review photo" fill sizes="90vw" style={{ objectFit: "contain" }} />
+            <Image
+              src={viewingPhotoUrl}
+              alt="Customer review photo"
+              fill
+              sizes="90vw"
+              style={{ objectFit: "contain" }}
+              unoptimized={Boolean(viewingPhotoUrl && viewingPhotoUrl.includes("supabase.co"))}
+            />
           </div>
         </div>
       )}
@@ -3005,7 +3294,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "20px", fontWeight: 600, color: "#261B13", margin: 0 }}>
-                Write a Patron Review
+                Write a Review
               </h3>
               <button
                 type="button"
@@ -3021,7 +3310,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 <div style={{ fontSize: "36px", marginBottom: "8px" }}>✦</div>
                 <div style={{ fontSize: "16px", fontWeight: 600, color: "#1E5E3A" }}>Thank you!</div>
                 <div style={{ fontSize: "13px", color: "#6E5B4E", marginTop: "4px" }}>
-                  Your review has been verified and added to the page.
+                  Your review has been received and submitted.
                 </div>
               </div>
             ) : (
@@ -3129,6 +3418,122 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                       resize: "none",
                     }}
                   />
+                </div>
+
+                {/* Customer Photo Upload Section */}
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" }}>
+                    <label style={{ fontSize: "12px", fontWeight: 600, color: "#261B13" }}>
+                      Upload Customer Photos (Optional)
+                    </label>
+                    <span style={{ fontSize: "11px", color: "#8E7D70" }}>
+                      {newReviewForm.photos.length}/3 photos
+                    </span>
+                  </div>
+                  <p style={{ fontSize: "11px", color: "#6E5B4E", margin: "0 0 8px" }}>
+                    Share photos of yourself wearing this outfit to help other customers see the drape, fabric texture, and fit.
+                  </p>
+
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                    {/* Render Uploaded Photo Thumbnails */}
+                    {newReviewForm.photos.map((pUrl, pIdx) => (
+                      <div
+                        key={pIdx}
+                        style={{
+                          position: "relative",
+                          width: "60px",
+                          height: "75px",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          border: "1px solid #D8CABE",
+                          backgroundColor: "#F2EBE3",
+                        }}
+                      >
+                        <Image
+                          src={pUrl}
+                          alt={`Uploaded review photo ${pIdx + 1}`}
+                          fill
+                          sizes="60px"
+                          style={{ objectFit: "cover" }}
+                          unoptimized={Boolean(pUrl && pUrl.includes("supabase.co"))}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhoto(pIdx)}
+                          title="Remove photo"
+                          style={{
+                            position: "absolute",
+                            top: "3px",
+                            right: "3px",
+                            width: "18px",
+                            height: "18px",
+                            borderRadius: "50%",
+                            backgroundColor: "rgba(38, 27, 19, 0.85)",
+                            color: "#FAF7F2",
+                            border: "none",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            padding: 0,
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Upload Trigger Button */}
+                    {newReviewForm.photos.length < 3 && (
+                      <button
+                        type="button"
+                        onClick={() => reviewFileInputRef.current?.click()}
+                        disabled={uploadingPhoto}
+                        style={{
+                          width: "60px",
+                          height: "75px",
+                          borderRadius: "8px",
+                          border: "1.5px dashed #C5A059",
+                          backgroundColor: "rgba(197, 160, 89, 0.08)",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px",
+                          cursor: uploadingPhoto ? "not-allowed" : "pointer",
+                          color: "#866951",
+                          fontSize: "10px",
+                          fontWeight: 500,
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        {uploadingPhoto ? (
+                          <SpinnerIcon size={16} color="#866951" />
+                        ) : (
+                          <>
+                            <PlusIcon size={16} color="#866951" />
+                            <span>Add Photo</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    <input
+                      ref={reviewFileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      style={{ display: "none" }}
+                      onChange={handlePhotoSelected}
+                    />
+                  </div>
+
+                  {uploadError && (
+                    <div style={{ color: "#8A1818", fontSize: "11px", marginTop: "4px" }}>
+                      {uploadError}
+                    </div>
+                  )}
                 </div>
 
                 <button

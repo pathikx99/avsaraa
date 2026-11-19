@@ -30,7 +30,7 @@ export default function NavigationDrawer({
   const categories = [
     { label: "HOME", subtitle: "Bespoke Sanctuary & Highlights", href: "/" },
     { label: "ALL PRODUCTS", subtitle: "Full Handcrafted Catalog", href: "/products" },
-    { label: "UP TO ₹1,299 EDIT", subtitle: "Daily Wear Kurtas & Stoles", href: "/under-1299" },
+    { label: "UP TO ₹1,299 EDIT", subtitle: "Daily Wear Kurtas & Stoles", href: "/products?maxPrice=1299" },
     { label: "SAREES", subtitle: "Banarasi & Organza Weaves", href: "/products?category=Sarees" },
     { label: "DRESSES", subtitle: "Anarkalis & Chanderi Sets", href: "/products?category=Dresses" },
     { label: "OCCASION WEAR", subtitle: "Bridal Zari & Heavy Drapes", href: "/products?category=Occasion%20Wear" },
@@ -69,7 +69,7 @@ export default function NavigationDrawer({
           borderRight: "1px solid rgba(197, 160, 89, 0.35)",
           display: "flex",
           flexDirection: "column",
-          padding: "24px 22px 32px 22px",
+          padding: "24px 22px calc(32px + env(safe-area-inset-bottom, 16px)) 22px",
           boxShadow: "14px 0 40px rgba(26, 18, 12, 0.25)",
           animation: "slideInLeft 0.35s cubic-bezier(0.16, 1, 0.3, 1) both",
           overflowY: "auto",
@@ -145,7 +145,7 @@ export default function NavigationDrawer({
               border: "1px solid rgba(197, 160, 89, 0.35)",
             }}
           >
-            ✦ ATELIER COLLECTIONS ✦
+            ✦ EXPLORE COLLECTIONS ✦
           </span>
         </div>
 
@@ -237,7 +237,7 @@ export default function NavigationDrawer({
           >
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <HeartIcon size={17} color={totalWishlist > 0 ? "#B83A4B" : "#866951"} />
-              <span>Saved Heirlooms</span>
+              <span>Wishlist</span>
             </div>
             {totalWishlist > 0 ? (
               <span
@@ -430,7 +430,33 @@ export default function NavigationDrawer({
         </div>
 
         {/* 5. ATELIER CONCIERGE CALLOUT */}
-        <div style={{ marginTop: "auto", paddingTop: "24px", position: "relative", zIndex: 1 }}>
+        <div style={{ marginTop: "auto", paddingTop: "24px", position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
+          <a
+            href="https://wa.me/919876543210?text=Hello%20Avsaraa,%20I%20would%20like%20styling%20assistance."
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              padding: "11px 16px",
+              borderRadius: "14px",
+              backgroundColor: "#F5F8F6",
+              border: "1px solid #C4D9CC",
+              color: "#1E5E3A",
+              fontSize: "12px",
+              fontWeight: 600,
+              textDecoration: "none",
+              letterSpacing: "0.04em",
+              boxShadow: "0 2px 6px rgba(30, 94, 58, 0.06)",
+              transition: "transform 0.15s ease",
+            }}
+          >
+            <span>💬</span>
+            <span>Chat with Surat Stylist (WhatsApp)</span>
+          </a>
+
           <Link
             href="/contact"
             onClick={onClose}
@@ -455,7 +481,7 @@ export default function NavigationDrawer({
             <span>Contact Studio Concierge</span>
             <span>→</span>
           </Link>
-          <p style={{ marginTop: "10px", textAlign: "center", fontSize: "11px", color: "#8E7D70" }}>
+          <p style={{ marginTop: "4px", textAlign: "center", fontSize: "11px", color: "#8E7D70" }}>
             Surat Handloom Studio • Pan-India Free Delivery
           </p>
         </div>

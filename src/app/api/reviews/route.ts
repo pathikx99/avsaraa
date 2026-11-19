@@ -1,39 +1,15 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { getSupabaseUrl, getSupabasePublishableKey } from "@/lib/env";
+import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { ProductReview } from "@/types/review";
-
-function getReviewsSupabaseClient() {
-  const supabaseUrl = getSupabaseUrl();
-  if (!supabaseUrl) return null;
-
-  // Use service role / secret key if available, or gracefully fallback to public anon key
-  // since public reviews have SELECT (status = published) and INSERT (WITH CHECK true) RLS policies.
-  const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const isSecretValid = Boolean(
-    secretKey &&
-      !secretKey.includes("•") &&
-      !secretKey.includes("...") &&
-      secretKey.trim().length >= 20
-  );
-
-  const key = isSecretValid ? (secretKey as string) : getSupabasePublishableKey();
-  if (!key) return null;
-
-  return createClient(supabaseUrl, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
+import { rateLimitReviews } from "@/lib/rateLimit";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get("productId");
 
-    const supabase = getReviewsSupabaseClient();
+    const supabase = getAdminSupabaseClient();
     if (!supabase) {
       return NextResponse.json({
         success: true,
@@ -90,6 +66,47 @@ export async function POST(request: Request) {
       user_id = null,
     } = body;
 
+    // 1. Detect Authenticated User Session
+    let authUserId: string | null = user_id || null;
+    let authUserEmail: string | null = customer_email || null;
+    try {
+      const serverClient = await createSupabaseServerClient();
+      let user = (await serverClient.auth.getUser()).data.user;
+
+      if (!user) {
+        const authHeader = request.headers.get("authorization");
+        if (authHeader?.startsWith("Bearer ")) {
+          const token = authHeader.substring(7);
+          const { data: jwtData } = await serverClient.auth.getUser(token);
+          if (jwtData?.user) {
+            user = jwtData.user;
+          }
+        }
+      }
+
+      if (user) {
+        authUserId = user.id;
+        authUserEmail = user.email || authUserEmail;
+      }
+    } catch {
+      // Unauthenticated session fallback
+    }
+
+    // 2. Rate Limiting Protection (5 reviews per minute per IP / User)
+    const forwarded = request.headers.get("x-forwarded-for");
+    const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+    const rateLimitId = authUserId ? String(authUserId) : ip;
+    const rateCheck = rateLimitReviews(rateLimitId);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Too many review submissions. Please wait a few moments before posting another review.",
+        },
+        { status: 429 }
+      );
+    }
+
     if (!product_id) {
       return NextResponse.json(
         { success: false, error: "Product identifier is required." },
@@ -119,8 +136,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Security (Check 16): Strict photo whitelist - only allow HTTPS images or local /images/ paths.
-    // Disallow dangerous data: URIs and SVG files to prevent stored XSS vectors.
+    // 3. Security: Strict photo whitelist - only allow HTTPS images or local /images/ paths
     const SAFE_PHOTO_REGEX = /^(\/images\/|https:\/\/)/i;
     const cleanPhotos: string[] = Array.isArray(photos)
       ? photos
@@ -133,38 +149,84 @@ export async function POST(request: Request) {
               !p.toLowerCase().includes("javascript:") &&
               !p.toLowerCase().includes("data:")
           )
-          .slice(0, 10)
+          .slice(0, 5)
       : [];
+
+    const adminClient = getAdminSupabaseClient();
+
+    // 4. Verified Purchase Verification
+    // Check if the user has an existing order containing this product_id
+    let verifiedPurchase = false;
+    try {
+      const targetProductId = String(product_id).trim();
+      const matchedOrderIds: string[] = [];
+
+      if (authUserId) {
+        const { data: userOrders } = await adminClient
+          .from("orders")
+          .select("id")
+          .eq("user_id", authUserId)
+          .neq("order_status", "Cancelled");
+
+        if (userOrders) {
+          for (const ord of userOrders) {
+            matchedOrderIds.push(ord.id);
+          }
+        }
+      }
+
+      if (authUserEmail) {
+        const cleanEmail = authUserEmail.toLowerCase().trim();
+        const { data: allOrders } = await adminClient
+          .from("orders")
+          .select("id, shipping_address_snapshot")
+          .neq("order_status", "Cancelled");
+
+        if (allOrders) {
+          for (const ord of allOrders) {
+            const snap = ord.shipping_address_snapshot as { email?: string; phone_number?: string } | null;
+            if (snap?.email?.toLowerCase().trim() === cleanEmail && !matchedOrderIds.includes(ord.id)) {
+              matchedOrderIds.push(ord.id);
+            }
+          }
+        }
+      }
+
+      if (matchedOrderIds.length > 0) {
+        const { data: items } = await adminClient
+          .from("order_items")
+          .select("id")
+          .in("order_id", matchedOrderIds)
+          .eq("product_id", targetProductId)
+          .limit(1);
+
+        if (items && items.length > 0) {
+          verifiedPurchase = true;
+        }
+      }
+    } catch (checkErr) {
+      console.warn("Verified purchase check notice:", checkErr);
+    }
 
     const newReview: Partial<ProductReview> = {
       product_id: String(product_id).slice(0, 100),
       product_name: String(product_name).slice(0, 200),
       customer_name: customer_name.trim().slice(0, 100),
-      customer_email: customer_email ? String(customer_email).trim().slice(0, 200) : null,
+      customer_email: authUserEmail ? String(authUserEmail).trim().slice(0, 200) : null,
       customer_city: customer_city ? String(customer_city).trim().slice(0, 100) : null,
       rating: Math.round(numRating),
       title: title ? String(title).trim().slice(0, 150) : null,
       comment: comment.trim().slice(0, 3000),
       photos: cleanPhotos,
-      videos: [],
-      // Security (Check 11): Public reviews MUST NOT be pre-verified as verified purchases
-      verified_purchase: false,
+      verified_purchase: verifiedPurchase,
       helpful_count: 0,
-      status: "published",
-      user_id,
+      status: verifiedPurchase ? "published" : "pending",
+      user_id: authUserId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    const supabase = getReviewsSupabaseClient();
-    if (!supabase) {
-      return NextResponse.json(
-        { success: false, error: "Review service is currently unavailable. Please try again later." },
-        { status: 503 }
-      );
-    }
-
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("product_reviews")
       .insert([newReview])
       .select()
@@ -180,11 +242,16 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Thank you for sharing your royal review!",
+      message: verifiedPurchase
+        ? "Thank you! Your verified review and photos have been published."
+        : "Thank you for sharing your review! Our atelier concierge will review and publish your feedback shortly.",
       review: data,
     });
   } catch (err: unknown) {
     console.error("Reviews POST exception:", err);
-    return NextResponse.json({ success: false, error: "An unexpected error occurred while posting your review." }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "An unexpected error occurred while posting your review." },
+      { status: 500 }
+    );
   }
 }

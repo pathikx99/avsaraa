@@ -1,14 +1,30 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { verifyAdminSession } from "@/lib/jwtAdmin";
 import { isSuperAdminUser } from "@/lib/adminConstants";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { maskEmail, maskPhoneNumber } from "@/lib/phoneUtils";
 
 export async function GET(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const headerList = await headers();
+    const forwardedFor = headerList.get("x-forwarded-for");
+    const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
+
+    // Rate Limiting Protection (30 order lookups per minute per IP)
+    const rateCheck = checkRateLimit(`order-lookup:${ip}`, 30, 60);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, message: "Too many requests. Please try again shortly." },
+        { status: 429 }
+      );
+    }
+
     const { id } = await props.params;
 
     if (!id) {
@@ -17,9 +33,6 @@ export async function GET(
         { status: 400 }
       );
     }
-
-    const { searchParams } = new URL(request.url);
-    const checkoutSecret = searchParams.get("checkout_id") || request.headers.get("x-checkout-id");
 
     // 1. Authenticate Requester (Customer or Admin)
     const serverClient = await createSupabaseServerClient();
@@ -44,10 +57,11 @@ export async function GET(
         payments (*)
       `);
 
-    if (id.startsWith("AVS-")) {
-      query = query.eq("order_number", id);
-    } else {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUuid) {
       query = query.eq("id", id);
+    } else {
+      query = query.eq("order_number", id);
     }
 
     const { data: order, error } = await query.maybeSingle();
@@ -60,18 +74,66 @@ export async function GET(
     }
 
     // 2. Strict Access Control & IDOR Protection:
-    // Access is granted ONLY IF:
-    // a) Requester is an authorized Admin
-    // b) Requester is the authenticated owner (user.id === order.user_id)
-    // c) Requester has a matching secret checkout_id (for guest confirmation immediately post-purchase)
+    // a) Admin has full access
+    // b) Authenticated order owner has full access
+    // c) Guest order: if matching contact provided in query/header, grant full access; otherwise return masked PII summary
+    const GUEST_SYSTEM_USER_ID = "7a3b2e24-820f-4706-8cc3-4218b42b0da3";
     const isOwner = Boolean(user && user.id === order.user_id);
-    const isMatchingSecret = Boolean(checkoutSecret && checkoutSecret === order.id);
+    const isGuestOrder = Boolean(
+      order.user_id === GUEST_SYSTEM_USER_ID ||
+      order.shipping_address_snapshot?.is_guest === true
+    );
 
-    if (!isAdmin && !isOwner && !isMatchingSecret) {
+    if (!isAdmin && !isOwner && !isGuestOrder) {
       return NextResponse.json(
         { success: false, message: "Unauthorized: Access to this order is restricted." },
         { status: user ? 403 : 401 }
       );
+    }
+
+    // Contact verification for guest orders
+    const { searchParams } = new URL(request.url);
+    const contactParam = (searchParams.get("contact") || headerList.get("x-order-contact") || "").trim().toLowerCase();
+
+    let isContactVerified = false;
+    if (contactParam) {
+      const snap = order.shipping_address_snapshot || {};
+      const orderPhone = String(snap.phone_number || "").replace(/\D/g, "");
+      const orderEmail = String(snap.email || "").toLowerCase().trim();
+      const inputDigits = contactParam.replace(/\D/g, "");
+
+      if (inputDigits.length >= 10 && orderPhone) {
+        isContactVerified = orderPhone.slice(-10) === inputDigits.slice(-10);
+      } else if (orderEmail && orderEmail === contactParam) {
+        isContactVerified = true;
+      }
+    }
+
+    // If guest and not verified by contact, mask sensitive PII to prevent scraping
+    if (isGuestOrder && !isAdmin && !isOwner && !isContactVerified) {
+      const snap = order.shipping_address_snapshot || {};
+      const maskedSnap = {
+        ...snap,
+        recipient_name: snap.recipient_name ? `${snap.recipient_name.slice(0, 2)}••••` : "Customer",
+        phone_number: snap.phone_number ? maskPhoneNumber(snap.phone_number) : "••••••••••",
+        email: snap.email ? maskEmail(snap.email) : "••••@••••",
+        address_line1: snap.address_line1 ? "•••• Protected Address ••••" : "",
+        address_line2: null,
+      };
+
+      return NextResponse.json({
+        success: true,
+        order: {
+          ...order,
+          shipping_address_snapshot: maskedSnap,
+          payments: (order.payments || []).map((p: Record<string, unknown>) => {
+            const safePayment = { ...p };
+            delete safePayment.raw_payload;
+            return safePayment;
+          }),
+        },
+        masked: true,
+      });
     }
 
     return NextResponse.json({

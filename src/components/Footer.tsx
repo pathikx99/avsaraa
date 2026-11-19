@@ -155,6 +155,9 @@ export default function Footer() {
             }}
           >
             <input
+              id="footer-newsletter-email"
+              name="email"
+              aria-label="Email address for newsletter"
               type="email"
               placeholder="Enter your email address"
               value={email}
@@ -254,7 +257,7 @@ export default function Footer() {
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
               <li><Link href="/" className="luxury-nav-link">Home</Link></li>
               <li><Link href="/products" className="luxury-nav-link">Products</Link></li>
-              <li><Link href="/under-1299" className="luxury-nav-link">The ₹1,299 Edit</Link></li>
+              <li><Link href="/products?maxPrice=1299" className="luxury-nav-link">The ₹1,299 Edit</Link></li>
               <li><Link href="/about" className="luxury-nav-link">About Us</Link></li>
               <li><Link href="/contact" className="luxury-nav-link">Contact Us</Link></li>
               <li><Link href="/wishlist" className="luxury-nav-link">Wishlist</Link></li>
@@ -280,9 +283,22 @@ export default function Footer() {
               HELP & SUPPORT
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
-              <li><Link href="/contact">Contact Us</Link></li>
-              <li><Link href="/contact">Concierge Support</Link></li>
-              <li><a href="mailto:contact.avsaraa@gmail.com">contact.avsaraa@gmail.com</a></li>
+              <li><Link href="/contact" className="luxury-nav-link">Contact Us</Link></li>
+              <li><Link href="/track" className="luxury-nav-link">Track Order</Link></li>
+              <li><a href="mailto:info.avsaraa@gmail.com" className="luxury-nav-link">info.avsaraa@gmail.com</a></li>
+            </ul>
+          </div>
+
+          {/* POLICIES Column */}
+          <div>
+            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+              POLICIES
+            </h3>
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
+              <li><Link href="/privacy" className="luxury-nav-link">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="luxury-nav-link">Terms &amp; Conditions</Link></li>
+              <li><Link href="/shipping" className="luxury-nav-link">Shipping &amp; Delivery</Link></li>
+              <li><Link href="/returns" className="luxury-nav-link">Returns &amp; Exchanges</Link></li>
             </ul>
           </div>
         </div>
@@ -358,14 +374,24 @@ export default function Footer() {
           <div
             style={{
               display: "flex",
+              flexWrap: "wrap",
               alignItems: "center",
               justifyContent: "center",
+              gap: "8px 16px",
               fontSize: "12px",
               color: "#7E6E62",
               textAlign: "center",
             }}
           >
             <span>© 2026 Avsaraa. All rights reserved.</span>
+            <span>·</span>
+            <Link href="/privacy" style={{ color: "#7E6E62", textDecoration: "none" }}>Privacy Policy</Link>
+            <span>·</span>
+            <Link href="/terms" style={{ color: "#7E6E62", textDecoration: "none" }}>Terms &amp; Conditions</Link>
+            <span>·</span>
+            <Link href="/shipping" style={{ color: "#7E6E62", textDecoration: "none" }}>Shipping &amp; Delivery</Link>
+            <span>·</span>
+            <Link href="/returns" style={{ color: "#7E6E62", textDecoration: "none" }}>Returns &amp; Refunds</Link>
           </div>
         </div>
       </div>

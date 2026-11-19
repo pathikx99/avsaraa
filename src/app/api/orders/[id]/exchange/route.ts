@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseUrl, getSupabasePublishableKey } from "@/lib/env";
+import { isSuperAdminUser } from "@/lib/adminConstants";
+import { verifyAdminSession } from "@/lib/jwtAdmin";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 function getServiceSupabaseClient() {
   const supabaseUrl = getSupabaseUrl();
@@ -50,6 +53,15 @@ export async function POST(
       );
     }
 
+    // Rate Limiting Protection (5 exchange submissions per 5 minutes per user)
+    const rateCheck = checkRateLimit(`order-exchange:${user.id}`, 5, 300);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, message: `Too many exchange requests. Please wait ${rateCheck.resetSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { reason, details, requested_replacement } = body;
 
@@ -68,12 +80,15 @@ export async function POST(
       );
     }
 
-    // Fetch order to verify ownership & status
-    const { data: order, error: fetchErr } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
+    // Fetch order to verify ownership & status (support both UUID and order_number)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    let orderLookup = supabase.from("orders").select("*");
+    if (isUuid) {
+      orderLookup = orderLookup.eq("id", id);
+    } else {
+      orderLookup = orderLookup.eq("order_number", id);
+    }
+    const { data: order, error: fetchErr } = await orderLookup.maybeSingle();
 
     if (fetchErr || !order) {
       return NextResponse.json(
@@ -83,7 +98,11 @@ export async function POST(
     }
 
     // Security check: order must belong to user unless admin
-    const isAdmin = user.app_metadata?.role === "super_admin" || user.email === "admin@avsaraa.com";
+    const adminSession = await verifyAdminSession(request);
+    const isAdmin = Boolean(
+      adminSession.authorized ||
+      (user && isSuperAdminUser(user))
+    );
     if (order.user_id !== user.id && !isAdmin) {
       return NextResponse.json(
         { success: false, message: "Unauthorized to request exchange for this order." },
@@ -117,7 +136,7 @@ export async function POST(
         notes: updatedNotes,
         updated_at: nowIso,
       })
-      .eq("id", id)
+      .eq("id", order.id)
       .select(`
         *,
         order_items (*)
@@ -125,9 +144,10 @@ export async function POST(
       .single();
 
     if (updateErr) {
+      console.error("Exchange update error:", updateErr);
       return NextResponse.json(
-        { success: false, message: `Could not process exchange: ${updateErr.message}` },
-        { status: 400 }
+        { success: false, message: "Could not process exchange request at this time." },
+        { status: 500 }
       );
     }
 

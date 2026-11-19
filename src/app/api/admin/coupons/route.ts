@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
 import { Coupon } from "@/types/order";
+import { enrichCoupon, saveCouponMetadata, removeCouponMetadata } from "@/lib/couponManager";
 
 const FALLBACK_COUPONS: Coupon[] = [
   {
@@ -17,6 +18,7 @@ const FALLBACK_COUPONS: Coupon[] = [
     valid_from: new Date().toISOString(),
     valid_until: null,
     created_at: new Date().toISOString(),
+    per_user_limit: 5,
   },
   {
     id: "default-welcome500",
@@ -31,6 +33,7 @@ const FALLBACK_COUPONS: Coupon[] = [
     valid_from: new Date().toISOString(),
     valid_until: null,
     created_at: new Date().toISOString(),
+    per_user_limit: 1,
   },
 ];
 
@@ -53,20 +56,24 @@ export async function GET() {
         console.warn("Coupons query error (falling back to default templates):", error.message);
         return NextResponse.json({
           success: true,
-          coupons: FALLBACK_COUPONS,
+          coupons: FALLBACK_COUPONS.map(enrichCoupon),
           notice: "Using local promo cache as remote coupons table is being initialized.",
         });
       }
 
+      const couponList = (coupons && coupons.length > 0 ? coupons : FALLBACK_COUPONS).map(
+        (c) => enrichCoupon(c as Coupon)
+      );
+
       return NextResponse.json({
         success: true,
-        coupons: coupons && coupons.length > 0 ? coupons : FALLBACK_COUPONS,
+        coupons: couponList,
       });
     } catch (err: unknown) {
       console.warn("Coupons query exception, returning default coupons:", err);
       return NextResponse.json({
         success: true,
-        coupons: FALLBACK_COUPONS,
+        coupons: FALLBACK_COUPONS.map(enrichCoupon),
       });
     }
   } catch (err: unknown) {
@@ -95,6 +102,7 @@ export async function POST(request: Request) {
     const maxDiscountAmount = body.max_discount_amount ? Number(body.max_discount_amount) : null;
     const usageLimit = body.usage_limit ? Number(body.usage_limit) : null;
     const validUntil = body.valid_until ? new Date(body.valid_until).toISOString() : null;
+    const perUserLimit = body.per_user_limit ? Number(body.per_user_limit) : 1;
 
     if (!rawCode || rawCode.length < 3 || rawCode.length > 30) {
       return NextResponse.json(
@@ -124,20 +132,35 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: newCoupon, error: insertError } = await supabaseAdmin
+    const insertPayload: Record<string, unknown> = {
+      code: rawCode,
+      discount_type: discountType,
+      discount_value: discountValue,
+      min_order_amount: minOrderAmount,
+      max_discount_amount: maxDiscountAmount,
+      is_active: true,
+      usage_limit: usageLimit,
+      valid_until: validUntil,
+      per_user_limit: perUserLimit,
+    };
+
+    let newCoupon: unknown = null;
+    let { data, error: insertError } = await supabaseAdmin
       .from("coupons")
-      .insert({
-        code: rawCode,
-        discount_type: discountType,
-        discount_value: discountValue,
-        min_order_amount: minOrderAmount,
-        max_discount_amount: maxDiscountAmount,
-        is_active: true,
-        usage_limit: usageLimit,
-        valid_until: validUntil,
-      })
+      .insert(insertPayload)
       .select()
       .single();
+
+    if (insertError && insertError.message?.toLowerCase().includes("per_user_limit")) {
+      delete insertPayload.per_user_limit;
+      const retry = await supabaseAdmin
+        .from("coupons")
+        .insert(insertPayload)
+        .select()
+        .single();
+      data = retry.data;
+      insertError = retry.error;
+    }
 
     if (insertError) {
       if (insertError.code === "23505") {
@@ -151,10 +174,15 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+    newCoupon = data;
+
+    // Persist per_user_limit in metadata fallback
+    saveCouponMetadata(rawCode, perUserLimit);
+    const enriched = enrichCoupon(newCoupon as Coupon);
 
     return NextResponse.json({
       success: true,
-      coupon: newCoupon,
+      coupon: enriched,
       message: `Coupon '${rawCode}' created successfully.`,
     });
   } catch (err: unknown) {
@@ -175,7 +203,7 @@ export async function PATCH(request: Request) {
 
     const supabaseAdmin = getAdminSupabaseClient();
     const body = await request.json();
-    const { id, is_active, discount_value, min_order_amount, max_discount_amount, usage_limit, valid_until } = body;
+    const { id, is_active, discount_value, min_order_amount, max_discount_amount, usage_limit, valid_until, per_user_limit } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -191,31 +219,50 @@ export async function PATCH(request: Request) {
     if (max_discount_amount !== undefined) updates.max_discount_amount = max_discount_amount ? Number(max_discount_amount) : null;
     if (usage_limit !== undefined) updates.usage_limit = usage_limit ? Number(usage_limit) : null;
     if (valid_until !== undefined) updates.valid_until = valid_until ? new Date(valid_until).toISOString() : null;
+    if (per_user_limit !== undefined && Number(per_user_limit) > 0) updates.per_user_limit = Number(per_user_limit);
 
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json(
-        { success: false, error: "No fields provided for update." },
-        { status: 400 }
-      );
+    let updatedCoupon: Coupon | null = null;
+    if (Object.keys(updates).length > 0) {
+      let { data, error: updateError } = await supabaseAdmin
+        .from("coupons")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (updateError && updateError.message?.toLowerCase().includes("per_user_limit")) {
+        delete updates.per_user_limit;
+        const retry = await supabaseAdmin
+          .from("coupons")
+          .update(updates)
+          .eq("id", id)
+          .select()
+          .single();
+        data = retry.data;
+        updateError = retry.error;
+      }
+
+      if (updateError) {
+        return NextResponse.json(
+          { success: false, error: updateError.message || "Failed to update coupon." },
+          { status: 500 }
+        );
+      }
+      updatedCoupon = data as Coupon;
+    } else {
+      const { data } = await supabaseAdmin.from("coupons").select("*").eq("id", id).maybeSingle();
+      updatedCoupon = data as Coupon;
     }
 
-    const { data: updatedCoupon, error: updateError } = await supabaseAdmin
-      .from("coupons")
-      .update(updates)
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (updateError) {
-      return NextResponse.json(
-        { success: false, error: updateError.message || "Failed to update coupon." },
-        { status: 500 }
-      );
+    if (updatedCoupon && per_user_limit !== undefined) {
+      saveCouponMetadata(updatedCoupon.code, Number(per_user_limit));
     }
+
+    const enriched = updatedCoupon ? enrichCoupon(updatedCoupon) : null;
 
     return NextResponse.json({
       success: true,
-      coupon: updatedCoupon,
+      coupon: enriched,
       message: "Coupon updated successfully.",
     });
   } catch (err: unknown) {
@@ -254,6 +301,9 @@ export async function DELETE(request: Request) {
       );
     }
 
+    // Fetch code to cleanup metadata
+    const { data: coup } = await supabaseAdmin.from("coupons").select("code").eq("id", id).maybeSingle();
+
     const { error: deleteError } = await supabaseAdmin
       .from("coupons")
       .delete()
@@ -264,6 +314,10 @@ export async function DELETE(request: Request) {
         { success: false, error: deleteError.message || "Failed to delete coupon." },
         { status: 500 }
       );
+    }
+
+    if (coup?.code) {
+      removeCouponMetadata(coup.code);
     }
 
     return NextResponse.json({
@@ -278,4 +332,3 @@ export async function DELETE(request: Request) {
     );
   }
 }
-

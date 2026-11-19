@@ -1,0 +1,17 @@
+{
+  "AVSARAA10": {
+    "per_user_limit": 5
+  },
+  "WELCOME500": {
+    "per_user_limit": 1
+  },
+  "FESTIVE25": {
+    "per_user_limit": 1
+  },
+  "ROYAL1000": {
+    "per_user_limit": 2
+  },
+  "EXPIRED10": {
+    "per_user_limit": 1
+  }
+}

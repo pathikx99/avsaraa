@@ -72,7 +72,7 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
       id="contact"
       style={{
         backgroundColor: "#F7F2EE",
-        padding: showHeader ? "80px 24px" : "60px 24px 80px 24px",
+        padding: showHeader ? "80px 24px 120px 24px" : "60px 24px 120px 24px",
         position: "relative",
         borderBottom: "1px solid #E6DACF",
         overflow: "hidden",
@@ -258,7 +258,7 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
                   </div>
                   <div>
                     <span style={{ display: "block", fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      Atelier Concierge & Inquiries
+                      Customer Care & Inquiries
                     </span>
                     <a
                       href="mailto:contact.avsaraa@gmail.com"

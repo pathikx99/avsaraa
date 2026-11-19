@@ -1,28 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { HeartIcon, ShoppingBagIcon, TrashIcon } from "@/components/Icons";
+import { HeartIcon, TrashIcon } from "@/components/Icons";
 import { useWishlist } from "@/context/WishlistContext";
-import { useCart } from "@/context/CartContext";
-import { Product } from "@/types/product";
 import { resolveProductImage } from "@/lib/productUtils";
 
 export default function WishlistPage() {
+  const router = useRouter();
   const { wishlist, removeFromWishlist, clearWishlist, user, isLoaded } = useWishlist();
-  const { addToCart } = useCart();
-  const [addedId, setAddedId] = useState<string | null>(null);
 
-  const handleMoveToBag = (product: Product) => {
-    const success = addToCart(product);
-    if (success) {
-      setAddedId(product.id);
-      setTimeout(() => setAddedId(null), 2000);
+  useEffect(() => {
+    if (isLoaded && !user) {
+      router.replace("/login?redirectTo=/wishlist");
     }
-  };
+  }, [isLoaded, user, router]);
 
   return (
     <div
@@ -80,7 +76,7 @@ export default function WishlistPage() {
               border: "1px solid rgba(196, 171, 148, 0.3)",
             }}
           >
-            ✦ SAVED FOR CELEBRATIONS ✦
+            ✦ SAVED ITEMS ✦
           </span>
 
           <h1
@@ -93,7 +89,7 @@ export default function WishlistPage() {
               color: "#FAF7F2",
             }}
           >
-            Saved Heirlooms
+            My Wishlist
           </h1>
 
           <p
@@ -105,12 +101,12 @@ export default function WishlistPage() {
               lineHeight: 1.7,
             }}
           >
-            Your personally curated collection of handcrafted Banarasi silks, royal organzas, and defining festive ensembles.
+            Your saved collection of handcrafted sarees, dresses, and festive wear.
           </p>
         </section>
 
         {/* Wishlist Content */}
-        <section style={{ padding: "60px 24px 80px 24px", maxWidth: "1240px", margin: "0 auto" }}>
+        <section style={{ padding: "60px 24px 120px 24px", maxWidth: "1240px", margin: "0 auto" }}>
           {!user && isLoaded ? (
             <div
               style={{
@@ -141,7 +137,7 @@ export default function WishlistPage() {
               </div>
 
               <span className="luxury-badge" style={{ marginBottom: "12px", display: "inline-block" }}>
-                ✦ ATELIER WISHLIST ACCESS ✦
+                ✦ MY WISHLIST ✦
               </span>
 
               <h2
@@ -153,7 +149,7 @@ export default function WishlistPage() {
                   marginBottom: "10px",
                 }}
               >
-                Sign In to View Saved Heirlooms
+                Sign In to View Your Wishlist
               </h2>
 
               <p
@@ -165,12 +161,12 @@ export default function WishlistPage() {
                   margin: "0 auto 28px auto",
                 }}
               >
-                Please sign in to your Avsaraa account to view your saved sarees, manage your bridal trousseau selections, and proceed with private drape consultations.
+                Please sign in to view your saved items, keep track of your favourites, and easily add them to your bag.
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "340px", margin: "0 auto" }}>
                 <Link
-                  href="/login?redirect=/wishlist"
+                  href="/login?redirectTo=/wishlist"
                   className="avsaraa-btn-primary btn-shine"
                   style={{
                     height: "48px",
@@ -219,7 +215,7 @@ export default function WishlistPage() {
                     fontWeight: 500,
                   }}
                 >
-                  Explore The Atelier Collection →
+                  Explore Collection →
                 </Link>
               </div>
             </div>
@@ -273,7 +269,7 @@ export default function WishlistPage() {
                   margin: "0 auto 28px auto",
                 }}
               >
-                Discover our handcrafted pure silk drapes, organza sarees, and festive silhouettes to save your defining favorites.
+                Explore our handcrafted silk sarees and festive wear to save your favourites.
               </p>
 
               <Link
@@ -292,7 +288,7 @@ export default function WishlistPage() {
                   borderRadius: "25px",
                 }}
               >
-                <span>Explore The Atelier</span>
+                <span>Explore Collection</span>
                 <span>→</span>
               </Link>
             </div>
@@ -336,6 +332,7 @@ export default function WishlistPage() {
                   <div
                     key={product.id}
                     className="luxury-hover-card product-card-container"
+                    onClick={() => router.push(`/products/${product.id}`)}
                     style={{
                       backgroundColor: "#FFFFFF",
                       borderRadius: "20px",
@@ -345,20 +342,26 @@ export default function WishlistPage() {
                       display: "flex",
                       flexDirection: "column",
                       position: "relative",
+                      cursor: "pointer",
                     }}
                   >
                     {/* Image Frame */}
                     <div
                       className="luxury-image-zoom-container product-card-image"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/products/${product.id}`);
+                      }}
                       style={{
                         position: "relative",
                         width: "100%",
                         height: "360px",
                         backgroundColor: "#F2EBE3",
+                        cursor: "pointer",
                       }}
                     >
                       <Image
-                        src={resolveProductImage(product.image_url) || "/images/banarasi_silk_saree.jpg"}
+                        src={resolveProductImage(product.image_url) || "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80"}
                         alt={product.name}
                         fill
                         sizes="(min-width: 900px) 25vw, 50vw"
@@ -390,7 +393,10 @@ export default function WishlistPage() {
                       {/* Remove Button */}
                       <button
                         type="button"
-                        onClick={() => removeFromWishlist(product.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFromWishlist(product.id);
+                        }}
                         aria-label="Remove from wishlist"
                         style={{
                           position: "absolute",
@@ -424,19 +430,25 @@ export default function WishlistPage() {
                         flex: 1,
                       }}
                     >
-                      <h3
-                        className="product-card-title"
-                        style={{
-                          fontFamily: "var(--font-serif), Georgia, serif",
-                          fontSize: "19px",
-                          fontWeight: 600,
-                          color: "#261B13",
-                          marginBottom: "6px",
-                          lineHeight: 1.3,
-                        }}
+                      <Link
+                        href={`/products/${product.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ textDecoration: "none" }}
                       >
-                        {product.name}
-                      </h3>
+                        <h3
+                          className="product-card-title"
+                          style={{
+                            fontFamily: "var(--font-serif), Georgia, serif",
+                            fontSize: "19px",
+                            fontWeight: 600,
+                            color: "#261B13",
+                            marginBottom: "6px",
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          {product.name}
+                        </h3>
+                      </Link>
 
                       <p
                         className="product-card-desc"
@@ -475,6 +487,7 @@ export default function WishlistPage() {
 
                           <Link
                             href={`/contact?inquire=${encodeURIComponent(product.name)}`}
+                            onClick={(e) => e.stopPropagation()}
                             style={{
                               fontSize: "11px",
                               fontWeight: 600,
@@ -489,7 +502,10 @@ export default function WishlistPage() {
 
                         <button
                           type="button"
-                          onClick={() => handleMoveToBag(product)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/products/${product.id}`);
+                          }}
                           className="avsaraa-btn-primary product-card-btn btn-shine"
                           style={{
                             height: "40px",
@@ -502,12 +518,12 @@ export default function WishlistPage() {
                             gap: "6px",
                             borderRadius: "20px",
                             width: "100%",
-                            backgroundColor: addedId === product.id ? "#1B6B40" : "#261B13",
+                            backgroundColor: "#261B13",
                             transition: "background-color 0.3s ease",
+                            cursor: "pointer",
                           }}
                         >
-                          <ShoppingBagIcon size={14} color="#FAF7F2" />
-                          <span>{addedId === product.id ? "Added to Bag ✓" : "Move to Bag"}</span>
+                          <span>Select Size & Order →</span>
                         </button>
                       </div>
                     </div>

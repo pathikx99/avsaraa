@@ -4,7 +4,7 @@
 
 export const FREE_DELIVERY_THRESHOLD = 500;
 export const STANDARD_COURIER_FEE = 50;
-export const COD_SURCHARGE = 10;
+export const COD_SURCHARGE = 20;
 export const GST_RATE = 0.05; // 5% inclusive GST
 
 /**
@@ -56,7 +56,7 @@ export function computeCourierFee(subtotal: number, baseFee: number = STANDARD_C
 }
 
 /**
- * Computes COD surcharge: ₹10 for Cash on Delivery, ₹0 for prepaid
+ * Computes COD surcharge: ₹20 for Cash on Delivery, ₹0 for prepaid
  */
 export function computeCodSurcharge(paymentMethod: string): number {
   return paymentMethod === "COD" ? COD_SURCHARGE : 0;

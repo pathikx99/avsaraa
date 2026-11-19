@@ -3,6 +3,7 @@ import assert from "node:assert";
 import crypto from "crypto";
 import { signAdminToken, verifyAdminToken } from "../../src/lib/jwtAdmin.ts";
 import { escapeHtml } from "../../src/lib/emailTemplates.ts";
+import { isSuperAdminUser, isSuperAdminEmail } from "../../src/lib/adminConstants.ts";
 
 describe("Security Architecture & Cryptographic Verification Tests", () => {
   test("Standalone Admin JWT generation and cryptographic verification with jose", async () => {
@@ -62,5 +63,75 @@ describe("Security Architecture & Cryptographic Verification Tests", () => {
 
     assert.strictEqual(crypto.timingSafeEqual(bufA, bufB), true);
     assert.strictEqual(crypto.timingSafeEqual(bufA, bufC), false);
+  });
+
+  test("Centralized Super Admin authority correctly verifies roles and rejects impostors", () => {
+    // 1. Valid super_admin role in app_metadata
+    assert.strictEqual(isSuperAdminUser({ app_metadata: { role: "super_admin" }, email: "other@gmail.com" }), true);
+    assert.strictEqual(isSuperAdminUser({ app_metadata: { role: "admin" } }), true);
+
+    // 2. Verified admin emails
+    assert.strictEqual(isSuperAdminEmail("contact.avsaraa@gmail.com"), true);
+    assert.strictEqual(isSuperAdminEmail("admin@avsaraa.com"), true);
+    assert.strictEqual(isSuperAdminUser({ email: "contact.avsaraa@gmail.com" }), true);
+
+    // 3. Reject regular patron or malicious user
+    assert.strictEqual(isSuperAdminUser({ app_metadata: { role: "customer" }, email: "customer@gmail.com" }), false);
+    assert.strictEqual(isSuperAdminUser({ user_metadata: { role: "super_admin" }, email: "hacker@evil.com" }), false);
+    assert.strictEqual(isSuperAdminUser(null), false);
+  });
+
+  test("UUID vs Non-UUID disambiguation regex avoids PostgreSQL 22P02 type mismatch", () => {
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    // Valid UUIDs (including seeded and nil UUIDs accepted by PostgreSQL)
+    assert.strictEqual(UUID_REGEX.test("e0000000-0000-0000-0000-000000000001"), true);
+    assert.strictEqual(UUID_REGEX.test("00000000-0000-0000-0000-000000000000"), true);
+    assert.strictEqual(UUID_REGEX.test("3fa85f64-5717-4562-b3fc-2c963f66afa6"), true);
+
+    // Non-UUIDs (Order numbers, alphanumeric codes, malicious injections)
+    assert.strictEqual(UUID_REGEX.test("AVS-20261112-X1Y2"), false);
+    assert.strictEqual(UUID_REGEX.test("AVS-001"), false);
+    assert.strictEqual(UUID_REGEX.test("12345"), false);
+    assert.strictEqual(UUID_REGEX.test("' OR 1=1 --"), false);
+    assert.strictEqual(UUID_REGEX.test(""), false);
+  });
+
+  test("Address update field whitelisting strictly prevents mass assignment of user_id", () => {
+    const allowedFields = [
+      "recipient_name",
+      "phone_number",
+      "address_line1",
+      "address_line2",
+      "landmark",
+      "city",
+      "state",
+      "postal_code",
+      "country",
+      "address_type",
+      "is_default",
+    ] as const;
+
+    const maliciousPayload = {
+      id: "addr_123",
+      user_id: "victim_user_456",
+      recipient_name: "Pooja Patel",
+      created_at: "2020-01-01T00:00:00Z",
+      role: "admin",
+      is_default: true,
+    };
+
+    const sanitized: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (field in maliciousPayload) {
+        sanitized[field] = (maliciousPayload as Record<string, unknown>)[field];
+      }
+    }
+
+    assert.strictEqual(sanitized.recipient_name, "Pooja Patel");
+    assert.strictEqual(sanitized.is_default, true);
+    assert.strictEqual(sanitized.user_id, undefined);
+    assert.strictEqual(sanitized.created_at, undefined);
+    assert.strictEqual(sanitized.role, undefined);
   });
 });

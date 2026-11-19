@@ -101,16 +101,16 @@ export async function getShiprocketServiceability(
       source: "fallback_matrix",
     };
   } else if (/^\d{6}$/.test(cleanPin)) {
-    // Valid national pincode (for non-Gujarat deliveries or warnings)
+    // Valid national pincode outside Gujarat territory (Avsaraa currently delivers exclusively in Gujarat 360000–399999)
     result = {
       pincode: cleanPin,
-      serviceable: true,
+      serviceable: false,
       city: cleanPin.startsWith("11") ? "Delhi NCR" : cleanPin.startsWith("40") ? "Mumbai" : "India Rest",
-      state: "National",
-      estimatedDeliveryDays: 4,
-      courierPartner: "Delhivery Surface / Blue Dart",
-      codAvailable: true,
-      rate: 90,
+      state: "Outside Gujarat",
+      estimatedDeliveryDays: 0,
+      courierPartner: "None",
+      codAvailable: false,
+      rate: 0,
       chargeableWeightKg,
       source: "fallback_matrix",
     };

@@ -36,6 +36,7 @@ export default function CouponsAdminTab({
   const [newMinOrderAmount, setNewMinOrderAmount] = useState("");
   const [newMaxDiscountAmount, setNewMaxDiscountAmount] = useState("");
   const [newUsageLimit, setNewUsageLimit] = useState("");
+  const [newPerUserLimit, setNewPerUserLimit] = useState("1");
   const [newValidUntil, setNewValidUntil] = useState("");
 
   // Toggle & Delete processing states
@@ -148,6 +149,7 @@ export default function CouponsAdminTab({
         min_order_amount: newMinOrderAmount ? Number(newMinOrderAmount) : 0,
         max_discount_amount: newMaxDiscountAmount ? Number(newMaxDiscountAmount) : null,
         usage_limit: newUsageLimit ? Number(newUsageLimit) : null,
+        per_user_limit: newPerUserLimit ? Number(newPerUserLimit) : 1,
         valid_until: newValidUntil ? new Date(newValidUntil).toISOString() : null,
       };
 
@@ -170,6 +172,7 @@ export default function CouponsAdminTab({
         setNewMinOrderAmount("");
         setNewMaxDiscountAmount("");
         setNewUsageLimit("");
+        setNewPerUserLimit("1");
         setNewValidUntil("");
         fetchCoupons();
       } else {
@@ -630,20 +633,25 @@ export default function CouponsAdminTab({
 
                       {/* Redemptions */}
                       <td style={{ padding: "16px 16px" }}>
-                        <span style={{ fontWeight: 600, color: "#261B13" }}>
-                          {coupon.used_count || 0}
-                        </span>
-                        {coupon.usage_limit ? (
-                          <span style={{ color: "#8E8782", fontSize: "0.75rem" }}>
-                            {" "}
-                            / {coupon.usage_limit} limit
+                        <div>
+                          <span style={{ fontWeight: 600, color: "#261B13" }}>
+                            {coupon.used_count || 0}
                           </span>
-                        ) : (
-                          <span style={{ color: "#8E8782", fontSize: "0.75rem" }}>
-                            {" "}
-                            (unlimited)
-                          </span>
-                        )}
+                          {coupon.usage_limit ? (
+                            <span style={{ color: "#8E8782", fontSize: "0.75rem" }}>
+                              {" "}
+                              / {coupon.usage_limit} limit
+                            </span>
+                          ) : (
+                            <span style={{ color: "#8E8782", fontSize: "0.75rem" }}>
+                              {" "}
+                              (unlimited)
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "#866951", marginTop: "2px" }}>
+                          Limit: {coupon.per_user_limit || 1} / customer
+                        </div>
                       </td>
 
                       {/* Validity */}
@@ -975,8 +983,8 @@ export default function CouponsAdminTab({
                   </div>
                 </div>
 
-                {/* Usage Limit & Expiry Date */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {/* Usage Limits & Expiry Date */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                   <div>
                     <label
                       style={{
@@ -989,7 +997,7 @@ export default function CouponsAdminTab({
                         marginBottom: 6,
                       }}
                     >
-                      Max Redemptions
+                      Total Redemptions
                     </label>
                     <input
                       type="number"
@@ -1020,7 +1028,38 @@ export default function CouponsAdminTab({
                         marginBottom: 6,
                       }}
                     >
-                      Valid Until (Optional)
+                      Per-Customer Limit
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="1 (default)"
+                      value={newPerUserLimit}
+                      onChange={(e) => setNewPerUserLimit(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        borderRadius: 8,
+                        border: "1px solid #E0D9D0",
+                        fontSize: "0.85rem",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
+                        color: "#3B332E",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        marginBottom: 6,
+                      }}
+                    >
+                      Valid Until (Expiry)
                     </label>
                     <input
                       type="date"

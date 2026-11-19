@@ -1,11 +1,29 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { normalizePhoneNumber, maskEmail } from "@/lib/phoneUtils";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
   try {
+    const headerList = await headers();
+    const forwardedFor = headerList.get("x-forwarded-for");
+    const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
+
+    // Rate Limiting Protection (10 pre-registration checks per minute per IP)
+    const rateCheck = checkRateLimit(`register-check:${ip}`, 10, 60);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many registration attempts. Please wait ${rateCheck.resetSeconds} seconds before trying again.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { fullName, email, phoneNumber, countryCode = "+91", password } = body;
 
@@ -47,6 +65,7 @@ export async function POST(request: Request) {
     const { normalized, formatted } = phoneValidation;
     const digitsOnly = normalized.replace(/\D/g, "");
     const last10Digits = digitsOnly.slice(-10);
+    const encNormalized = encodeURIComponent(normalized);
 
     const supabaseAdmin = getAdminSupabaseClient();
 
@@ -55,7 +74,7 @@ export async function POST(request: Request) {
       .from("profiles")
       .select("id, email, full_name, phone_number")
       .or(
-        `phone_number.eq.${normalized},phone_number.eq.${digitsOnly},phone_number.ilike.%${last10Digits}`
+        `phone_number.eq.${encNormalized},phone_number.eq.${digitsOnly},phone_number.ilike.%${last10Digits}`
       )
       .limit(1);
 

@@ -87,15 +87,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 3. Protected Route: /checkout requires an active customer session
-  if (pathname.startsWith("/checkout")) {
-    if (!user) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/login";
-      redirectUrl.searchParams.set("redirectTo", pathname);
-      return NextResponse.redirect(redirectUrl);
-    }
-  }
+  // 3. /checkout supports both Guest Checkout and Authenticated Checkout (no forced redirect)
 
   // 4. Redirect logged-in users away from /login and /register unless explicitly specified
   const isAuthPage = pathname === "/login" || pathname === "/register";
@@ -104,6 +96,36 @@ export async function proxy(request: NextRequest) {
     const isSuperAdmin = isSuperAdminUser(user);
     const destination = isSuperAdmin ? "/admin" : "/account";
     return NextResponse.redirect(new URL(destination, request.url));
+  }
+
+  // 5. Product Detail Pre-Check: return real HTTP 404 for non-existent product IDs before App Shell streams
+  if (pathname.startsWith("/products/")) {
+    const rawId = pathname.slice("/products/".length).split("/")[0]?.trim();
+    if (rawId) {
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const SEED_PRODUCT_IDS = new Set([
+        "e0000000-0000-0000-0000-000000000001",
+        "e0000000-0000-0000-0000-000000000002",
+        "e0000000-0000-0000-0000-000000000003",
+        "e0000000-0000-0000-0000-000000000004",
+        "e0000000-0000-0000-0000-000000000005",
+      ]);
+
+      if (!SEED_PRODUCT_IDS.has(rawId)) {
+        if (!UUID_REGEX.test(rawId)) {
+          return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
+        }
+        const { data: product } = await supabase
+          .from("products")
+          .select("id")
+          .eq("id", rawId)
+          .maybeSingle();
+
+        if (!product) {
+          return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
+        }
+      }
+    }
   }
 
   return supabaseResponse;

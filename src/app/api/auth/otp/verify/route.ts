@@ -46,11 +46,21 @@ export async function POST(request: Request) {
     // Consume OTP once verified
     otpStore.delete(cleanContact);
 
-    // Generate verification proof token
-    const proofToken = crypto
-      .createHmac("sha256", "avsaraa_dual_contact_salt_2026")
-      .update(`${cleanContact}:${Date.now()}`)
+    // Generate verifiable proof token (<encodedContact>.<timestamp>.<hmacSignature>)
+    const timestamp = Date.now();
+    const rawSecret =
+      process.env.OTP_PROOF_SECRET ||
+      process.env.SUPABASE_SECRET_KEY ||
+      process.env.ADMIN_JWT_SECRET;
+    if (!rawSecret && process.env.NODE_ENV === "production") {
+      throw new Error("Critical Security Configuration: OTP_PROOF_SECRET must be configured in production.");
+    }
+    const proofSecret = rawSecret || "avsaraa_dual_contact_salt_2026";
+    const signature = crypto
+      .createHmac("sha256", proofSecret)
+      .update(`${cleanContact}:${timestamp}`)
       .digest("hex");
+    const proofToken = `${Buffer.from(cleanContact).toString("base64url")}.${timestamp}.${signature}`;
 
     return NextResponse.json({
       success: true,

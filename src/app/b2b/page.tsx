@@ -37,7 +37,7 @@ export default function B2BWholesalePage() {
         body: JSON.stringify({
           name: `${form.contactPerson} (${form.businessName})`,
           email: form.email,
-          subject: `[B2B Wholesale / Atelier Inquiry] - ${form.orderVolume}`,
+          subject: `[B2B Wholesale / Bulk Inquiry] - ${form.orderVolume}`,
           message: `Business: ${form.businessName}\nCity: ${form.city}\nInquiry Type: ${form.inquiryType}\nVolume: ${form.orderVolume}\nPhone: ${form.phone}\nNotes: ${form.message}`,
         }),
       });
@@ -60,13 +60,13 @@ export default function B2BWholesalePage() {
       <main style={{ maxWidth: "1000px", margin: "0 auto", padding: "60px 20px" }}>
         <div style={{ textAlign: "center", marginBottom: "48px" }}>
           <span style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.2em", color: "#866951", fontWeight: 600 }}>
-            Atelier Partnership & Corporate Gifting
+            Wholesale & Corporate Gifting
           </span>
           <h1 style={{ fontSize: "36px", margin: "12px 0 16px", fontWeight: 400, letterSpacing: "0.04em" }}>
             B2B & Handloom Bulk Inquiries
           </h1>
           <p style={{ maxWidth: "640px", margin: "0 auto", fontSize: "15px", color: "#6A5C52", lineHeight: 1.6 }}>
-            Partner directly with our Surat loom atelier for premium silk sarees, couture silhouettes, curated bridal trousseau collections, and bespoke luxury corporate gifting.
+            Partner directly with our Surat workshop for premium silk sarees, festive wear, bridal collections, and custom corporate gifting.
           </p>
         </div>
 
@@ -194,7 +194,7 @@ export default function B2BWholesalePage() {
                     <option value="50-100 pieces">50 – 100 Pieces</option>
                     <option value="100-500 pieces">100 – 500 Pieces</option>
                     <option value="500-2000 pieces">500 – 2,000 Pieces</option>
-                    <option value="2000+ pieces">2,000+ Pieces (Atelier Custom Production)</option>
+                    <option value="2000+ pieces">2,000+ Pieces (Custom Bulk Production)</option>
                   </select>
                 </div>
                 <div>

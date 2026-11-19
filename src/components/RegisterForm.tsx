@@ -275,7 +275,7 @@ export default function RegisterForm({
         width: "100%",
         backgroundColor: "#FAF7F2",
         position: "relative",
-        padding: "16px 24px 36px 24px",
+        padding: "16px 24px 100px 24px",
         overflow: "hidden",
       }}
     >
@@ -832,7 +832,9 @@ export default function RegisterForm({
                 }}
               >
                 I agree to the{" "}
-                <span
+                <Link
+                  href="/terms"
+                  target="_blank"
                   style={{
                     fontWeight: 600,
                     color: "#261B13",
@@ -841,9 +843,11 @@ export default function RegisterForm({
                   }}
                 >
                   Terms & Conditions
-                </span>{" "}
+                </Link>{" "}
                 and{" "}
-                <span
+                <Link
+                  href="/privacy"
+                  target="_blank"
                   style={{
                     fontWeight: 600,
                     color: "#261B13",
@@ -852,7 +856,7 @@ export default function RegisterForm({
                   }}
                 >
                   Privacy Policy
-                </span>
+                </Link>
                 .
               </label>
             </div>

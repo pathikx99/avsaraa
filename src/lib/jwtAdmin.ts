@@ -8,9 +8,16 @@ function getJwtSecret(): Uint8Array {
   const rawSecret =
     process.env.ADMIN_JWT_SECRET ||
     process.env.ADMIN_PASSWORD ||
-    process.env.SUPABASE_SECRET_KEY ||
-    "avsaraa_super_secret_admin_jwt_signature_key_2026";
-  return new TextEncoder().encode(rawSecret.padEnd(32, "#"));
+    process.env.SUPABASE_SECRET_KEY;
+
+  if (!rawSecret && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Critical Security Configuration: ADMIN_JWT_SECRET or ADMIN_PASSWORD must be configured in production environments."
+    );
+  }
+
+  const secretToUse = rawSecret || "avsaraa_super_secret_admin_jwt_signature_key_2026";
+  return new TextEncoder().encode(secretToUse.padEnd(32, "#"));
 }
 
 export interface AdminJwtPayload {

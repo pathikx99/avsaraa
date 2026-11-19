@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
+import { normalizePhoneNumber } from "@/lib/phoneUtils";
 
 export async function GET() {
   try {
@@ -22,7 +23,8 @@ export async function GET() {
       .maybeSingle();
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      console.error("Profile query error:", error);
+      return NextResponse.json({ success: false, error: "Failed to retrieve profile." }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -59,7 +61,14 @@ export async function PUT(request: Request) {
     };
 
     if (full_name !== undefined) updates.full_name = String(full_name).trim().slice(0, 100);
-    if (phone_number !== undefined) updates.phone_number = phone_number ? String(phone_number).trim() : null;
+    if (phone_number !== undefined) {
+      if (phone_number) {
+        const phoneValidation = normalizePhoneNumber(String(phone_number));
+        updates.phone_number = phoneValidation.isValid ? phoneValidation.normalized : String(phone_number).trim();
+      } else {
+        updates.phone_number = null;
+      }
+    }
     if (preferred_currency !== undefined) updates.preferred_currency = String(preferred_currency).trim();
 
     const adminClient = getAdminSupabaseClient();
@@ -71,7 +80,14 @@ export async function PUT(request: Request) {
       .single();
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      console.error("Profile update error:", error);
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { success: false, error: "This mobile number is already linked to another account." },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ success: false, error: "Failed to update profile details." }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, profile: updated });

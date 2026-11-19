@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
-import { Order, OrderItem, CreateOrderPayload, PaymentStatus, OrderStatus, Coupon } from "@/types/order";
+import { Order, OrderItem, CreateOrderPayload, PaymentStatus, OrderStatus } from "@/types/order";
+import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import {
   isValidGujaratPincode,
   calculateOrderTotals,
 } from "@/lib/financials";
+import { validateCouponEngine } from "@/lib/couponManager";
+import { dispatchOrderSuccessEmails } from "@/lib/emailService";
 
 function generateOrderNumber(): string {
   const now = new Date();
@@ -18,7 +21,7 @@ function generateOrderNumber(): string {
 
 export async function POST(request: Request) {
   try {
-    // 1. Authenticate Requester
+    // 1. Authenticate Requester (or enable Guest Checkout)
     const serverClient = await createSupabaseServerClient();
     const {
       data: { user },
@@ -36,11 +39,12 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!currentUserId) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized: Please sign in to place an order." },
-        { status: 401 }
-      );
+    // Guest Checkout Support:
+    // When unauthenticated, route through system guest account for seamless zero-friction purchase
+    const GUEST_SYSTEM_USER_ID = "7a3b2e24-820f-4706-8cc3-4218b42b0da3";
+    const isGuest = !currentUserId;
+    if (isGuest) {
+      currentUserId = GUEST_SYSTEM_USER_ID;
     }
 
     // 2. Parse and Validate Request Payload
@@ -75,6 +79,16 @@ export async function POST(request: Request) {
       );
     }
 
+    if (isGuest) {
+      shipping_address_snapshot.is_guest = true;
+      if (!shipping_address_snapshot.email || !shipping_address_snapshot.email.includes("@")) {
+        return NextResponse.json(
+          { success: false, message: "A valid email address is required for guest checkout." },
+          { status: 400 }
+        );
+      }
+    }
+
     // 3. Strict Geographic Enforcement: Gujarat Pincode Verification (360000–399999)
     const postalCode = shipping_address_snapshot.postal_code;
     if (!isValidGujaratPincode(postalCode)) {
@@ -87,76 +101,104 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. Compute Financials & Validate Items
+    // 4. Compute Financials & Validate Items with Canonical Database Prices
+    const adminClient = getAdminSupabaseClient();
+    const productIds = items
+      .map((item) => item.product_id)
+      .filter((id): id is string => Boolean(id));
+
+    // Fetch verified prices from database
+    const priceMap = new Map<string, number>();
+    if (productIds.length > 0) {
+      try {
+        const { data: dbProducts } = await adminClient
+          .from("products")
+          .select("id, price")
+          .in("id", productIds);
+
+        if (dbProducts) {
+          for (const p of dbProducts) {
+            priceMap.set(p.id, Number(p.price));
+          }
+        }
+      } catch (err) {
+        console.warn("Notice: Canonical price query notice:", err);
+      }
+    }
+
+    // Populate missing from seed catalog
+    for (const seed of SEED_CATALOG_PRODUCTS) {
+      if (!priceMap.has(seed.id)) {
+        priceMap.set(seed.id, seed.price);
+      }
+    }
+
     let rawSubtotal = 0;
-    const sanitizedItems = items.map((item) => {
-      const unitPrice = Number(item.unit_price) || 0;
-      const quantity = Math.max(1, Number(item.quantity) || 1);
-      const totalPrice = unitPrice * quantity;
+    const sanitizedItems: OrderItem[] = [];
+
+    for (const item of items) {
+      if (!item.product_id || !priceMap.has(item.product_id)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Unverified product: "${item.product_name || "Unknown item"}". Every piece in your shopping bag must be verified in our catalog.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const verifiedPrice = priceMap.get(item.product_id)!;
+      if (typeof verifiedPrice !== "number" || verifiedPrice <= 0 || isNaN(verifiedPrice)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Invalid product pricing configuration for "${item.product_name}".`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+      const totalPrice = verifiedPrice * quantity;
       rawSubtotal += totalPrice;
 
-      return {
-        product_id: item.product_id || null,
+      sanitizedItems.push({
+        product_id: item.product_id,
         product_name: item.product_name,
         image_url: item.image_url || "/images/placeholder.jpg",
         size: item.size || "Standard",
         color: item.color || "Default",
         tailored_blouse: Boolean(item.tailored_blouse),
-        unit_price: unitPrice,
+        unit_price: verifiedPrice,
         quantity,
         total_price: totalPrice,
-      };
-    });
+      });
+    }
 
     // 5. Validate Coupon Code
     let discountAmount = 0;
-    let validatedCoupon = coupon_code?.trim().toUpperCase() || null;
-    const adminClient = getAdminSupabaseClient();
+    let validatedCoupon: string | null = null;
 
-    if (validatedCoupon) {
-      if (validatedCoupon === "AVSARAA10") {
-        discountAmount = Math.round((rawSubtotal * 10) / 100);
-      } else {
-        try {
-          const { data: coup } = await adminClient
-            .from("coupons")
-            .select("*")
-            .ilike("code", validatedCoupon)
-            .eq("is_active", true)
-            .maybeSingle();
+    if (coupon_code && coupon_code.trim()) {
+      const coupValidation = await validateCouponEngine({
+        code: coupon_code.trim(),
+        subtotal: rawSubtotal,
+        userId: isGuest ? null : currentUserId,
+        contact: shipping_address_snapshot?.email || shipping_address_snapshot?.phone_number || null,
+      });
 
-          if (coup) {
-            const couponData = coup as Coupon;
-            const now = new Date();
-            const isExpired = couponData.valid_until && new Date(couponData.valid_until) < now;
-            const isLimitReached = couponData.usage_limit && couponData.used_count >= couponData.usage_limit;
-            const isSubtotalMet = !couponData.min_order_amount || rawSubtotal >= couponData.min_order_amount;
-
-            if (!isExpired && !isLimitReached && isSubtotalMet) {
-              if (couponData.discount_type === "percentage") {
-                discountAmount = Math.round((rawSubtotal * couponData.discount_value) / 100);
-                if (couponData.max_discount_amount && discountAmount > couponData.max_discount_amount) {
-                  discountAmount = couponData.max_discount_amount;
-                }
-              } else {
-                discountAmount = couponData.discount_value;
-              }
-
-              // Atomically increment usage count
-              await adminClient
-                .from("coupons")
-                .update({ used_count: couponData.used_count + 1 })
-                .eq("id", couponData.id);
-            } else {
-              validatedCoupon = null;
-            }
-          } else {
-            validatedCoupon = null;
-          }
-        } catch {
-          // Graceful fallback
-        }
+      if (!coupValidation.valid) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: coupValidation.message || "Invalid or ineligible promotion code.",
+          },
+          { status: 400 }
+        );
       }
+
+      discountAmount = coupValidation.discountAmount || 0;
+      validatedCoupon = coupValidation.coupon?.code || coupon_code.trim().toUpperCase();
     }
 
     // 6. Comprehensive Financial Breakdown (Courier fee, COD surcharge, 5% GST inclusive)
@@ -167,16 +209,21 @@ export async function POST(request: Request) {
     });
 
     const isCOD = payment_method === "COD";
-    const orderStatus: OrderStatus = "Confirmed";
-    const paymentStatus: PaymentStatus = isCOD ? "Pending" : "Paid";
+    const orderStatus: OrderStatus = isCOD ? "Confirmed" : "Pending";
+    const paymentStatus: PaymentStatus = "Pending";
     const orderNumber = generateOrderNumber();
 
     const estDelivery = new Date();
     estDelivery.setDate(estDelivery.getDate() + 3);
 
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const sanitizedAddressId = shipping_address_id && isUuid.test(shipping_address_id)
+      ? shipping_address_id
+      : null;
+
     const orderPayload = {
       user_id: currentUserId,
-      shipping_address_id: shipping_address_id || null,
+      shipping_address_id: sanitizedAddressId,
       shipping_address_snapshot: shipping_address_snapshot,
       order_number: orderNumber,
       subtotal: financials.subtotal,
@@ -242,6 +289,26 @@ export async function POST(request: Request) {
             notes,
           },
         });
+
+        // Increment coupon used_count on successful placement
+        if (validatedCoupon) {
+          try {
+            const { data: coupRow } = await adminClient
+              .from("coupons")
+              .select("id, used_count")
+              .ilike("code", validatedCoupon)
+              .maybeSingle();
+
+            if (coupRow) {
+              await adminClient
+                .from("coupons")
+                .update({ used_count: (coupRow.used_count || 0) + 1 })
+                .eq("id", coupRow.id);
+            }
+          } catch (cErr) {
+            console.warn("Notice: coupon used_count increment error:", cErr);
+          }
+        }
       }
     } catch (dbEx) {
       console.warn("Notice: Database orders insert warning (fallback simulated):", dbEx);
@@ -265,6 +332,18 @@ export async function POST(request: Request) {
       }));
     }
 
+    const finalOrderWithItems = {
+      ...createdOrder,
+      order_items: createdItems,
+    };
+
+    // If order is confirmed immediately (e.g. COD), dispatch confirmation & alert emails
+    if (isCOD) {
+      dispatchOrderSuccessEmails(finalOrderWithItems).catch((e) =>
+        console.warn("Notice: COD background email dispatch error:", e)
+      );
+    }
+
     return NextResponse.json({
       success: true,
       message: "Order placed successfully!",
@@ -272,10 +351,7 @@ export async function POST(request: Request) {
         ...financials,
         inclusive_gst_rate: "5%",
       },
-      order: {
-        ...createdOrder,
-        order_items: createdItems,
-      },
+      order: finalOrderWithItems,
     });
   } catch (err: unknown) {
     console.error("Order creation unexpected error:", err);

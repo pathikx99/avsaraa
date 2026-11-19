@@ -92,7 +92,7 @@ export default function OrdersAccountTab({
           className="avsaraa-btn-outline"
           style={{ height: "36px", padding: "0 16px", fontSize: "12px", width: "auto" }}
         >
-          Discover Heirlooms
+          Explore Collection
         </Link>
       </div>
 
@@ -145,7 +145,7 @@ export default function OrdersAccountTab({
             No Orders Placed Yet
           </h4>
           <p style={{ fontSize: "13.5px", color: "#6E5B4E", maxWidth: "420px", margin: "0 auto 20px", lineHeight: 1.5 }}>
-            When you acquire handcrafted heirlooms and couture pieces from AVSARAA, your real-time tracking, AWB details, and 7-day exchange portal will appear here.
+            When you order from AVSARAA, your real-time tracking, courier details, and 7-day exchange options will appear here.
           </p>
           <Link
             href="/"
@@ -368,9 +368,17 @@ export default function OrdersAccountTab({
                           </span>
                         </span>
                       </div>
-                      <span style={{ fontSize: "11px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        Verified Pan-India Insured Dispatch
-                      </span>
+                      <Link
+                        href={`/track?orderId=${encodeURIComponent(order.order_number)}&contact=${encodeURIComponent(order.shipping_address_snapshot?.phone_number || order.shipping_address_snapshot?.email || "")}`}
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: "#866951",
+                          textDecoration: "underline",
+                        }}
+                      >
+                        Live Tracking Checkpoints →
+                      </Link>
                     </div>
                   )}
                 </div>
@@ -398,6 +406,24 @@ export default function OrdersAccountTab({
                   </div>
 
                   <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    <Link
+                      href={`/track?orderId=${encodeURIComponent(order.order_number)}&contact=${encodeURIComponent(order.shipping_address_snapshot?.phone_number || order.shipping_address_snapshot?.email || "")}`}
+                      className="avsaraa-btn-outline"
+                      style={{
+                        height: "36px",
+                        padding: "0 14px",
+                        fontSize: "12px",
+                        width: "auto",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        backgroundColor: "#FAF7F2",
+                      }}
+                    >
+                      <DeliveryVanIcon size={14} color="#866951" />
+                      <span>Track Shipment</span>
+                    </Link>
+
                     <Link
                       href={`/order-success/${order.id}`}
                       className="avsaraa-btn-outline"

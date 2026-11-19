@@ -43,8 +43,9 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
     assert.strictEqual(computeCourierFee(15000), 0);
   });
 
-  test("Cash on Delivery (COD) surcharge strictly applies ₹10", () => {
+  test("Cash on Delivery (COD) surcharge strictly applies ₹20", () => {
     assert.strictEqual(computeCodSurcharge("COD"), COD_SURCHARGE);
+    assert.strictEqual(computeCodSurcharge("COD"), 20);
     assert.strictEqual(computeCodSurcharge("Online Card / UPI"), 0);
     assert.strictEqual(computeCodSurcharge("Razorpay"), 0);
   });
@@ -83,15 +84,15 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
   });
 
   test("calculateOrderTotals orchestrates subtotal, discounts, shipping, COD, and GST without drift", () => {
-    // Scenario 1: Subtotal ₹400 with COD -> Shipping ₹50, COD ₹10 -> Total ₹460
+    // Scenario 1: Subtotal ₹400 with COD -> Shipping ₹50, COD ₹20 -> Total ₹470
     const ord1 = calculateOrderTotals({
       subtotal: 400,
       discountAmount: 0,
       paymentMethod: "COD",
     });
     assert.strictEqual(ord1.shippingFee, 50);
-    assert.strictEqual(ord1.codSurcharge, 10);
-    assert.strictEqual(ord1.totalAmount, 460);
+    assert.strictEqual(ord1.codSurcharge, 20);
+    assert.strictEqual(ord1.totalAmount, 470);
 
     // Scenario 2: Subtotal ₹1050 with Online Card -> Free shipping, COD ₹0 -> Total ₹1050
     const ord2 = calculateOrderTotals({

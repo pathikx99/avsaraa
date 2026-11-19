@@ -1,9 +1,9 @@
 import { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { fetchProductById, SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
+import { fetchProductById } from "@/lib/productDetailData";
 import ProductDetailClient from "@/app/products/[id]/ProductDetailClient";
 
-export const instant = false;
+export const dynamicParams = true;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -12,19 +12,10 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   // Match by id or slugified name
-  const product =
-    (await fetchProductById(slug)) ||
-    SEED_CATALOG_PRODUCTS.find(
-      (p) =>
-        p.id === slug ||
-        p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") === slug
-    );
+  const product = await fetchProductById(slug);
 
   if (!product) {
-    return {
-      title: "Product Not Found | AVSARAA",
-      description: "Handcrafted Indian luxury fashion and occasion wear.",
-    };
+    notFound();
   }
 
   return {
@@ -47,13 +38,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ProductSlugPage({ params }: PageProps) {
   const { slug } = await params;
-  const product =
-    (await fetchProductById(slug)) ||
-    SEED_CATALOG_PRODUCTS.find(
-      (p) =>
-        p.id === slug ||
-        p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") === slug
-    );
+  const product = await fetchProductById(slug);
 
   if (!product) {
     notFound();
@@ -69,7 +54,7 @@ export default async function ProductSlugPage({ params }: PageProps) {
     "@type": "Product",
     name: product.name,
     image: product.image_url,
-    description: product.description || "Handcrafted Indian luxury couture and sarees from Surat atelier.",
+    description: product.description || "Handcrafted Indian sarees and festive wear from Surat.",
     brand: {
       "@type": "Brand",
       name: "AVSARAA",
@@ -85,7 +70,7 @@ export default async function ProductSlugPage({ params }: PageProps) {
           : "https://schema.org/OutOfStock",
       seller: {
         "@type": "Organization",
-        name: "AVSARAA Atelier",
+        name: "AVSARAA",
       },
     },
   };
@@ -94,7 +79,7 @@ export default async function ProductSlugPage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       <ProductDetailClient initialProduct={product} />
     </>

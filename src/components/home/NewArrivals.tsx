@@ -1,48 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
-import { Product } from "@/types/product";
-import { normalizeProducts } from "@/lib/productUtils";
+import { useProductsCatalog } from "@/lib/useProductsCatalog";
 import { RevealSection } from "@/components/RevealSection";
 import ProductCard from "./ProductCard";
 
 export default function NewArrivals() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { products, loading } = useProductsCatalog({ sort: "newest", limit: 8 });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(8)
-      .then(
-        ({ data, error }) => {
-          if (!isMounted) return;
-          if (error || !data) {
-            setProducts([]);
-          } else {
-            setProducts(normalizeProducts(data));
-          }
-          setLoading(false);
-        },
-        () => {
-          if (isMounted) {
-            setProducts([]);
-            setLoading(false);
-          }
-        }
-      );
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const handleScroll = (direction: "left" | "right") => {
     if (!scrollContainerRef.current) return;
@@ -55,7 +21,7 @@ export default function NewArrivals() {
       id="new-arrivals"
       style={{
         backgroundColor: "#FAF7F2",
-        padding: "85px 24px 95px 24px",
+        padding: "85px 20px 95px 20px",
         position: "relative",
         borderBottom: "1px solid #E6DACF",
       }}
@@ -69,7 +35,7 @@ export default function NewArrivals() {
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: "20px",
-            marginBottom: "40px",
+            marginBottom: "36px",
           }}
         >
           <RevealSection>
@@ -80,15 +46,15 @@ export default function NewArrivals() {
                   marginBottom: "12px",
                   backgroundColor: "rgba(196, 171, 148, 0.15)",
                   color: "#6E5B4E",
-                  border: "1px solid rgba(196, 171, 148, 0.35)",
+                  border: "1px solid rgba(197, 160, 89, 0.4)",
                 }}
               >
-                ✦ FRESH ATELIER EDITIONS ✦
+                ✦ NEW ARRIVALS ✦
               </span>
               <h2
                 style={{
                   fontFamily: "var(--font-serif), Georgia, serif",
-                  fontSize: "clamp(32px, 4.5vw, 48px)",
+                  fontSize: "clamp(30px, 4.5vw, 48px)",
                   fontWeight: 500,
                   color: "#261B13",
                   lineHeight: 1.15,
@@ -97,7 +63,7 @@ export default function NewArrivals() {
               >
                 New Arrivals
               </h2>
-              <p style={{ fontSize: "15px", color: "#6E5B4E", margin: 0, lineHeight: 1.6 }}>
+              <p style={{ fontSize: "14.5px", color: "#6E5B4E", margin: 0, lineHeight: 1.6 }}>
                 Freshly finished on Surat and Varanasi handlooms for the 2026 festive season.
               </p>
             </div>
@@ -108,13 +74,14 @@ export default function NewArrivals() {
             <Link
               href="/products?sort=newest"
               style={{
-                fontSize: "12.5px",
+                fontSize: "12px",
                 fontWeight: 600,
-                letterSpacing: "0.08em",
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 color: "#261B13",
                 textDecoration: "underline",
                 textUnderlineOffset: "4px",
+                transition: "color 0.2s ease",
               }}
             >
               View All Arrivals →
@@ -126,17 +93,18 @@ export default function NewArrivals() {
                 onClick={() => handleScroll("left")}
                 aria-label="Scroll products left"
                 style={{
-                  width: "38px",
-                  height: "38px",
+                  width: "40px",
+                  height: "40px",
                   borderRadius: "50%",
-                  border: "1px solid #CFBEAD",
+                  border: "1px solid rgba(197, 160, 89, 0.4)",
                   backgroundColor: "#FFFFFF",
                   color: "#261B13",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   cursor: "pointer",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                  boxShadow: "0 2px 8px rgba(38,27,19,0.06)",
+                  transition: "all 0.2s ease",
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -149,17 +117,18 @@ export default function NewArrivals() {
                 onClick={() => handleScroll("right")}
                 aria-label="Scroll products right"
                 style={{
-                  width: "38px",
-                  height: "38px",
+                  width: "40px",
+                  height: "40px",
                   borderRadius: "50%",
-                  border: "1px solid #CFBEAD",
+                  border: "1px solid rgba(197, 160, 89, 0.4)",
                   backgroundColor: "#FFFFFF",
                   color: "#261B13",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   cursor: "pointer",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                  boxShadow: "0 2px 8px rgba(38,27,19,0.06)",
+                  transition: "all 0.2s ease",
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -177,7 +146,7 @@ export default function NewArrivals() {
             style={{
               display: "grid",
               gridAutoFlow: "column",
-              gridAutoColumns: "minmax(270px, 1fr)",
+              gridAutoColumns: "clamp(250px, 74vw, 300px)",
               gap: "20px",
               overflowX: "auto",
               paddingBottom: "16px",
@@ -188,7 +157,7 @@ export default function NewArrivals() {
               <div
                 key={i}
                 style={{
-                  minWidth: "270px",
+                  minWidth: "260px",
                   maxWidth: "320px",
                   backgroundColor: "#FFFFFF",
                   borderRadius: "16px",
@@ -219,7 +188,7 @@ export default function NewArrivals() {
             style={{
               display: "grid",
               gridAutoFlow: "column",
-              gridAutoColumns: "minmax(270px, 1fr)",
+              gridAutoColumns: "clamp(250px, 74vw, 300px)",
               gap: "20px",
               overflowX: "auto",
               scrollSnapType: "x mandatory",
@@ -232,11 +201,11 @@ export default function NewArrivals() {
                 key={product.id}
                 style={{
                   scrollSnapAlign: "start",
-                  minWidth: "270px",
+                  minWidth: "250px",
                   maxWidth: "320px",
                 }}
               >
-                <ProductCard product={product} badge="NEW" />
+                <ProductCard product={product} badge="NEW ARRIVAL" />
               </div>
             ))}
           </div>

@@ -43,4 +43,5 @@ next-env.d.ts
 
 # documentation & files
 colour_theme.txt
+supabase/.temp/
 

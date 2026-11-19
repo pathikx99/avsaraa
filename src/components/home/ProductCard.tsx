@@ -5,8 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Product } from "@/types/product";
 import { formatINR, resolveProductImage } from "@/lib/productUtils";
-import { HeartIcon, ShoppingBagIcon } from "@/components/Icons";
-import { useCart } from "@/context/CartContext";
+import { HeartIcon } from "@/components/Icons";
 import { useWishlist } from "@/context/WishlistContext";
 
 interface ProductCardProps {
@@ -16,7 +15,7 @@ interface ProductCardProps {
   aspectRatio?: "portrait" | "standard";
 }
 
-const DEFAULT_IMAGE = "/images/banarasi_silk_saree.jpg";
+const DEFAULT_IMAGE = "https://aqpkagsbaecavoznnrlj.supabase.co/storage/v1/object/public/items/products/e2000000-0000-0000-0000-000000000001/hero.webp";
 
 export default function ProductCard({
   product,
@@ -25,13 +24,19 @@ export default function ProductCard({
   aspectRatio = "portrait",
 }: ProductCardProps) {
   const router = useRouter();
-  const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
-  const [isAdded, setIsAdded] = useState(false);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const imgSrc = imgError ? DEFAULT_IMAGE : (resolveProductImage(product.image_url) || DEFAULT_IMAGE);
+  
+  const activeColorVariant = selectedColor
+    ? product.color_variants?.find((v) => v.name === selectedColor)
+    : null;
+  const activeImage =
+    activeColorVariant?.primary_image ||
+    activeColorVariant?.image_url ||
+    product.image_url;
+  const imgSrc = imgError ? DEFAULT_IMAGE : (resolveProductImage(activeImage) || DEFAULT_IMAGE);
 
   const isFavorited = isInWishlist(product.id);
 
@@ -39,18 +44,11 @@ export default function ProductCard({
     if (onSelect) {
       onSelect(product);
     } else {
-      router.push(`/products/${product.id}`);
+      const colorParam = selectedColor ? `?color=${encodeURIComponent(selectedColor)}` : "";
+      router.push(`/products/${product.id}${colorParam}`);
     }
   };
 
-  const handleQuickAdd = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const success = addToCart(product);
-    if (success) {
-      setIsAdded(true);
-      setTimeout(() => setIsAdded(false), 2000);
-    }
-  };
 
   return (
     <div
@@ -60,13 +58,13 @@ export default function ProductCard({
         backgroundColor: "#FFFFFF",
         borderRadius: "16px",
         overflow: "hidden",
-        border: "1px solid #E8DED3",
-        boxShadow: "0 4px 18px -6px rgba(38,27,19,0.06)",
+        border: "1px solid rgba(230, 218, 207, 0.8)",
+        boxShadow: "0 4px 20px -4px rgba(38, 27, 19, 0.06), 0 1px 3px rgba(38, 27, 19, 0.02)",
         display: "flex",
         flexDirection: "column",
         position: "relative",
         cursor: "pointer",
-        transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+        transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease",
       }}
     >
       {/* Product Image Frame */}
@@ -96,12 +94,13 @@ export default function ProductCard({
           src={imgSrc}
           alt={product.name}
           fill
+          unoptimized={Boolean(imgSrc && imgSrc.includes("supabase.co"))}
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
           style={{
             objectFit: "cover",
             objectPosition: "center 20%",
             opacity: imgLoaded ? 1 : 0,
-            transition: "opacity 0.4s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
+            transition: "opacity 0.3s ease, transform 0.65s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
           onLoad={() => setImgLoaded(true)}
           onError={() => {
@@ -110,28 +109,43 @@ export default function ProductCard({
           }}
         />
 
+        {/* Soft vignette overlay */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(180deg, rgba(38, 27, 19, 0.08) 0%, transparent 25%, transparent 75%, rgba(38, 27, 19, 0.12) 100%)",
+            pointerEvents: "none",
+          }}
+        />
+
         {/* Badge: Category, Custom Badge or Price Tag */}
         {(badge || product.category) && (
           <div
             style={{
               position: "absolute",
-              top: "12px",
-              left: "12px",
-              backgroundColor: "rgba(38, 27, 19, 0.85)",
+              top: "10px",
+              left: "10px",
+              backgroundColor: "rgba(26, 18, 12, 0.88)",
               backdropFilter: "blur(8px)",
               WebkitBackdropFilter: "blur(8px)",
-              color: "#FAF7F2",
-              padding: "4px 10px",
-              borderRadius: "12px",
-              fontSize: "10px",
+              color: "#ECC880",
+              padding: "4px 9px",
+              borderRadius: "10px",
+              fontSize: "9.5px",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               fontWeight: 600,
               zIndex: 2,
-              border: "1px solid rgba(197, 160, 89, 0.3)",
+              border: "1px solid rgba(197, 160, 89, 0.4)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
             }}
           >
-            {badge || product.category}
+            <span style={{ fontSize: "8px" }}>✦</span>
+            <span>{badge || product.category}</span>
           </div>
         )}
 
@@ -147,30 +161,34 @@ export default function ProductCard({
             position: "absolute",
             top: "10px",
             right: "10px",
-            width: "36px",
-            height: "36px",
+            width: "34px",
+            height: "34px",
             borderRadius: "50%",
-            backgroundColor: isFavorited ? "#8A181A" : "rgba(255, 255, 255, 0.92)",
+            backgroundColor: isFavorited ? "#8A181A" : "rgba(255, 255, 255, 0.9)",
             color: isFavorited ? "#FFFFFF" : "#261B13",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-            border: "none",
+            boxShadow: isFavorited
+              ? "0 4px 12px rgba(138, 24, 26, 0.35)"
+              : "0 4px 14px rgba(38, 27, 19, 0.12)",
+            border: isFavorited ? "1px solid #8A181A" : "1px solid rgba(197, 160, 89, 0.35)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
             cursor: "pointer",
             transition: "all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
             transform: isFavorited ? "scale(1.05)" : "scale(1)",
             zIndex: 3,
           }}
         >
-          <HeartIcon size={18} fill={isFavorited ? "currentColor" : "none"} stroke="currentColor" />
+          <HeartIcon size={17} fill={isFavorited ? "currentColor" : "none"} stroke="currentColor" />
         </button>
       </div>
 
       {/* Product Information */}
       <div
         style={{
-          padding: "14px 14px 14px 14px",
+          padding: "13px 14px 14px 14px",
           display: "flex",
           flexDirection: "column",
           flex: 1,
@@ -251,7 +269,7 @@ export default function ProductCard({
             <span
               style={{
                 fontSize: "16px",
-                fontWeight: 600,
+                fontWeight: 700,
                 color: "#261B13",
                 fontFamily: "var(--font-sans)",
                 lineHeight: 1.2,
@@ -262,8 +280,8 @@ export default function ProductCard({
             {product.price <= 1299 && (
               <span
                 style={{
-                  fontSize: "9.5px",
-                  fontWeight: 600,
+                  fontSize: "9px",
+                  fontWeight: 700,
                   color: "#1E5E3A",
                   backgroundColor: "rgba(30, 94, 58, 0.08)",
                   padding: "2px 5px",
@@ -280,37 +298,34 @@ export default function ProductCard({
 
           <button
             type="button"
-            onClick={handleQuickAdd}
-            aria-label={isAdded ? "Added to Bag" : `Quick add ${product.name} to bag`}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCardClick();
+            }}
+            aria-label={`View options for ${product.name}`}
             className="product-card-quick-add-btn btn-shine"
             style={{
-              padding: "7px 11px",
-              borderRadius: "6px",
-              backgroundColor: isAdded ? "#1E5E3A" : "#261B13",
+              padding: "7px 12px",
+              borderRadius: "8px",
+              backgroundColor: "#261B13",
               color: "#FAF7F2",
-              border: "1px solid rgba(197, 160, 89, 0.35)",
+              border: "1px solid rgba(197, 160, 89, 0.4)",
               fontSize: "10.5px",
               fontWeight: 600,
-              letterSpacing: "0.06em",
+              letterSpacing: "0.05em",
               textTransform: "uppercase",
               cursor: "pointer",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "5px",
+              gap: "4px",
               transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
               boxShadow: "0 2px 8px rgba(38,27,19,0.14)",
               flexShrink: 0,
             }}
           >
-            {isAdded ? (
-              <span>✓ Added</span>
-            ) : (
-              <>
-                <ShoppingBagIcon size={13} />
-                <span>Add</span>
-              </>
-            )}
+            <span>View</span>
+            <span style={{ fontSize: "11px" }}>→</span>
           </button>
         </div>
       </div>

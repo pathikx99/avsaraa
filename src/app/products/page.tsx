@@ -18,7 +18,7 @@ function ProductsContent() {
   let bannerSubtitle = "Explore handloom sarees, designer silhouettes, and curated festive ensembles.";
   let badgeText = "✦ ALL PIECES ✦";
 
-  if (maxPrice && Number(maxPrice) <= 1299) {
+  if ((maxPrice && Number(maxPrice) <= 1299) || category?.toLowerCase().includes("1299") || category?.toLowerCase().includes("under")) {
     bannerTitle = "The Up to ₹1,299 Edit";
     bannerSubtitle = "Thoughtfully priced daily wear kurtas, handcrafted stoles, and festive essentials.";
     badgeText = "✦ VALUE EDIT · UNDER & UP TO ₹1,299 ✦";

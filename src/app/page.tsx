@@ -8,7 +8,6 @@ import ShopByOccasion from "@/components/home/ShopByOccasion";
 import PriceEdit from "@/components/home/PriceEdit";
 import NewArrivals from "@/components/home/NewArrivals";
 import Bestsellers from "@/components/home/Bestsellers";
-import AvsaraaStyle from "@/components/home/AvsaraaStyle";
 import ShoppingBenefits from "@/components/home/ShoppingBenefits";
 
 export default function HomePage() {
@@ -41,10 +40,7 @@ export default function HomePage() {
         {/* 6. Our Bestsellers (Patron favorites & top ranked pieces) */}
         <Bestsellers />
 
-        {/* 7. AVSARAA Style: Mix-and-Match Pairings & Combinations Studio */}
-        <AvsaraaStyle />
-
-        {/* 8. Shopping Benefits (Trust Strip: Free express delivery, COD, 7-day returns, keepsake box) */}
+        {/* 7. Shopping Benefits (Trust Strip: Free express delivery, COD, 7-day returns, keepsake box) */}
         <ShoppingBenefits />
       </main>
 

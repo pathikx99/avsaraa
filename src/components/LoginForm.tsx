@@ -27,7 +27,7 @@ export default function LoginForm({
 }: LoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams?.get("redirectTo") || "/account";
+  const redirectTo = searchParams?.get("redirectTo") || searchParams?.get("redirect") || "/account";
   const urlError = searchParams?.get("error");
 
   const [email, setEmail] = useState("");
@@ -193,6 +193,7 @@ export default function LoginForm({
 
       {/* Top Hero Section: Model Photo + Official Logo + Quote */}
       <div
+        className="login-mobile-hero"
         style={{
           position: "relative",
           height: "280px",
@@ -281,13 +282,14 @@ export default function LoginForm({
 
       {/* Curved Ivory Bottom Card Sheet */}
       <div
+        className="login-card-sheet"
         style={{
           position: "relative",
           flex: 1,
           backgroundColor: "#FCFAF7",
           borderTopLeftRadius: "34px",
           borderTopRightRadius: "34px",
-          padding: "28px 24px 36px 24px",
+          padding: "28px 24px 100px 24px",
           marginTop: "-26px",
           zIndex: 20,
           boxShadow: "0 -8px 25px rgba(38, 27, 19, 0.05)",

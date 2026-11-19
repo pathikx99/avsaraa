@@ -89,7 +89,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
             { stat: "64+ Hours", label: "Artisan Loom Time Per Drape" },
             { stat: "100%", label: "Certified Pure Silk Guarantee" },
             { stat: "3 Hubs", label: "Varanasi, Chanderi & Surat Clusters" },
-            { stat: "12,000+", label: "Patrons Across India & Abroad" },
+            { stat: "12,000+", label: "Happy Customers Across India & Abroad" },
           ].map((item, idx) => (
             <div
               key={idx}
@@ -170,7 +170,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
                   border: "1px solid rgba(197, 160, 89, 0.35)",
                 }}
               >
-                ✦ Surat, India • Handloom Atelier
+                ✦ Surat, India • Artisan Studio
               </div>
             </div>
           </div>

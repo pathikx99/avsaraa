@@ -37,6 +37,8 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 const GUEST_CART_KEY = "avsaraa_guest_cart";
 const DEBOUNCE_DELAY_MS = 400;
 
+export const getCartItemKey = (p: Product) => `${p.id}__${p.name}`;
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -155,8 +157,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             const guestItems: CartItem[] = JSON.parse(savedGuestCart);
             if (Array.isArray(guestItems) && guestItems.length > 0) {
               guestItems.forEach((gItem) => {
+                const targetKey = getCartItemKey(gItem.product);
                 const existingIdx = userCart.findIndex(
-                  (uItem) => uItem.product.id === gItem.product.id
+                  (uItem) => getCartItemKey(uItem.product) === targetKey
                 );
                 if (existingIdx > -1) {
                   userCart[existingIdx].quantity += gItem.quantity;
@@ -243,18 +246,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
    */
   const addToCart = useCallback(
     (product: Product, quantity = 1): boolean => {
+      const addedQty = Math.max(1, quantity);
+      const targetKey = getCartItemKey(product);
+
       setCartItems((prevItems) => {
-        const existingIndex = prevItems.findIndex((item) => item.product.id === product.id);
+        const existingIndex = prevItems.findIndex(
+          (item) => getCartItemKey(item.product) === targetKey
+        );
         let updated: CartItem[];
 
         if (existingIndex > -1) {
+          const currentItem = prevItems[existingIndex];
+          const maxStock = currentItem.product.stock_count && currentItem.product.stock_count > 0
+            ? currentItem.product.stock_count
+            : 20;
+          const newQty = Math.min(maxStock, currentItem.quantity + addedQty);
+
           updated = prevItems.map((item, index) =>
-            index === existingIndex
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
+            index === existingIndex ? { ...item, quantity: newQty } : item
           );
         } else {
-          updated = [{ product, quantity }, ...prevItems];
+          updated = [{ product, quantity: addedQty }, ...prevItems];
         }
 
         persistCartLocally(updated, user);
@@ -269,9 +281,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const removeFromCart = useCallback(
-    (productId: string) => {
+    (itemIdentifier: string) => {
       setCartItems((prev) => {
-        const updated = prev.filter((item) => item.product.id !== productId);
+        const updated = prev.filter(
+          (item) => getCartItemKey(item.product) !== itemIdentifier && item.product.id !== itemIdentifier
+        );
         persistCartLocally(updated, user);
         return updated;
       });
@@ -281,16 +295,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateQuantity = useCallback(
-    (productId: string, quantity: number) => {
+    (itemIdentifier: string, quantity: number) => {
       if (quantity <= 0) {
-        removeFromCart(productId);
+        removeFromCart(itemIdentifier);
         return;
       }
 
       setCartItems((prev) => {
-        const updated = prev.map((item) =>
-          item.product.id === productId ? { ...item, quantity } : item
-        );
+        const updated = prev.map((item) => {
+          const isMatch =
+            getCartItemKey(item.product) === itemIdentifier || item.product.id === itemIdentifier;
+          if (!isMatch) return item;
+
+          const maxStock =
+            item.product.stock_count && item.product.stock_count > 0 ? item.product.stock_count : 20;
+          const cappedQty = Math.min(maxStock, quantity);
+          return { ...item, quantity: cappedQty };
+        });
+
         persistCartLocally(updated, user);
         return updated;
       });
@@ -399,7 +421,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         <div
           style={{
             position: "fixed",
-            bottom: "28px",
+            top: "24px",
             left: "50%",
             transform: "translateX(-50%)",
             backgroundColor: "#261B13",
@@ -408,7 +430,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             borderRadius: "30px",
             fontSize: "13px",
             fontWeight: 500,
-            zIndex: 2000,
+            zIndex: 3000,
             boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
             display: "flex",
             alignItems: "center",

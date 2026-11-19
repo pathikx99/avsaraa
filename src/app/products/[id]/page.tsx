@@ -1,12 +1,12 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { fetchProductById, SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
+import { fetchProductById } from "@/lib/productDetailData";
 import ProductDetailClient from "./ProductDetailClient";
 
+export const dynamicParams = true;
+
 export async function generateStaticParams() {
-  return SEED_CATALOG_PRODUCTS.map((p) => ({
-    id: p.id,
-  }));
+  return [];
 }
 
 interface PageProps {
@@ -18,10 +18,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const product = await fetchProductById(id);
 
   if (!product) {
-    return {
-      title: "Product Not Found | AVSARAA",
-      description: "Handcrafted Indian luxury fashion and occasion wear.",
-    };
+    notFound();
   }
 
   return {
@@ -55,7 +52,7 @@ export default async function ProductPage({ params }: PageProps) {
     "@type": "Product",
     name: product.name,
     image: product.image_url,
-    description: product.description || "Handcrafted Indian luxury couture and sarees from Surat atelier.",
+    description: product.description || "Handcrafted Indian sarees and festive wear from Surat.",
     brand: {
       "@type": "Brand",
       name: "AVSARAA",
@@ -73,7 +70,7 @@ export default async function ProductPage({ params }: PageProps) {
           : "https://schema.org/OutOfStock",
       seller: {
         "@type": "Organization",
-        name: "AVSARAA Atelier",
+        name: "AVSARAA",
       },
     },
   };
@@ -82,7 +79,7 @@ export default async function ProductPage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       <ProductDetailClient initialProduct={product} />
     </>

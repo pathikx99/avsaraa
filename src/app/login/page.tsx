@@ -89,7 +89,7 @@ export default function LoginPage() {
             }}
           >
             <Image
-              src="/images/saree_model_hero.jpg"
+              src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=85"
               alt="Avsaraa Sarees"
               fill
               sizes="(min-width: 900px) 50vw, 100vw"
@@ -214,6 +214,9 @@ export default function LoginPage() {
 
         /* Desktop & Tablet: Luxury editorial card styling */
         @media (min-width: 900px) {
+          .login-mobile-hero {
+            display: none !important;
+          }
           .login-desktop-nav {
             display: flex !important;
           }
@@ -227,6 +230,12 @@ export default function LoginPage() {
           }
           .login-form-container {
             border-left: 1px solid #E6DACF !important;
+          }
+          .login-card-sheet {
+            margin-top: 0 !important;
+            border-top-left-radius: 0 !important;
+            border-top-right-radius: 0 !important;
+            padding-top: 56px !important;
           }
         }
       `}</style>

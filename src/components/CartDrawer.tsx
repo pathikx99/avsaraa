@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
@@ -18,6 +18,7 @@ export default function CartDrawer() {
     updateQuantity,
     clearCart,
   } = useCart();
+  const [giftNote, setGiftNote] = useState(false);
 
   if (!isCartOpen) return null;
 
@@ -46,10 +47,11 @@ export default function CartDrawer() {
 
       {/* Drawer Panel */}
       <div
+        className="cart-drawer-panel"
         style={{
           position: "relative",
-          width: "420px",
-          maxWidth: "90vw",
+          width: "440px",
+          maxWidth: "100vw",
           height: "100%",
           backgroundColor: "#FAF7F2",
           borderLeft: "1px solid #E6DACF",
@@ -199,9 +201,15 @@ export default function CartDrawer() {
               </Link>
             </div>
           ) : (
-            cartItems.map((item) => (
+            cartItems.map((item) => {
+              const itemKey = `${item.product.id}__${item.product.name}`;
+              const maxStock =
+                item.product.stock_count && item.product.stock_count > 0 ? item.product.stock_count : 20;
+              const isAtMax = item.quantity >= maxStock;
+
+              return (
               <div
-                key={item.product.id}
+                key={itemKey}
                 style={{
                   display: "flex",
                   gap: "14px",
@@ -213,7 +221,9 @@ export default function CartDrawer() {
                 }}
               >
                 {/* Product Thumbnail */}
-                <div
+                <Link
+                  href={`/products/${item.product.id}`}
+                  onClick={closeCart}
                   style={{
                     position: "relative",
                     width: "78px",
@@ -222,16 +232,18 @@ export default function CartDrawer() {
                     overflow: "hidden",
                     flexShrink: 0,
                     backgroundColor: "#F2EBE3",
+                    display: "block",
+                    cursor: "pointer",
                   }}
                 >
                   <Image
-                    src={resolveProductImage(item.product.image_url) || "/images/banarasi_silk_saree.jpg"}
+                    src={resolveProductImage(item.product.image_url) || "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=300&q=80"}
                     alt={item.product.name}
                     fill
                     sizes="80px"
                     style={{ objectFit: "cover" }}
                   />
-                </div>
+                </Link>
 
                 {/* Details */}
                 <div
@@ -254,19 +266,26 @@ export default function CartDrawer() {
                     >
                       {item.product.category}
                     </span>
-                    <h5
-                      style={{
-                        fontFamily: "var(--font-serif), Georgia, serif",
-                        fontSize: "15px",
-                        fontWeight: 600,
-                        color: "#261B13",
-                        marginTop: "2px",
-                        marginBottom: "4px",
-                        lineHeight: 1.3,
-                      }}
+                    <Link
+                      href={`/products/${item.product.id}`}
+                      onClick={closeCart}
+                      style={{ textDecoration: "none" }}
                     >
-                      {item.product.name}
-                    </h5>
+                      <h5
+                        style={{
+                          fontFamily: "var(--font-serif), Georgia, serif",
+                          fontSize: "15px",
+                          fontWeight: 600,
+                          color: "#261B13",
+                          marginTop: "2px",
+                          marginBottom: "4px",
+                          lineHeight: 1.3,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {item.product.name}
+                      </h5>
+                    </Link>
                     <span style={{ fontSize: "14px", fontWeight: 700, color: "#261B13" }}>
                       ₹{item.product.price.toLocaleString("en-IN")}
                     </span>
@@ -285,7 +304,7 @@ export default function CartDrawer() {
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
-                        border: "1px solid #CFBEAD",
+                        border: "1.5px solid #CFBEAD",
                         borderRadius: "20px",
                         overflow: "hidden",
                         backgroundColor: "#FAF7F2",
@@ -293,48 +312,55 @@ export default function CartDrawer() {
                     >
                       <button
                         type="button"
-                        onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                        onClick={() => updateQuantity(itemKey, item.quantity - 1)}
                         aria-label="Decrease quantity"
                         style={{
-                          width: "28px",
-                          height: "26px",
+                          width: "32px",
+                          height: "30px",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: "14px",
+                          fontSize: "16px",
+                          fontWeight: 700,
                           color: "#261B13",
                           cursor: "pointer",
                           background: "none",
                           border: "none",
+                          transition: "background-color 0.15s ease",
                         }}
                       >
                         -
                       </button>
                       <span
                         style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          padding: "0 8px",
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          padding: "0 10px",
                           color: "#261B13",
+                          minWidth: "22px",
+                          textAlign: "center",
                         }}
                       >
                         {item.quantity}
                       </span>
                       <button
                         type="button"
-                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        onClick={() => updateQuantity(itemKey, item.quantity + 1)}
+                        disabled={isAtMax}
                         aria-label="Increase quantity"
                         style={{
-                          width: "28px",
-                          height: "26px",
+                          width: "32px",
+                          height: "30px",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: "14px",
-                          color: "#261B13",
-                          cursor: "pointer",
+                          fontSize: "16px",
+                          fontWeight: 700,
+                          color: isAtMax ? "#B8A99A" : "#261B13",
+                          cursor: isAtMax ? "not-allowed" : "pointer",
                           background: "none",
                           border: "none",
+                          transition: "background-color 0.15s ease",
                         }}
                       >
                         +
@@ -343,14 +369,15 @@ export default function CartDrawer() {
 
                     <button
                       type="button"
-                      onClick={() => removeFromCart(item.product.id)}
+                      onClick={() => removeFromCart(itemKey)}
                       style={{
-                        fontSize: "11.5px",
+                        fontSize: "12px",
                         color: "#A83E2D",
                         background: "none",
                         border: "none",
                         cursor: "pointer",
                         textDecoration: "underline",
+                        fontWeight: 500,
                       }}
                     >
                       Remove
@@ -358,15 +385,17 @@ export default function CartDrawer() {
                   </div>
                 </div>
               </div>
-            ))
+            );
+            })
           )}
         </div>
 
         {/* Footer / Summary */}
         {cartItems.length > 0 && (
           <div
+            className="cart-drawer-footer"
             style={{
-              padding: "20px 24px",
+              padding: "18px 22px calc(18px + env(safe-area-inset-bottom, 12px)) 22px",
               borderTop: "1px solid #EAE0D5",
               backgroundColor: "#FFFFFF",
               display: "flex",
@@ -419,6 +448,37 @@ export default function CartDrawer() {
               <span style={{ fontSize: "10.5px", color: "#8E7D70" }}>
                 * All applicable GST and handcrafted charges included
               </span>
+            </div>
+
+            {/* Complimentary Handwritten Gift Note & Keepsake Box */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "10px 12px",
+                backgroundColor: "#FAF7F2",
+                border: "1px dashed #D6C7B8",
+                borderRadius: "12px",
+                fontSize: "12px",
+                color: "#6E5B4E",
+              }}
+            >
+              <input
+                type="checkbox"
+                id="keepsake-gift-box"
+                checked={giftNote}
+                onChange={(e) => setGiftNote(e.target.checked)}
+                style={{ accentColor: "#866951", width: "16px", height: "16px", cursor: "pointer" }}
+              />
+              <label htmlFor="keepsake-gift-box" style={{ cursor: "pointer", flex: 1, userSelect: "none" }}>
+                <span style={{ fontWeight: 600, color: "#261B13", display: "block", fontSize: "12px" }}>
+                  🎁 Complimentary Keepsake Box & Note
+                </span>
+                <span style={{ fontSize: "10.5px", color: "#8E7D70" }}>
+                  Handwritten on gold foil vellum paper with satin ribbon wrap
+                </span>
+              </label>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

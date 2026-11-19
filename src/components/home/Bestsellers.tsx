@@ -1,52 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
-import { Product } from "@/types/product";
-import { normalizeProducts } from "@/lib/productUtils";
+import { useProductsCatalog } from "@/lib/useProductsCatalog";
 import { RevealSection } from "@/components/RevealSection";
 import ProductCard from "./ProductCard";
 
 export default function Bestsellers() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { products, loading } = useProductsCatalog({ sort: "bestselling", limit: 8 });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    // Fetch products ordered by sales_count or created_at
-    supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(14)
-      .then(
-        ({ data, error }) => {
-          if (!isMounted) return;
-          if (error || !data) {
-            setProducts([]);
-          } else {
-            const normalized = normalizeProducts(data);
-            // Sort by sales_count descending
-            normalized.sort((a, b) => (b.sales_count || 0) - (a.sales_count || 0));
-            setProducts(normalized.slice(0, 8));
-          }
-          setLoading(false);
-        },
-        () => {
-          if (isMounted) {
-            setProducts([]);
-            setLoading(false);
-          }
-        }
-      );
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const handleScroll = (direction: "left" | "right") => {
     if (!scrollContainerRef.current) return;
@@ -59,7 +21,7 @@ export default function Bestsellers() {
       id="bestsellers"
       style={{
         backgroundColor: "#FAF7F2",
-        padding: "85px 24px 95px 24px",
+        padding: "85px 20px 95px 20px",
         position: "relative",
         borderBottom: "1px solid #E6DACF",
       }}
@@ -73,7 +35,7 @@ export default function Bestsellers() {
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: "20px",
-            marginBottom: "40px",
+            marginBottom: "36px",
           }}
         >
           <RevealSection>
@@ -84,15 +46,15 @@ export default function Bestsellers() {
                   marginBottom: "12px",
                   backgroundColor: "rgba(196, 171, 148, 0.15)",
                   color: "#6E5B4E",
-                  border: "1px solid rgba(196, 171, 148, 0.35)",
+                  border: "1px solid rgba(197, 160, 89, 0.4)",
                 }}
               >
-                ✦ PATRON FAVOURITES ✦
+                ✦ MOST LOVED ✦
               </span>
               <h2
                 style={{
                   fontFamily: "var(--font-serif), Georgia, serif",
-                  fontSize: "clamp(32px, 4.5vw, 48px)",
+                  fontSize: "clamp(30px, 4.5vw, 48px)",
                   fontWeight: 500,
                   color: "#261B13",
                   lineHeight: 1.15,
@@ -101,8 +63,8 @@ export default function Bestsellers() {
               >
                 Our Bestsellers
               </h2>
-              <p style={{ fontSize: "15px", color: "#6E5B4E", margin: 0, lineHeight: 1.6 }}>
-                The most cherished weaves and silhouettes loved by our patrons across India.
+              <p style={{ fontSize: "14.5px", color: "#6E5B4E", margin: 0, lineHeight: 1.6 }}>
+                Our most loved handcrafted sarees and festive outfits.
               </p>
             </div>
           </RevealSection>
@@ -112,13 +74,14 @@ export default function Bestsellers() {
             <Link
               href="/products?sort=bestsellers"
               style={{
-                fontSize: "12.5px",
+                fontSize: "12px",
                 fontWeight: 600,
-                letterSpacing: "0.08em",
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 color: "#261B13",
                 textDecoration: "underline",
                 textUnderlineOffset: "4px",
+                transition: "color 0.2s ease",
               }}
             >
               View All Bestsellers →
@@ -130,17 +93,18 @@ export default function Bestsellers() {
                 onClick={() => handleScroll("left")}
                 aria-label="Scroll bestsellers left"
                 style={{
-                  width: "38px",
-                  height: "38px",
+                  width: "40px",
+                  height: "40px",
                   borderRadius: "50%",
-                  border: "1px solid #CFBEAD",
+                  border: "1px solid rgba(197, 160, 89, 0.4)",
                   backgroundColor: "#FFFFFF",
                   color: "#261B13",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   cursor: "pointer",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                  boxShadow: "0 2px 8px rgba(38,27,19,0.06)",
+                  transition: "all 0.2s ease",
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -153,17 +117,18 @@ export default function Bestsellers() {
                 onClick={() => handleScroll("right")}
                 aria-label="Scroll bestsellers right"
                 style={{
-                  width: "38px",
-                  height: "38px",
+                  width: "40px",
+                  height: "40px",
                   borderRadius: "50%",
-                  border: "1px solid #CFBEAD",
+                  border: "1px solid rgba(197, 160, 89, 0.4)",
                   backgroundColor: "#FFFFFF",
                   color: "#261B13",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   cursor: "pointer",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                  boxShadow: "0 2px 8px rgba(38,27,19,0.06)",
+                  transition: "all 0.2s ease",
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -174,14 +139,14 @@ export default function Bestsellers() {
           </div>
         </div>
 
-        {/* Swipeable Carousel Track */}
+        {/* Swipeable Carousel on Mobile / Multi-column on Desktop */}
         {loading ? (
           <div
             className="product-carousel-track"
             style={{
               display: "grid",
               gridAutoFlow: "column",
-              gridAutoColumns: "minmax(270px, 1fr)",
+              gridAutoColumns: "clamp(250px, 74vw, 300px)",
               gap: "20px",
               overflowX: "auto",
               paddingBottom: "16px",
@@ -192,7 +157,7 @@ export default function Bestsellers() {
               <div
                 key={i}
                 style={{
-                  minWidth: "270px",
+                  minWidth: "260px",
                   maxWidth: "320px",
                   backgroundColor: "#FFFFFF",
                   borderRadius: "16px",
@@ -223,7 +188,7 @@ export default function Bestsellers() {
             style={{
               display: "grid",
               gridAutoFlow: "column",
-              gridAutoColumns: "minmax(270px, 1fr)",
+              gridAutoColumns: "clamp(250px, 74vw, 300px)",
               gap: "20px",
               overflowX: "auto",
               scrollSnapType: "x mandatory",
@@ -236,7 +201,7 @@ export default function Bestsellers() {
                 key={product.id}
                 style={{
                   scrollSnapAlign: "start",
-                  minWidth: "270px",
+                  minWidth: "250px",
                   maxWidth: "320px",
                 }}
               >

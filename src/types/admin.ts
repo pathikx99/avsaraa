@@ -19,6 +19,46 @@ export interface AdminUser {
   updated_at?: string;
 }
 
+export interface CustomerOrderItem {
+  product_name: string;
+  quantity: number;
+  total_price: number;
+  color?: string | null;
+  size?: string | null;
+  image_url?: string | null;
+}
+
+export interface CustomerOrderSummary {
+  id: string;
+  user_id: string;
+  order_number: string;
+  total_amount: number;
+  order_status: string;
+  created_at: string;
+  shipping_address_snapshot?: {
+    recipient_name?: string;
+    city?: string;
+    state?: string;
+    phone?: string;
+    email?: string;
+    address_line1?: string;
+    postal_code?: string;
+  } | null;
+  order_items?: CustomerOrderItem[];
+}
+
+export interface CustomerAddressSummary {
+  id: string;
+  user_id: string;
+  recipient_name: string;
+  phone_number: string;
+  address_line1: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  is_default?: boolean;
+}
+
 export interface CustomerProfile {
   id: string;
   full_name: string;
@@ -31,6 +71,18 @@ export interface CustomerProfile {
   preferred_currency?: string;
   created_at: string;
   updated_at: string;
+  // CRM Enrichment
+  total_spend?: number;
+  order_count?: number;
+  last_order_date?: string | null;
+  first_order_date?: string | null;
+  primary_city?: string | null;
+  orders?: CustomerOrderSummary[];
+  addresses?: CustomerAddressSummary[];
+  inquiries?: ContactInquiry[];
+  is_guest?: boolean;
+  rfm_segment?: "VIP Atelier" | "Repeat Patron" | "Active Patron" | "Guest Buyer" | "Prospective Lead";
+  concierge_notes?: string | null;
 }
 
 export interface ContactInquiry {

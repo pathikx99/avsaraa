@@ -1,41 +1,49 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Product, ProductCategory } from "@/types/product";
-import { normalizeProducts, productMatchesOccasion, getOccasionTitleBySlug, resolveProductImage } from "@/lib/productUtils";
-import { ShoppingBagIcon, HeartIcon } from "./Icons";
-import { useCart } from "@/context/CartContext";
+import { productMatchesOccasion, getOccasionTitleBySlug, resolveProductImage } from "@/lib/productUtils";
+import { HeartIcon } from "./Icons";
 import { useWishlist } from "@/context/WishlistContext";
+import { fetchCatalog } from "@/lib/useProductsCatalog";
 import type { User } from "@supabase/supabase-js";
 
+export type ProductDisplayCategory = ProductCategory | "ALL" | "Under ₹1,299";
+
 interface ProductsSectionProps {
-  initialCategory?: ProductCategory | "ALL";
+  initialCategory?: ProductDisplayCategory;
+  initialMaxPrice?: number | null;
   showHeader?: boolean;
 }
 
-const DEFAULT_FALLBACK_IMAGE = "/images/banarasi_silk_saree.jpg";
+const DEFAULT_FALLBACK_IMAGE = "https://aqpkagsbaecavoznnrlj.supabase.co/storage/v1/object/public/items/products/e2000000-0000-0000-0000-000000000001/hero.webp";
 
 export default function ProductsSection({
   initialCategory = "ALL",
+  initialMaxPrice = null,
   showHeader = true,
 }: ProductsSectionProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
-  const [activeCategory, setActiveCategory] = useState<ProductCategory | "ALL">(initialCategory);
+  const [activeCategory, setActiveCategory] = useState<ProductDisplayCategory>(initialCategory);
   const [products, setProducts] = useState<Product[]>([]);
   const [, setUser] = useState<User | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeOccasion, setActiveOccasion] = useState<string | null>(null);
-  const [activeMaxPrice, setActiveMaxPrice] = useState<number | null>(null);
+  const [activeMaxPrice, setActiveMaxPrice] = useState<number | null>(initialMaxPrice);
   const [sortBy, setSortBy] = useState<"featured" | "bestsellers" | "newest" | "price-asc" | "price-desc">("featured");
-  const [addedId, setAddedId] = useState<string | null>(null);
+  const isMountedClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -51,24 +59,16 @@ export default function ProductsSection({
       if (isMounted) setUser(session?.user ?? null);
     });
 
-    // Load products strictly from Supabase database
-    void supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .then(
-        ({ data, error }) => {
-          if (!isMounted) return;
-          if (error || !data) {
-            setProducts([]);
-          } else {
-            setProducts(normalizeProducts(data));
-          }
-        },
-        () => {
-          if (isMounted) setProducts([]);
-        }
-      );
+    // Load products using fast shared catalog cache
+    fetchCatalog().then(
+      (data) => {
+        if (!isMounted) return;
+        setProducts(data || []);
+      },
+      () => {
+        if (isMounted) setProducts([]);
+      }
+    );
 
     return () => {
       isMounted = false;
@@ -78,7 +78,7 @@ export default function ProductsSection({
 
   // Synchronize state when URL searchParams change
   const currentParamsKey = searchParams ? searchParams.toString() : "";
-  const [prevParamsKey, setPrevParamsKey] = useState(currentParamsKey);
+  const [prevParamsKey, setPrevParamsKey] = useState<string | null>(null);
 
   if (currentParamsKey !== prevParamsKey) {
     setPrevParamsKey(currentParamsKey);
@@ -90,7 +90,9 @@ export default function ProductsSection({
 
     setSearchQuery(searchParam !== null && searchParam !== undefined ? searchParam : "");
     setActiveOccasion(occasionParam || null);
-    setActiveMaxPrice(maxPriceParam && !isNaN(Number(maxPriceParam)) ? Number(maxPriceParam) : null);
+
+    const parsedMax = maxPriceParam && !isNaN(Number(maxPriceParam)) ? Number(maxPriceParam) : initialMaxPrice;
+    setActiveMaxPrice(parsedMax);
 
     if (sortParam) {
       if (["featured", "bestsellers", "newest", "price-asc", "price-desc"].includes(sortParam)) {
@@ -98,35 +100,65 @@ export default function ProductsSection({
       }
     }
 
-    if (categoryQuery) {
+    if (parsedMax !== null && parsedMax <= 1299) {
+      setActiveCategory("Under ₹1,299");
+    } else if (categoryQuery) {
       const normalized = categoryQuery.toLowerCase();
-      if (normalized.includes("saree")) setActiveCategory("Sarees");
-      else if (normalized.includes("dress")) setActiveCategory("Dresses");
-      else if (normalized.includes("new")) setActiveCategory("New Arrivals");
-      else if (normalized.includes("occasion")) setActiveCategory("Occasion Wear");
-      else if (normalized === "all") setActiveCategory("ALL");
+      if (normalized.includes("1299") || normalized.includes("under")) {
+        setActiveCategory("Under ₹1,299");
+        setActiveMaxPrice(1299);
+      } else if (normalized.includes("saree")) {
+        setActiveCategory("Sarees");
+      } else if (normalized.includes("dress")) {
+        setActiveCategory("Dresses");
+      } else if (normalized.includes("new")) {
+        setActiveCategory("New Arrivals");
+      } else if (normalized.includes("occasion")) {
+        setActiveCategory("Occasion Wear");
+      } else if (normalized === "all") {
+        setActiveCategory("ALL");
+      }
+    } else if (initialCategory === "Under ₹1,299") {
+      setActiveCategory("Under ₹1,299");
+      setActiveMaxPrice(1299);
     } else {
       setActiveCategory(initialCategory);
     }
   }
 
-  const categoriesList: (ProductCategory | "ALL")[] = [
+  const categoriesList: ProductDisplayCategory[] = [
     "ALL",
     "Sarees",
     "Dresses",
+    "Under ₹1,299",
     "New Arrivals",
     "Occasion Wear",
   ];
 
   // Filter & Sort
   const processedProducts = useMemo(() => {
-    let result = activeCategory === "ALL"
-      ? [...products]
-      : products.filter((p) => p.category === activeCategory);
+    let result = [...products];
+
+    if (activeCategory === "Under ₹1,299") {
+      result = result.filter((p) => p.price <= 1299);
+    } else if (activeCategory === "New Arrivals") {
+      result = [...result]
+        .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+        .slice(0, 20);
+    } else if (activeCategory === "Occasion Wear") {
+      result = result.filter((p) => p.occasion_tags && p.occasion_tags.length > 0);
+    } else if (activeCategory !== "ALL") {
+      result = result.filter((p) => p.category.toLowerCase() === activeCategory.toLowerCase());
+    }
 
     // Filter by occasion if active
     if (activeOccasion) {
       result = result.filter((p) => productMatchesOccasion(p, activeOccasion));
+    }
+
+    // Filter by max price if active and not already applied by category
+    if (activeMaxPrice !== null && activeCategory !== "Under ₹1,299") {
+      result = result.filter((p) => p.price <= activeMaxPrice);
     }
 
     // Filter by max price if active (e.g., Up to ₹1,299)
@@ -159,14 +191,6 @@ export default function ProductsSection({
 
     return result;
   }, [products, activeCategory, activeOccasion, activeMaxPrice, searchQuery, sortBy]);
-
-  const handleQuickAdd = (product: Product) => {
-    const success = addToCart(product);
-    if (success) {
-      setAddedId(product.id);
-      setTimeout(() => setAddedId(null), 2000);
-    }
-  };
 
   return (
     <section
@@ -217,14 +241,31 @@ export default function ProductsSection({
           <div className="category-scroll-strip">
             {categoriesList.map((cat) => {
               const isActive = activeCategory === cat;
-              const count = cat === "ALL" ? products.length : products.filter((p) => p.category === cat).length;
+              const count =
+                cat === "ALL"
+                  ? products.length
+                  : cat === "Under ₹1,299"
+                  ? products.filter((p) => p.price <= 1299).length
+                  : cat === "New Arrivals"
+                  ? Math.min(20, products.length)
+                  : cat === "Occasion Wear"
+                  ? products.filter((p) => p.occasion_tags && p.occasion_tags.length > 0).length
+                  : products.filter((p) => p.category.toLowerCase() === cat.toLowerCase()).length;
               return (
                 <button
                   key={cat}
                   onClick={() => {
                     setActiveCategory(cat);
-                    const newUrl = cat === "ALL" ? "/products" : `/products?category=${encodeURIComponent(cat)}`;
-                    router.replace(newUrl, { scroll: false });
+                    if (cat === "ALL") {
+                      setActiveMaxPrice(null);
+                      router.replace("/products", { scroll: false });
+                    } else if (cat === "Under ₹1,299") {
+                      setActiveMaxPrice(1299);
+                      router.replace("/products?maxPrice=1299", { scroll: false });
+                    } else {
+                      setActiveMaxPrice(null);
+                      router.replace(`/products?category=${encodeURIComponent(cat)}`, { scroll: false });
+                    }
                   }}
                   className="luxury-pill-tab"
                   style={{
@@ -421,6 +462,9 @@ export default function ProductsSection({
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
+              id="catalog-search-input"
+              name="catalog-search"
+              aria-label="Search catalog"
               type="text"
               placeholder="Search weaves, silks, drapes..."
               value={searchQuery}
@@ -570,21 +614,27 @@ export default function ProductsSection({
               <div
                 key={product.id}
                 className="luxury-hover-card product-card-container product-card-shimmer"
+                onClick={() => router.push(`/products/${product.id}`)}
                 style={{
                   backgroundColor: "#FFFFFF",
-                  borderRadius: "20px",
+                  borderRadius: "16px",
                   overflow: "hidden",
-                  border: "1px solid #E8DED3",
-                  boxShadow: "0 8px 24px -10px rgba(38,27,19,0.06)",
+                  border: "1px solid rgba(230, 218, 207, 0.85)",
+                  boxShadow: "0 4px 20px -4px rgba(38,27,19,0.06), 0 1px 3px rgba(38,27,19,0.02)",
                   display: "flex",
                   flexDirection: "column",
                   position: "relative",
+                  cursor: "pointer",
+                  transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.3s ease",
                 }}
               >
                 {/* Product Image Frame */}
                 <div
                   className="luxury-image-zoom-container product-card-image"
-                  onClick={() => setSelectedProduct(product)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/products/${product.id}`);
+                  }}
                   style={{
                     position: "relative",
                     width: "100%",
@@ -597,7 +647,7 @@ export default function ProductsSection({
                     alt={product.name}
                     fill
                     sizes="(min-width: 900px) 25vw, 50vw"
-                    style={{ objectFit: "cover", objectPosition: "center 20%" }}
+                    style={{ objectFit: "cover", objectPosition: "center 20%", transition: "transform 0.65s cubic-bezier(0.16, 1, 0.3, 1)" }}
                   />
 
                   {/* Category Badge */}
@@ -605,21 +655,27 @@ export default function ProductsSection({
                     className="product-card-badge"
                     style={{
                       position: "absolute",
-                      top: "14px",
-                      left: "14px",
-                      backgroundColor: "rgba(38, 27, 19, 0.85)",
-                      backdropFilter: "blur(6px)",
-                      WebkitBackdropFilter: "blur(6px)",
-                      color: "#FAF7F2",
-                      padding: "5px 12px",
-                      borderRadius: "14px",
-                      fontSize: "10.5px",
-                      letterSpacing: "0.1em",
+                      top: "10px",
+                      left: "10px",
+                      backgroundColor: "rgba(26, 18, 12, 0.88)",
+                      backdropFilter: "blur(8px)",
+                      WebkitBackdropFilter: "blur(8px)",
+                      color: "#ECC880",
+                      padding: "4px 10px",
+                      borderRadius: "10px",
+                      fontSize: "9.5px",
+                      letterSpacing: "0.08em",
                       textTransform: "uppercase",
                       fontWeight: 600,
+                      border: "1px solid rgba(197, 160, 89, 0.4)",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
                     }}
                   >
-                    {product.category}
+                    <span style={{ fontSize: "8px" }}>✦</span>
+                    <span>{product.category}</span>
                   </div>
 
                   {/* Wishlist Heart Toggle Button */}
@@ -629,35 +685,36 @@ export default function ProductsSection({
                       e.stopPropagation();
                       toggleWishlist(product);
                     }}
-                    aria-label={isInWishlist(product.id) ? "Remove from saved heirlooms" : "Save to wishlist"}
+                    aria-label={isInWishlist(product.id) ? "Remove from wishlist" : "Save to wishlist"}
                     style={{
                       position: "absolute",
-                      top: "12px",
-                      right: "12px",
+                      top: "10px",
+                      right: "10px",
                       width: "34px",
                       height: "34px",
                       borderRadius: "50%",
-                      backgroundColor: "rgba(250, 247, 242, 0.94)",
+                      backgroundColor: isInWishlist(product.id) ? "#8A181A" : "rgba(255, 255, 255, 0.9)",
+                      color: isInWishlist(product.id) ? "#FFFFFF" : "#261B13",
                       backdropFilter: "blur(8px)",
                       WebkitBackdropFilter: "blur(8px)",
-                      border: "1px solid rgba(197, 160, 89, 0.45)",
+                      border: isInWishlist(product.id) ? "1px solid #8A181A" : "1px solid rgba(197, 160, 89, 0.35)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       cursor: "pointer",
                       zIndex: 3,
-                      boxShadow: "0 3px 10px rgba(0,0,0,0.1)",
-                      transition: "all 0.2s ease",
+                      boxShadow: isInWishlist(product.id) ? "0 4px 12px rgba(138, 24, 26, 0.35)" : "0 4px 14px rgba(38, 27, 19, 0.12)",
+                      transition: "all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
                     }}
                   >
                     <HeartIcon
                       size={16}
-                      color={isInWishlist(product.id) ? "#B83A4B" : "#866951"}
+                      color={isInWishlist(product.id) ? "#FFFFFF" : "#261B13"}
+                      fill={isInWishlist(product.id) ? "currentColor" : "none"}
                     />
                   </button>
 
                   {/* Quick View Button on Image */}
-
                   <button
                     type="button"
                     onClick={(e) => {
@@ -667,15 +724,15 @@ export default function ProductsSection({
                     className="product-card-quickview"
                     style={{
                       position: "absolute",
-                      bottom: "14px",
-                      right: "14px",
+                      bottom: "12px",
+                      right: "12px",
                       backgroundColor: "rgba(250, 247, 242, 0.94)",
                       backdropFilter: "blur(8px)",
                       WebkitBackdropFilter: "blur(8px)",
                       color: "#261B13",
-                      padding: "7px 16px",
-                      borderRadius: "18px",
-                      fontSize: "11px",
+                      padding: "6px 14px",
+                      borderRadius: "16px",
+                      fontSize: "10.5px",
                       fontWeight: 600,
                       letterSpacing: "0.06em",
                       textTransform: "uppercase",
@@ -692,7 +749,7 @@ export default function ProductsSection({
                 <div
                   className="product-card-body"
                   style={{
-                    padding: "20px",
+                    padding: "16px",
                     display: "flex",
                     flexDirection: "column",
                     flex: 1,
@@ -703,7 +760,7 @@ export default function ProductsSection({
                     className="product-card-title"
                     style={{
                       fontFamily: "var(--font-serif), Georgia, serif",
-                      fontSize: "19px",
+                      fontSize: "18px",
                       fontWeight: 600,
                       color: "#261B13",
                       marginBottom: "6px",
@@ -719,10 +776,10 @@ export default function ProductsSection({
                     <p
                       className="product-card-desc"
                       style={{
-                        fontSize: "12.5px",
+                        fontSize: "12px",
                         color: "#6E5B4E",
                         lineHeight: 1.55,
-                        marginBottom: "16px",
+                        marginBottom: "14px",
                         flex: 1,
                       }}
                     >
@@ -733,7 +790,7 @@ export default function ProductsSection({
                   <div
                     style={{
                       marginTop: "auto",
-                      paddingTop: "14px",
+                      paddingTop: "12px",
                       borderTop: "1px solid #F0E8DF",
                       display: "flex",
                       flexDirection: "column",
@@ -752,7 +809,7 @@ export default function ProductsSection({
                           className="product-card-price"
                           style={{
                             display: "block",
-                            fontSize: "18px",
+                            fontSize: "17px",
                             fontWeight: 700,
                             color: "#261B13",
                             lineHeight: 1.1,
@@ -763,7 +820,7 @@ export default function ProductsSection({
                         <span
                           className="desktop-only"
                           style={{
-                            fontSize: "10.5px",
+                            fontSize: "10px",
                             color: "#8E7D70",
                             textTransform: "uppercase",
                             letterSpacing: "0.04em",
@@ -775,6 +832,7 @@ export default function ProductsSection({
 
                       <Link
                         href={`/contact?inquire=${encodeURIComponent(product.name)}`}
+                        onClick={(e) => e.stopPropagation()}
                         style={{
                           fontSize: "11px",
                           fontWeight: 600,
@@ -787,28 +845,32 @@ export default function ProductsSection({
                       </Link>
                     </div>
 
-                    {/* Add to Bag Action Button */}
+                    {/* View Product Action Button */}
                     <button
                       type="button"
-                      onClick={() => handleQuickAdd(product)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/products/${product.id}`);
+                      }}
                       className="avsaraa-btn-primary product-card-btn btn-shine"
                       style={{
-                        height: "40px",
-                        fontSize: "11px",
+                        height: "38px",
+                        fontSize: "10.5px",
                         letterSpacing: "0.08em",
                         textTransform: "uppercase",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         gap: "6px",
-                        borderRadius: "20px",
+                        borderRadius: "8px",
                         width: "100%",
-                        backgroundColor: addedId === product.id ? "#1B6B40" : "#261B13",
-                        transition: "background-color 0.3s ease",
+                        backgroundColor: "#261B13",
+                        border: "1px solid rgba(197, 160, 89, 0.4)",
+                        boxShadow: "0 2px 8px rgba(38,27,19,0.14)",
+                        cursor: "pointer",
                       }}
                     >
-                      <ShoppingBagIcon size={14} color="#FAF7F2" />
-                      <span>{addedId === product.id ? "Added to Bag ✓" : "Add to Bag"}</span>
+                      <span>Select Size & Details →</span>
                     </button>
                   </div>
                 </div>
@@ -819,7 +881,7 @@ export default function ProductsSection({
       </div>
 
       {/* Quick View Modal */}
-      {selectedProduct && (
+      {isMountedClient && selectedProduct && typeof document !== "undefined" && createPortal(
         <div
           style={{
             position: "fixed",
@@ -827,14 +889,16 @@ export default function ProductsSection({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(38, 27, 19, 0.72)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(20, 13, 8, 0.78)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 1000,
-            padding: "16px",
+            zIndex: 99999,
+            padding: "20px",
             animation: "fadeIn 0.25s ease both",
           }}
           onClick={() => setSelectedProduct(null)}
@@ -923,7 +987,7 @@ export default function ProductsSection({
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <div>
                 <span className="luxury-badge" style={{ marginBottom: "10px" }}>
-                  ✦ AVSARAA ATELIER
+                  ✦ AVSARAA COLLECTION
                 </span>
                 <h3
                   style={{
@@ -983,12 +1047,9 @@ export default function ProductsSection({
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const added = addToCart(selectedProduct);
-                    if (added) setSelectedProduct(null);
-                  }}
+                <Link
+                  href={`/products/${selectedProduct.id}`}
+                  onClick={() => setSelectedProduct(null)}
                   className="avsaraa-btn-primary btn-shine"
                   style={{
                     height: "48px",
@@ -1002,11 +1063,11 @@ export default function ProductsSection({
                     borderRadius: "24px",
                     backgroundColor: "#261B13",
                     color: "#FAF7F2",
+                    textDecoration: "none",
                   }}
                 >
-                  <ShoppingBagIcon size={16} color="#FAF7F2" />
-                  <span>Add to Shopping Bag</span>
-                </button>
+                  <span>Select Size & Customization →</span>
+                </Link>
 
                 <Link
                   href={`/products/${selectedProduct.id}`}
@@ -1048,7 +1109,7 @@ export default function ProductsSection({
                     color: "#261B13",
                   }}
                 >
-                  <span>Inquire with Atelier</span>
+                  <span>Inquire with Us</span>
                   <span>→</span>
                 </Link>
 
@@ -1071,7 +1132,8 @@ export default function ProductsSection({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   );

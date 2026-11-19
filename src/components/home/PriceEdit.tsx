@@ -11,7 +11,7 @@ export default function PriceEdit() {
       <div className="price-edit-container">
         <RevealSection>
           <Link
-            href="/under-1299"
+            href="/products?maxPrice=1299"
             className="price-edit-box-card luxury-hover-card"
             aria-label="Explore The ₹1,299 Edit - All pieces up to ₹1,299"
           >
@@ -26,7 +26,7 @@ export default function PriceEdit() {
               <div className="price-edit-image-col">
                 <div className="price-edit-image-window">
                   <Image
-                    src="/images/product_suit_under1299.jpg"
+                    src="https://images.unsplash.com/photo-1768651925875-d1523ed07cb6?auto=format&fit=crop&w=1000&q=85"
                     alt="The ₹1,299 Edit - Handcrafted Daily Wear"
                     fill
                     sizes="(max-width: 767px) 94vw, 48vw"

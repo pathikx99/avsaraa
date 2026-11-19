@@ -1,10 +1,29 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { normalizePhoneNumber, maskEmail, maskPhoneNumber } from "@/lib/phoneUtils";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
   try {
+    const headerList = await headers();
+    const forwardedFor = headerList.get("x-forwarded-for");
+    const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
+
+    // Rate Limiting Protection (10 validations per minute per IP to prevent bulk enumeration)
+    const rateCheck = checkRateLimit(`phone-validate:${ip}`, 10, 60);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          valid: false,
+          available: false,
+          error: `Too many phone verification attempts. Please retry in ${rateCheck.resetSeconds} seconds.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { phoneNumber, countryCode = "+91", currentUserId } = body;
 
@@ -35,6 +54,7 @@ export async function POST(request: Request) {
     const { normalized, formatted } = validation;
     const digitsOnly = normalized.replace(/\D/g, "");
     const last10Digits = digitsOnly.slice(-10);
+    const encNormalized = encodeURIComponent(normalized);
 
     const supabaseAdmin = getAdminSupabaseClient();
 
@@ -45,7 +65,7 @@ export async function POST(request: Request) {
       .from("profiles")
       .select("id, email, full_name, phone_number")
       .or(
-        `phone_number.eq.${normalized},phone_number.eq.${digitsOnly},phone_number.ilike.%${last10Digits}`
+        `phone_number.eq.${encNormalized},phone_number.eq.${digitsOnly},phone_number.ilike.%${last10Digits}`
       );
 
     // Security: Only allow excluding currentUserId if the caller is verified to own that session ID

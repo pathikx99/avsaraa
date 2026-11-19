@@ -13,14 +13,7 @@ import OrdersAccountTab from "@/components/account/OrdersAccountTab";
 import { normalizePhoneNumber } from "@/lib/phoneUtils";
 import { isSuperAdminUser } from "@/lib/adminConstants";
 
-const PRESET_PRODUCT_IMAGES = [
-  { label: "Banarasi Silk Saree", url: "/images/banarasi_silk_saree.jpg" },
-  { label: "Emerald Organza Saree", url: "/images/royal_organza_saree.jpg" },
-  { label: "Heritage Anarkali Gown", url: "/images/royal_occasion_dress.jpg" },
-  { label: "Chanderi Dress", url: "/images/festive_chanderi_dress.jpg" },
-  { label: "Royal Zari Bridal Drape", url: "/images/saree_model_hero.jpg" },
-  { label: "Handloom Weave Texture", url: "/images/account_hero.jpg" },
-];
+const DEFAULT_PRODUCT_FALLBACK = "/images/account_hero.jpg";
 
 interface UserProfile {
   id: string;
@@ -82,7 +75,7 @@ export default function AccountPage() {
     address_line2: "",
     landmark: "",
     city: "",
-    state: "",
+    state: "Gujarat",
     postal_code: "",
     address_type: "Home",
     is_default: true,
@@ -1438,7 +1431,7 @@ export default function AccountPage() {
                       >
                         <div style={{ position: "relative", width: "100%", height: "200px", backgroundColor: "#F2EBE3" }}>
                           <Image
-                            src={prod.image_url || PRESET_PRODUCT_IMAGES[0].url}
+                            src={prod.image_url || DEFAULT_PRODUCT_FALLBACK}
                             alt={prod.name}
                             fill
                             sizes="240px"
@@ -1541,7 +1534,7 @@ export default function AccountPage() {
                     Help & Support
                   </h3>
                   <p style={{ fontSize: "14px", color: "#6E5B4E", lineHeight: 1.7, marginBottom: "28px", maxWidth: "520px", margin: "0 auto 28px auto" }}>
-                    Have questions about your order, sizing, or our sarees? Contact our atelier concierge team directly.
+                    Have questions about your order, sizing, or our sarees? Contact our customer care team directly.
                   </p>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "420px", margin: "0 auto" }}>
@@ -1550,7 +1543,7 @@ export default function AccountPage() {
                       className="avsaraa-btn-primary"
                       style={{ height: "50px", fontSize: "13.5px", backgroundColor: "#261B13", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
                     >
-                      <span>Contact Atelier Concierge</span>
+                      <span>Contact Customer Care</span>
                     </Link>
                     <a
                       href="mailto:contact.avsaraa@gmail.com"
@@ -1711,7 +1704,7 @@ export default function AccountPage() {
                     value={newAddress.state}
                     onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
                     required
-                    placeholder="Maharashtra"
+                    placeholder="Gujarat"
                     style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>
@@ -1724,7 +1717,7 @@ export default function AccountPage() {
                     value={newAddress.postal_code}
                     onChange={(e) => setNewAddress({ ...newAddress, postal_code: e.target.value })}
                     required
-                    placeholder="400050"
+                    placeholder="395001"
                     maxLength={6}
                     style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />

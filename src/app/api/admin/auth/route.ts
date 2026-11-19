@@ -92,19 +92,24 @@ export async function POST(request: Request) {
       // Synchronize Supabase Auth & admin_users record in the background
       try {
         const supabaseAdmin = getAdminSupabaseClient();
-        const { data: userListData } = await supabaseAdmin.auth.admin.listUsers();
-        const existingUser = userListData?.users?.find(
-          (u) => u.email?.toLowerCase().trim() === configuredEmail
-        );
+        const { data: existingAdmin } = await supabaseAdmin
+          .from("admin_users")
+          .select("id")
+          .eq("email", configuredEmail)
+          .maybeSingle();
 
-        if (!existingUser) {
-          await supabaseAdmin.auth.admin.createUser({
-            email: configuredEmail,
-            password: envPassword,
-            email_confirm: true,
-            user_metadata: { role: "super_admin", full_name: "Kratos Lord" },
-            app_metadata: { role: "super_admin" },
-          });
+        if (!existingAdmin) {
+          try {
+            await supabaseAdmin.auth.admin.createUser({
+              email: configuredEmail,
+              password: envPassword,
+              email_confirm: true,
+              user_metadata: { role: "super_admin", full_name: "Kratos Lord" },
+              app_metadata: { role: "super_admin" },
+            });
+          } catch {
+            // User may already exist in auth.users
+          }
         }
 
         await supabaseAdmin.from("admin_users").upsert(

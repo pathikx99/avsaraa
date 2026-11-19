@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { orderId, orderNumber, checkoutUuid } = body;
+    const { orderId, orderNumber } = body;
 
     if (!orderId && !orderNumber) {
       return NextResponse.json(
@@ -29,12 +29,15 @@ export async function POST(request: Request) {
 
     const adminClient = getAdminSupabaseClient();
 
+    const target = String(orderId || orderNumber || "").trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target);
+
     // Query order
     let query = adminClient.from("orders").select("*");
-    if (orderId) {
-      query = query.eq("id", orderId);
+    if (isUuid) {
+      query = query.eq("id", target);
     } else {
-      query = query.eq("order_number", orderNumber);
+      query = query.eq("order_number", target);
     }
 
     const { data: order, error } = await query.maybeSingle();
@@ -47,14 +50,21 @@ export async function POST(request: Request) {
     }
 
     // Security Check: Order claiming verification
-    const userEmail = user.email.toLowerCase().trim();
+    const userEmail = user.email ? user.email.toLowerCase().trim() : "";
     const addressEmail = order.shipping_address_snapshot?.email
       ? String(order.shipping_address_snapshot.email).toLowerCase().trim()
       : null;
     const orderNotes = order.notes ? String(order.notes).toLowerCase() : "";
 
-    const emailMatches = Boolean(addressEmail && addressEmail === userEmail) || orderNotes.includes(userEmail);
-    const checkoutUuidMatches = Boolean(checkoutUuid && order.id === checkoutUuid);
+    const userPhone = user.phone ? user.phone.replace(/\D/g, "").slice(-10) : "";
+    const addressPhone = order.shipping_address_snapshot?.phone_number
+      ? String(order.shipping_address_snapshot.phone_number).replace(/\D/g, "").slice(-10)
+      : "";
+
+    const emailMatches =
+      Boolean(addressEmail && userEmail && addressEmail === userEmail) ||
+      (Boolean(userEmail) && orderNotes.includes(userEmail));
+    const phoneMatches = Boolean(userPhone && addressPhone && userPhone === addressPhone);
 
     // If order is already owned by this user
     if (order.user_id === user.id) {
@@ -65,11 +75,25 @@ export async function POST(request: Request) {
       });
     }
 
-    if (!emailMatches && !checkoutUuidMatches) {
+    const GUEST_SYSTEM_USER_ID = "7a3b2e24-820f-4706-8cc3-4218b42b0da3";
+    const isGuestOrder = !order.user_id || order.user_id === GUEST_SYSTEM_USER_ID;
+
+    // Prevent taking over an order that is already assigned to another user
+    if (order.user_id && !isGuestOrder && order.user_id !== user.id) {
       return NextResponse.json(
         {
           success: false,
-          error: "Claim verification failed: The email or checkout UUID does not match this order.",
+          error: "This order is already linked to another registered account.",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (!emailMatches && !phoneMatches) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Claim verification failed: Your account email or phone number does not match this order.",
         },
         { status: 403 }
       );

@@ -8,6 +8,7 @@ import {
   rateLimitCustomerLogin,
   rateLimitCouponValidation,
   rateLimitOrderTracking,
+  rateLimitReviews,
 } from "../../src/lib/rateLimit.ts";
 
 describe("Rate Limiting & Brute-Force Defense Tests", () => {
@@ -55,5 +56,8 @@ describe("Rate Limiting & Brute-Force Defense Tests", () => {
 
     const coupon1 = rateLimitCouponValidation("192.168.1.1");
     assert.strictEqual(coupon1.allowed, true);
+
+    const reviewCheck = rateLimitReviews("192.168.1.1");
+    assert.strictEqual(reviewCheck.allowed, true);
   });
 });

@@ -32,15 +32,6 @@ import OrdersAdminTab from "@/components/admin/OrdersAdminTab";
 import CouponsAdminTab from "@/components/admin/CouponsAdminTab";
 import { ADMIN_EMAIL, isSuperAdminUser } from "@/lib/adminConstants";
 
-const PRESET_PRODUCT_IMAGES = [
-  { label: "Banarasi Silk Saree", url: "/images/banarasi_silk_saree.jpg" },
-  { label: "Emerald Organza Saree", url: "/images/royal_organza_saree.jpg" },
-  { label: "Heritage Anarkali Gown", url: "/images/royal_occasion_dress.jpg" },
-  { label: "Chanderi Dress", url: "/images/festive_chanderi_dress.jpg" },
-  { label: "Royal Zari Bridal Drape", url: "/images/saree_model_hero.jpg" },
-  { label: "Handloom Weave Texture", url: "/images/account_hero.jpg" },
-];
-
 // Single Super Admin Default
 const DEFAULT_SUPER_ADMIN: AdminUser = {
   id: "adm-001",
@@ -105,36 +96,63 @@ export default function AdminDashboardPage() {
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
 
-  // Modals state for Customers
+  // Modals state for Customers & CRM
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerProfile | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<CustomerProfile | null>(null);
+  const [viewingCustomer, setViewingCustomer] = useState<CustomerProfile | null>(null);
+  const [customerSegmentFilter, setCustomerSegmentFilter] = useState<string>("ALL");
+  const [customerDetailSubTab, setCustomerDetailSubTab] = useState<"orders" | "addresses" | "inquiries" | "notes">("orders");
+  const [crmNoteDraft, setCrmNoteDraft] = useState("");
+  const [isSavingCrmNote, setIsSavingCrmNote] = useState(false);
+  const [isConvertingGuest, setIsConvertingGuest] = useState(false);
 
   // Modals state for Super Admin & Inquiries
   const [showEditSuperAdminModal, setShowEditSuperAdminModal] = useState(false);
   const [viewingInquiry, setViewingInquiry] = useState<ContactInquiry | null>(null);
   const [deletingInquiry, setDeletingInquiry] = useState<ContactInquiry | null>(null);
 
+  // Bulk Product Ingestion & Image Upload States
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [bulkCsvFile, setBulkCsvFile] = useState<File | null>(null);
+  const [bulkParsedProducts, setBulkParsedProducts] = useState<Array<Record<string, unknown>>>([]);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkImportError, setBulkImportError] = useState<string | null>(null);
+  const [isUploadingProductPhoto, setIsUploadingProductPhoto] = useState(false);
+  const [productPhotoUploadNotice, setProductPhotoUploadNotice] = useState<string | null>(null);
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+  const [galleryUploadNotice, setGalleryUploadNotice] = useState<string | null>(null);
+
   // Form states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
-  // Product Form state
+  // Product Form state (with Promotional & Stock capabilities)
   const [productForm, setProductForm] = useState<{
     name: string;
     category: ProductCategory;
     price: string;
+    mrp: string;
+    discount_percent: string;
+    stock_count: string;
+    promo_tag: string;
     image_url: string;
+    gallery_images: string[];
     description: string;
   }>({
     name: "",
     category: "Sarees",
     price: "",
-    image_url: PRESET_PRODUCT_IMAGES[0].url,
+    mrp: "",
+    discount_percent: "0",
+    stock_count: "10",
+    promo_tag: "",
+    image_url: "",
+    gallery_images: [],
     description: "",
   });
 
-  // Customer Form state
+  // Customer Form state (with Concierge Notes)
   const [customerForm, setCustomerForm] = useState<{
     full_name: string;
     email: string;
@@ -142,6 +160,7 @@ export default function AdminDashboardPage() {
     status: string;
     membership_tier: string;
     reward_points: string;
+    concierge_notes: string;
   }>({
     full_name: "",
     email: "",
@@ -149,6 +168,7 @@ export default function AdminDashboardPage() {
     status: "Active",
     membership_tier: "Standard",
     reward_points: "100",
+    concierge_notes: "",
   });
 
   // Super Admin Edit Form state
@@ -510,25 +530,44 @@ export default function AdminDashboardPage() {
   // Product CRUD
   // ---------------------------------------------------------------------------
   const openAddProductModal = () => {
+    setEditingProduct(null);
     setProductForm({
       name: "",
       category: "Sarees",
       price: "",
-      image_url: PRESET_PRODUCT_IMAGES[0].url,
+      mrp: "",
+      discount_percent: "0",
+      stock_count: "10",
+      promo_tag: "",
+      image_url: "",
+      gallery_images: [],
       description: "",
     });
+    setProductPhotoUploadNotice(null);
+    setGalleryUploadNotice(null);
     setShowAddProductModal(true);
   };
 
   const openEditProductModal = (product: Product) => {
     setEditingProduct(product);
+    const promoTag = (product.occasion_tags || []).find((t) =>
+      ["Special Promo", "Festive Offer", "Sale", "Under ₹1,299", "Flash Deal", "Limited Deal"].includes(t)
+    ) || "";
+
     setProductForm({
       name: product.name,
       category: product.category,
       price: String(product.price),
+      mrp: product.mrp ? String(product.mrp) : "",
+      discount_percent: product.discount_percent !== undefined ? String(product.discount_percent) : "0",
+      stock_count: product.stock_count !== undefined ? String(product.stock_count) : "10",
+      promo_tag: promoTag,
       image_url: product.image_url,
+      gallery_images: Array.isArray(product.gallery_images) ? product.gallery_images : [],
       description: product.description || "",
     });
+    setProductPhotoUploadNotice(null);
+    setGalleryUploadNotice(null);
   };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
@@ -536,10 +575,31 @@ export default function AdminDashboardPage() {
     setIsSubmitting(true);
     try {
       const headers = await getAuthHeaders();
+      const numPrice = Number(productForm.price);
+      const numMrp = productForm.mrp ? Number(productForm.mrp) : undefined;
+      const numDiscount = Number(productForm.discount_percent) || 0;
+      const numStock = Number(productForm.stock_count) || 10;
+      const occasionTags = productForm.promo_tag && productForm.promo_tag !== "None"
+        ? [productForm.promo_tag]
+        : [];
+
+      const payload = {
+        name: productForm.name,
+        category: productForm.category,
+        price: numPrice,
+        mrp: numMrp,
+        discount_percent: numDiscount,
+        stock_count: numStock,
+        occasion_tags: occasionTags,
+        image_url: productForm.image_url,
+        gallery_images: productForm.gallery_images,
+        description: productForm.description,
+      };
+
       const res = await fetch("/api/admin/products", {
         method: "POST",
         headers,
-        body: JSON.stringify(productForm),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
@@ -549,8 +609,7 @@ export default function AdminDashboardPage() {
 
       const created: Product = json.data || {
         id: crypto.randomUUID(),
-        ...productForm,
-        price: Number(productForm.price),
+        ...payload,
         created_at: new Date().toISOString(),
       };
 
@@ -571,13 +630,32 @@ export default function AdminDashboardPage() {
     setIsSubmitting(true);
     try {
       const headers = await getAuthHeaders();
+      const numPrice = Number(productForm.price);
+      const numMrp = productForm.mrp ? Number(productForm.mrp) : undefined;
+      const numDiscount = Number(productForm.discount_percent) || 0;
+      const numStock = Number(productForm.stock_count) || 10;
+      const occasionTags = productForm.promo_tag && productForm.promo_tag !== "None"
+        ? [productForm.promo_tag]
+        : [];
+
+      const payload = {
+        id: editingProduct.id,
+        name: productForm.name,
+        category: productForm.category,
+        price: numPrice,
+        mrp: numMrp,
+        discount_percent: numDiscount,
+        stock_count: numStock,
+        occasion_tags: occasionTags,
+        image_url: productForm.image_url,
+        gallery_images: productForm.gallery_images,
+        description: productForm.description,
+      };
+
       const res = await fetch("/api/admin/products", {
         method: "PUT",
         headers,
-        body: JSON.stringify({
-          id: editingProduct.id,
-          ...productForm,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
@@ -587,8 +665,7 @@ export default function AdminDashboardPage() {
 
       const updated: Product = json.data || {
         ...editingProduct,
-        ...productForm,
-        price: Number(productForm.price),
+        ...payload,
       };
 
       setProducts(products.map((p) => (p.id === updated.id ? updated : p)));
@@ -628,8 +705,232 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Upload Product Photo (Auto-renamed & organized to Cloudflare)
+  const handleUploadProductPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingProductPhoto(true);
+    setProductPhotoUploadNotice(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "products");
+      if (productForm.name) formData.append("product_name", productForm.name);
+      if (productForm.category) formData.append("category", productForm.category);
+      formData.append("role", "hero");
+
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.url) {
+        throw new Error(data.error || "Failed to upload photo");
+      }
+
+      setProductForm((prev) => ({ ...prev, image_url: data.url }));
+      const sizeKb = Math.round(data.sizeBytes / 1024);
+      setProductPhotoUploadNotice(
+        `✓ Organized to Cloudflare: ${sizeKb} KB WebP (${data.path || "compressed"}).`
+      );
+      showToast(`Hero photo organized to Cloudflare (${sizeKb} KB WebP)!`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Upload error";
+      showToast(msg, "error");
+    } finally {
+      setIsUploadingProductPhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  // Upload Multiple Gallery Photos (Auto-renamed & organized to Cloudflare)
+  const handleUploadGalleryPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingGallery(true);
+    setGalleryUploadNotice(null);
+    const newUrls: string[] = [];
+    let uploadCount = 0;
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("folder", "products");
+        if (productForm.name) formData.append("product_name", productForm.name);
+        if (productForm.category) formData.append("category", productForm.category);
+        const roleIndex = (productForm.gallery_images?.length || 0) + i + 1;
+        formData.append("role", `gallery-${roleIndex}`);
+
+        const res = await fetch("/api/admin/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success && data.url) {
+          newUrls.push(data.url);
+          uploadCount++;
+        }
+      }
+
+      if (newUrls.length > 0) {
+        setProductForm((prev) => ({
+          ...prev,
+          gallery_images: [...(prev.gallery_images || []), ...newUrls],
+        }));
+        setGalleryUploadNotice(`✓ Added ${uploadCount} gallery image(s) organized in Cloudflare.`);
+        showToast(`${uploadCount} gallery image(s) organized to Cloudflare!`);
+      } else {
+        throw new Error("Failed to upload gallery images");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Gallery upload error";
+      showToast(msg, "error");
+    } finally {
+      setIsUploadingGallery(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveGalleryImage = (indexToRemove: number) => {
+    setProductForm((prev) => ({
+      ...prev,
+      gallery_images: (prev.gallery_images || []).filter((_, i) => i !== indexToRemove),
+    }));
+  };
+
+  // CSV Parsing and Bulk Ingestion
+  const parseCsvText = (text: string) => {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length < 2) return [];
+
+    const parseLine = (line: string): string[] => {
+      const result: string[] = [];
+      let cur = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (c === "," && !inQuotes) {
+          result.push(cur.trim());
+          cur = "";
+        } else {
+          cur += c;
+        }
+      }
+      result.push(cur.trim());
+      return result;
+    };
+
+    const headers = parseLine(lines[0]).map((h) => h.toLowerCase().replace(/[^a-z0-9_]/g, ""));
+    const items: Record<string, unknown>[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseLine(lines[i]);
+      if (values.length === 0 || values.every((v) => !v)) continue;
+
+      const row: Record<string, unknown> = {};
+      headers.forEach((h, idx) => {
+        row[h] = values[idx] || "";
+      });
+
+      if (row.name && row.price) {
+        items.push({
+          name: row.name,
+          category: row.category || "Sarees",
+          price: Number(row.price),
+          mrp: row.mrp ? Number(row.mrp) : Number(row.price),
+          stock_count: row.stock_count ? Number(row.stock_count) : 10,
+          fabric: row.fabric || undefined,
+          weave: row.weave || undefined,
+          available_sizes: row.available_sizes
+            ? String(row.available_sizes).split(",").map((s) => s.trim()).filter(Boolean)
+            : ["Free Size"],
+          image_url: row.image_url || "/images/products/hero-default.webp",
+          description: row.description || undefined,
+        });
+      }
+    }
+    return items;
+  };
+
+  const handleCsvFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBulkCsvFile(file);
+    setBulkImportError(null);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const text = String(evt.target?.result || "");
+        const parsed = parseCsvText(text);
+        if (parsed.length === 0) {
+          setBulkImportError("No valid product rows found in the CSV. Please ensure headers match the template.");
+          setBulkParsedProducts([]);
+        } else {
+          setBulkParsedProducts(parsed);
+        }
+      } catch {
+        setBulkImportError("Failed to parse CSV file format.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExecuteBulkImport = async () => {
+    if (bulkParsedProducts.length === 0) return;
+
+    setBulkImporting(true);
+    setBulkImportError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/products", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ bulk: bulkParsedProducts }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Bulk import failed");
+      }
+
+      showToast(`Successfully imported ${json.count || bulkParsedProducts.length} products!`);
+      setShowBulkImportModal(false);
+      setBulkCsvFile(null);
+      setBulkParsedProducts([]);
+      
+      const prodRes = await fetch("/api/admin/products", { headers });
+      if (prodRes.ok) {
+        const prodData = await prodRes.json();
+        if (prodData.success && prodData.products) {
+          setProducts(prodData.products);
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Import failed";
+      setBulkImportError(msg);
+      showToast(msg, "error");
+    } finally {
+      setBulkImporting(false);
+    }
+  };
+
   // ---------------------------------------------------------------------------
-  // Customer Profile CRUD
+  // Customer Profile & CRM Operations
   // ---------------------------------------------------------------------------
   const openAddCustomerModal = () => {
     setCustomerForm({
@@ -639,6 +940,7 @@ export default function AdminDashboardPage() {
       status: "Active",
       membership_tier: "Standard",
       reward_points: "100",
+      concierge_notes: "",
     });
     setShowAddCustomerModal(true);
   };
@@ -652,7 +954,88 @@ export default function AdminDashboardPage() {
       status: customer.status || "Active",
       membership_tier: customer.membership_tier,
       reward_points: String(customer.reward_points || 0),
+      concierge_notes: customer.concierge_notes || "",
     });
+  };
+
+  const openViewCustomerModal = (customer: CustomerProfile) => {
+    setViewingCustomer(customer);
+    setCrmNoteDraft(customer.concierge_notes || "");
+    setCustomerDetailSubTab("orders");
+  };
+
+  const handleSaveCrmNote = async () => {
+    if (!viewingCustomer) return;
+    setIsSavingCrmNote(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/users", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          target: "customer",
+          id: viewingCustomer.id,
+          concierge_notes: crmNoteDraft,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to save concierge notes");
+      }
+      const updatedNotes = crmNoteDraft;
+      setCustomerProfiles((prev) =>
+        prev.map((c) =>
+          c.id === viewingCustomer.id ? { ...c, concierge_notes: updatedNotes } : c
+        )
+      );
+      setViewingCustomer((prev) => (prev ? { ...prev, concierge_notes: updatedNotes } : null));
+      showToast("Patron concierge notes saved.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to save notes";
+      showToast(message, "error");
+    } finally {
+      setIsSavingCrmNote(false);
+    }
+  };
+
+  const handleConvertGuestToPatron = async () => {
+    if (!viewingCustomer) return;
+    setIsConvertingGuest(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/users", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          target: "customer",
+          id: viewingCustomer.id,
+          full_name: viewingCustomer.full_name,
+          email: viewingCustomer.email,
+          phone_number: viewingCustomer.phone_number,
+          status: "Active",
+          membership_tier: viewingCustomer.membership_tier || "Standard",
+          reward_points: 100,
+          concierge_notes: crmNoteDraft || viewingCustomer.concierge_notes,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to convert guest to permanent patron");
+      }
+      const newProfile: CustomerProfile = json.data;
+      setCustomerProfiles((prev) =>
+        prev.map((c) =>
+          c.id === viewingCustomer.id ? { ...c, ...newProfile, is_guest: false } : c
+        )
+      );
+      setViewingCustomer((prev) => (prev ? { ...prev, ...newProfile, is_guest: false } : null));
+      showToast(`Guest account converted to registered patron.`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to convert guest";
+      showToast(message, "error");
+    } finally {
+      setIsConvertingGuest(false);
+    }
   };
 
   const handleCreateCustomer = async (e: React.FormEvent) => {
@@ -915,23 +1298,64 @@ export default function AdminDashboardPage() {
   }, [reviews, searchQuery, reviewFilter]);
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
+      const q = searchQuery.toLowerCase().trim();
       const matchSearch =
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchCategory = categoryFilter === "ALL" || p.category === categoryFilter;
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        (p.description && p.description.toLowerCase().includes(q)) ||
+        (p.occasion_tags && p.occasion_tags.some((t) => t.toLowerCase().includes(q)));
+
+      let matchCategory = true;
+      if (categoryFilter === "PROMO") {
+        matchCategory = Boolean(
+          (p.mrp && p.mrp > p.price) ||
+          (p.discount_percent && p.discount_percent > 0) ||
+          (p.occasion_tags && p.occasion_tags.some((t) => t.toLowerCase().includes("promo") || t.toLowerCase().includes("sale")))
+        );
+      } else if (categoryFilter === "UNDER_1299") {
+        matchCategory = p.price <= 1299;
+      } else if (categoryFilter !== "ALL") {
+        matchCategory = p.category === categoryFilter;
+      }
       return matchSearch && matchCategory;
     });
   }, [products, searchQuery, categoryFilter]);
 
   const filteredCustomers = useMemo(() => {
     return customerProfiles.filter((c) => {
-      return (
-        c.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (c.email && c.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (c.phone_number && c.phone_number.includes(searchQuery))
-      );
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        c.full_name.toLowerCase().includes(q) ||
+        (c.email && c.email.toLowerCase().includes(q)) ||
+        (c.phone_number && c.phone_number.includes(q)) ||
+        (c.primary_city && c.primary_city.toLowerCase().includes(q));
+
+      const matchSegment =
+        customerSegmentFilter === "ALL" ||
+        (customerSegmentFilter === "GUEST" && c.is_guest) ||
+        (customerSegmentFilter === "REGISTERED" && !c.is_guest) ||
+        c.rfm_segment === customerSegmentFilter ||
+        c.membership_tier === customerSegmentFilter;
+
+      return matchSearch && matchSegment;
     });
-  }, [customerProfiles, searchQuery]);
+  }, [customerProfiles, searchQuery, customerSegmentFilter]);
+
+  const crmMetrics = useMemo(() => {
+    const totalCustomers = customerProfiles.length;
+    const totalSpend = customerProfiles.reduce((acc, c) => acc + (c.total_spend || 0), 0);
+    const vipCount = customerProfiles.filter((c) => c.membership_tier === "VIP" || c.membership_tier === "Atelier Circle").length;
+    const repeatBuyers = customerProfiles.filter((c) => (c.order_count || 0) > 1).length;
+    const guestCount = customerProfiles.filter((c) => c.is_guest).length;
+    return {
+      totalCustomers,
+      totalSpend,
+      vipCount,
+      repeatBuyers,
+      guestCount,
+    };
+  }, [customerProfiles]);
 
   const filteredInquiries = useMemo(() => {
     return inquiries.filter((inq) => {
@@ -1790,7 +2214,55 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               }}
             >
               <ShoppingBagIcon size={18} color={activeTab === "orders" ? "#866951" : "#AC9885"} />
-              <span>Orders & Fulfillment ({adminOrders.length})</span>
+              <span>Orders & Logistics ({adminOrders.length})</span>
+            </button>
+
+            {/* Tab: Products & Promo Catalog */}
+            <button
+              onClick={() => {
+                setActiveTab("products");
+                setSearchQuery("");
+                setCategoryFilter("ALL");
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "12px 18px",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: activeTab === "products" ? "#261B13" : "#866951",
+                borderBottom: activeTab === "products" ? "3px solid #866951" : "3px solid transparent",
+                marginBottom: "-2px",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <ShoppingBagIcon size={18} color={activeTab === "products" ? "#866951" : "#AC9885"} />
+              <span>Products & Promo Catalog ({products.length})</span>
+            </button>
+
+            {/* Tab: Customer CRM & Accounts */}
+            <button
+              onClick={() => {
+                setActiveTab("customers");
+                setSearchQuery("");
+                setCustomerSegmentFilter("ALL");
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "12px 18px",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: activeTab === "customers" ? "#261B13" : "#866951",
+                borderBottom: activeTab === "customers" ? "3px solid #866951" : "3px solid transparent",
+                marginBottom: "-2px",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <UserIcon size={18} color={activeTab === "customers" ? "#866951" : "#AC9885"} />
+              <span>Customer CRM & Accounts ({customerProfiles.length})</span>
             </button>
 
             {/* Tab: Promotional Coupons */}
@@ -1816,11 +2288,12 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               <span>Promotions & Coupons</span>
             </button>
 
-            {/* Tab 1: Customer Accounts */}
+            {/* Tab: Bespoke Inquiries & Concierge */}
             <button
               onClick={() => {
-                setActiveTab("customers");
+                setActiveTab("inquiries");
                 setSearchQuery("");
+                setInquiryStatusFilter("ALL");
               }}
               style={{
                 display: "inline-flex",
@@ -1829,17 +2302,17 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 padding: "12px 18px",
                 fontSize: "14px",
                 fontWeight: 600,
-                color: activeTab === "customers" ? "#261B13" : "#866951",
-                borderBottom: activeTab === "customers" ? "3px solid #866951" : "3px solid transparent",
+                color: activeTab === "inquiries" ? "#261B13" : "#866951",
+                borderBottom: activeTab === "inquiries" ? "3px solid #866951" : "3px solid transparent",
                 marginBottom: "-2px",
                 transition: "all 0.2s ease",
               }}
             >
-              <UserIcon size={18} color={activeTab === "customers" ? "#866951" : "#AC9885"} />
-              <span>Customer Accounts ({customerProfiles.length})</span>
+              <MailIcon size={18} color={activeTab === "inquiries" ? "#866951" : "#AC9885"} />
+              <span>Concierge Inquiries ({inquiries.length})</span>
             </button>
 
-            {/* Tab 2: Patron Reviews & Media */}
+            {/* Tab: Patron Reviews & Media */}
             <button
               onClick={() => {
                 setActiveTab("reviews");
@@ -1862,7 +2335,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               <span>Patron Reviews & Media ({reviews.length})</span>
             </button>
 
-            {/* Tab 3: Super Admin Master Profile */}
+            {/* Tab: Super Admin Authority */}
             <button
               onClick={() => setActiveTab("super_admin")}
               style={{
@@ -1882,7 +2355,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               <span>Super Admin Authority</span>
             </button>
 
-            {/* Tab 3: SQL & Security Governance */}
+            {/* Tab: SQL & Security Governance */}
             <button
               onClick={() => setActiveTab("sql_guide")}
               style={{
@@ -1899,7 +2372,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               }}
             >
               <DatabaseIcon size={18} color={activeTab === "sql_guide" ? "#866951" : "#AC9885"} />
-              <span>Security & Migration Setup</span>
+              <span>Security & Migration</span>
             </button>
           </div>
 
@@ -1927,24 +2400,71 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
             )}
 
             {activeTab === "products" && (
-              <button
-                onClick={openAddProductModal}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "10px 18px",
-                  backgroundColor: "#261B13",
-                  color: "#F7F2EE",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  boxShadow: "0 4px 14px rgba(38,27,19,0.15)",
-                }}
-              >
-                <PlusIcon size={16} color="#F7F2EE" />
-                <span>Add Product</span>
-              </button>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                <a
+                  href="/api/admin/products/template"
+                  download="avsaraa-products-template.csv"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "10px 14px",
+                    backgroundColor: "#FAF7F2",
+                    color: "#866951",
+                    borderRadius: "10px",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    border: "1px solid #CFBEAD",
+                    textDecoration: "none",
+                  }}
+                  title="Download CSV template with pre-filled sample rows"
+                >
+                  <span>📥 CSV Template</span>
+                </a>
+
+                <button
+                  onClick={() => {
+                    setShowBulkImportModal(true);
+                    setBulkCsvFile(null);
+                    setBulkParsedProducts([]);
+                    setBulkImportError(null);
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "10px 16px",
+                    backgroundColor: "#866951",
+                    color: "#FAF7F2",
+                    borderRadius: "10px",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span>📦 Bulk Import (CSV)</span>
+                </button>
+
+                <button
+                  onClick={openAddProductModal}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "10px 18px",
+                    backgroundColor: "#261B13",
+                    color: "#F7F2EE",
+                    borderRadius: "10px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    boxShadow: "0 4px 14px rgba(38,27,19,0.15)",
+                  }}
+                >
+                  <PlusIcon size={16} color="#F7F2EE" />
+                  <span>Add Product</span>
+                </button>
+              </div>
             )}
 
             {activeTab === "reviews" && (
@@ -2053,10 +2573,38 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                   }}
                 >
                   <option value="ALL">All Categories</option>
+                  <option value="PROMO">🏷️ Promo & Sale Deals</option>
+                  <option value="UNDER_1299">💎 Under ₹1,299 Deals</option>
                   <option value="Sarees">Sarees</option>
                   <option value="Dresses">Dresses</option>
+                  <option value="Co-ords">Co-ords</option>
+                  <option value="Men's Wear">Men's Wear</option>
                   <option value="New Arrivals">New Arrivals</option>
                   <option value="Occasion Wear">Occasion Wear</option>
+                </select>
+              )}
+
+              {activeTab === "customers" && (
+                <select
+                  value={customerSegmentFilter}
+                  onChange={(e) => setCustomerSegmentFilter(e.target.value)}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #E8DED3",
+                    backgroundColor: "#FAF7F2",
+                    fontSize: "13px",
+                    color: "#261B13",
+                  }}
+                >
+                  <option value="ALL">All Segments ({customerProfiles.length})</option>
+                  <option value="VIP Atelier">👑 VIP Atelier Patrons</option>
+                  <option value="Repeat Patron">🔁 Repeat Patrons</option>
+                  <option value="Active Patron">🛍️ Active Patrons</option>
+                  <option value="Guest Buyer">👤 Guest Buyers</option>
+                  <option value="Prospective Lead">✉️ Prospective Leads</option>
+                  <option value="REGISTERED">Registered Accounts Only</option>
+                  <option value="GUEST">Guest Orders Only</option>
                 </select>
               )}
 
@@ -2124,8 +2672,9 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 <thead>
                   <tr style={{ backgroundColor: "#FAF7F2", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Item</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Category</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Price</th>
+                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Category & Promo</th>
+                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Price & Discount</th>
+                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Inventory</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Description</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700, textAlign: "right" }}>Actions</th>
                   </tr>
@@ -2133,7 +2682,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 <tbody>
                   {filteredProducts.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: "#866951" }}>
+                      <td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "#866951" }}>
                         No products found matching your search.
                       </td>
                     </tr>
@@ -2177,24 +2726,77 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                         </td>
 
                         <td style={{ padding: "14px 18px" }}>
-                          <span
-                            style={{
-                              display: "inline-block",
-                              padding: "4px 10px",
-                              borderRadius: "20px",
-                              fontSize: "11.5px",
-                              fontWeight: 600,
-                              backgroundColor: "#FAF7F2",
-                              color: "#866951",
-                              border: "1px solid #CFBEAD",
-                            }}
-                          >
-                            {product.category}
-                          </span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "3px 9px",
+                                borderRadius: "20px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                backgroundColor: "#FAF7F2",
+                                color: "#866951",
+                                border: "1px solid #CFBEAD",
+                              }}
+                            >
+                              {product.category}
+                            </span>
+                            {product.occasion_tags && product.occasion_tags.length > 0 && product.occasion_tags.map((tag, tIdx) => (
+                              <span
+                                key={tIdx}
+                                style={{
+                                  display: "inline-block",
+                                  padding: "2px 7px",
+                                  borderRadius: "12px",
+                                  fontSize: "10.5px",
+                                  fontWeight: 700,
+                                  backgroundColor: tag.toLowerCase().includes("promo") || tag.toLowerCase().includes("sale") || tag.toLowerCase().includes("under") ? "#FEF3C7" : "#F3E8FF",
+                                  color: tag.toLowerCase().includes("promo") || tag.toLowerCase().includes("sale") || tag.toLowerCase().includes("under") ? "#92400E" : "#6B21A8",
+                                  border: "1px solid rgba(0,0,0,0.06)",
+                                }}
+                              >
+                                🏷️ {tag}
+                              </span>
+                            ))}
+                          </div>
                         </td>
 
-                        <td style={{ padding: "14px 18px", fontWeight: 700, color: "#261B13" }}>
-                          ₹{Number(product.price).toLocaleString("en-IN")}
+                        <td style={{ padding: "14px 18px" }}>
+                          <div style={{ fontWeight: 700, color: "#261B13", fontSize: "14px" }}>
+                            ₹{Number(product.price).toLocaleString("en-IN")}
+                          </div>
+                          {product.mrp && Number(product.mrp) > Number(product.price) && (
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                              <span style={{ textDecoration: "line-through", color: "#A08D80", fontSize: "11.5px" }}>
+                                ₹{Number(product.mrp).toLocaleString("en-IN")}
+                              </span>
+                              <span
+                                style={{
+                                  backgroundColor: "#FEF2F2",
+                                  color: "#DC2626",
+                                  padding: "1px 5px",
+                                  borderRadius: "4px",
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  border: "1px solid #FECACA",
+                                }}
+                              >
+                                {product.discount_percent || Math.round(((Number(product.mrp) - Number(product.price)) / Number(product.mrp)) * 100)}% OFF
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
+                        <td style={{ padding: "14px 18px" }}>
+                          {(product.stock_count !== undefined && product.stock_count <= 3) ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "#DC2626", fontWeight: 700, fontSize: "12px", backgroundColor: "#FEF2F2", padding: "3px 8px", borderRadius: "6px", border: "1px solid #FCA5A5" }}>
+                              ⚠️ Low: {product.stock_count} left
+                            </span>
+                          ) : (
+                            <span style={{ color: "#1E5E3A", fontWeight: 600, fontSize: "12px" }}>
+                              ● {product.stock_count !== undefined ? `${product.stock_count} units` : "In stock"}
+                            </span>
+                          )}
                         </td>
 
                         <td style={{ padding: "14px 18px", color: "#543E2E", maxWidth: "340px" }}>
@@ -2269,169 +2871,388 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
         {/* VIEW 2: CUSTOMER PROFILES TABLE                                   */}
         {/* ================================================================= */}
         {activeTab === "customers" && (
-          <div
-            style={{
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #E8DED3",
-              borderRadius: "14px",
-              boxShadow: "0 4px 20px rgba(38,27,19,0.04)",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
-                <thead>
-                  <tr style={{ backgroundColor: "#FAF7F2", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Customer Name</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Contact Info</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Status</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Membership Tier</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Reward Points</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Joined Date</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700, textAlign: "right" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCustomers.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#866951" }}>
-                        No customer accounts found matching your query.
-                      </td>
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* CRM KPI Metrics Summary Bar */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "14px",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  border: "1px solid #E8DED3",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  boxShadow: "0 2px 8px rgba(38,27,19,0.03)",
+                }}
+              >
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Total CRM Accounts
+                </div>
+                <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
+                  {crmMetrics.totalCustomers}
+                </div>
+                <div style={{ fontSize: "11.5px", color: "#866951", marginTop: "2px" }}>
+                  {crmMetrics.totalCustomers - crmMetrics.guestCount} Registered · {crmMetrics.guestCount} Guest Buyers
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  border: "1px solid #E8DED3",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  boxShadow: "0 2px 8px rgba(38,27,19,0.03)",
+                }}
+              >
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Total Lifetime Value (LTV)
+                </div>
+                <div style={{ fontSize: "24px", fontWeight: 700, color: "#1E5E3A", marginTop: "4px" }}>
+                  ₹{crmMetrics.totalSpend.toLocaleString("en-IN")}
+                </div>
+                <div style={{ fontSize: "11.5px", color: "#866951", marginTop: "2px" }}>
+                  Gross Revenue Generated
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  border: "1px solid #E8DED3",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  boxShadow: "0 2px 8px rgba(38,27,19,0.03)",
+                }}
+              >
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#B78103", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  VIP Atelier Patrons
+                </div>
+                <div style={{ fontSize: "24px", fontWeight: 700, color: "#B78103", marginTop: "4px" }}>
+                  {crmMetrics.vipCount}
+                </div>
+                <div style={{ fontSize: "11.5px", color: "#866951", marginTop: "2px" }}>
+                  VIP & Atelier Circle Members
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  border: "1px solid #E8DED3",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  boxShadow: "0 2px 8px rgba(38,27,19,0.03)",
+                }}
+              >
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#6F42C1", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Repeat Patrons
+                </div>
+                <div style={{ fontSize: "24px", fontWeight: 700, color: "#6F42C1", marginTop: "4px" }}>
+                  {crmMetrics.repeatBuyers}
+                </div>
+                <div style={{ fontSize: "11.5px", color: "#866951", marginTop: "2px" }}>
+                  High-Retention Repeat Buyers
+                </div>
+              </div>
+            </div>
+
+            {/* Segment Quick Filter Pills */}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "#866951", marginRight: "4px" }}>
+                Filter Segment:
+              </span>
+              {[
+                { key: "ALL", label: `All Patrons (${customerProfiles.length})` },
+                { key: "VIP Atelier", label: "👑 VIP Atelier" },
+                { key: "Repeat Patron", label: "🔁 Repeat Patrons" },
+                { key: "Active Patron", label: "🛍️ Active Patrons" },
+                { key: "Guest Buyer", label: "👤 Guest Buyers" },
+                { key: "Prospective Lead", label: "✉️ Prospective Leads" },
+              ].map((seg) => {
+                const isSelected = customerSegmentFilter === seg.key;
+                return (
+                  <button
+                    key={seg.key}
+                    onClick={() => setCustomerSegmentFilter(seg.key)}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "20px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      backgroundColor: isSelected ? "#261B13" : "#FFFFFF",
+                      color: isSelected ? "#F7F2EE" : "#866951",
+                      border: isSelected ? "1px solid #261B13" : "1px solid #E8DED3",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {seg.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Customers & CRM Table */}
+            <div
+              style={{
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #E8DED3",
+                borderRadius: "14px",
+                boxShadow: "0 4px 20px rgba(38,27,19,0.04)",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
+                  <thead>
+                    <tr style={{ backgroundColor: "#FAF7F2", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Customer / Patron</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Contact & City</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Segment & Tier</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Lifetime Spend</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Orders</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Reward Points</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Status</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700, textAlign: "right" }}>Actions</th>
                     </tr>
-                  ) : (
-                    filteredCustomers.map((customer) => {
-                      const tierBadgeColors: Record<string, { bg: string; text: string; border: string }> = {
-                        VIP: { bg: "#FFF8ED", text: "#B78103", border: "#F9E4B7" },
-                        "Atelier Circle": { bg: "#F4EFFC", text: "#6F42C1", border: "#D8C7F5" },
-                        Privilege: { bg: "#EBF8F2", text: "#0F7A50", border: "#B5E8D2" },
-                        Standard: { bg: "#FAF7F2", text: "#543E2E", border: "#E8DED3" },
-                      };
-                      const colors = tierBadgeColors[customer.membership_tier] || tierBadgeColors.Standard;
+                  </thead>
+                  <tbody>
+                    {filteredCustomers.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ padding: "40px", textAlign: "center", color: "#866951" }}>
+                          No customer accounts found matching your query.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredCustomers.map((customer) => {
+                        const tierBadgeColors: Record<string, { bg: string; text: string; border: string }> = {
+                          VIP: { bg: "#FFF8ED", text: "#B78103", border: "#F9E4B7" },
+                          "Atelier Circle": { bg: "#F4EFFC", text: "#6F42C1", border: "#D8C7F5" },
+                          Privilege: { bg: "#EBF8F2", text: "#0F7A50", border: "#B5E8D2" },
+                          Standard: { bg: "#FAF7F2", text: "#543E2E", border: "#E8DED3" },
+                        };
+                        const colors = tierBadgeColors[customer.membership_tier] || tierBadgeColors.Standard;
 
-                      const statusColors: Record<string, { bg: string; text: string; border: string }> = {
-                        Active: { bg: "#EBF8F2", text: "#0F7A50", border: "#B5E8D2" },
-                        Suspended: { bg: "#FEF2F2", text: "#B91C1C", border: "#FCA5A5" },
-                        Inactive: { bg: "#F3F4F6", text: "#4B5563", border: "#E5E7EB" },
-                      };
-                      const st = statusColors[customer.status || "Active"] || statusColors.Active;
+                        const statusColors: Record<string, { bg: string; text: string; border: string }> = {
+                          Active: { bg: "#EBF8F2", text: "#0F7A50", border: "#B5E8D2" },
+                          Suspended: { bg: "#FEF2F2", text: "#B91C1C", border: "#FCA5A5" },
+                          Inactive: { bg: "#F3F4F6", text: "#4B5563", border: "#E5E7EB" },
+                        };
+                        const st = statusColors[customer.status || "Active"] || statusColors.Active;
 
-                      return (
-                        <tr
-                          key={customer.id}
-                          style={{ borderBottom: "1px solid #F0E8DF", transition: "background-color 0.15s ease" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#FCFAF7")}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                        >
-                          <td style={{ padding: "16px 18px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                              <div
-                                style={{
-                                  width: "34px",
-                                  height: "34px",
-                                  borderRadius: "50%",
-                                  backgroundColor: "#FAF7F2",
-                                  border: "1px solid #CFBEAD",
-                                  color: "#866951",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontWeight: 600,
-                                  fontSize: "12px",
-                                }}
-                              >
-                                {customer.full_name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .slice(0, 2)
-                                  .join("")}
+                        const segmentColors: Record<string, { bg: string; text: string }> = {
+                          "VIP Atelier": { bg: "#FFFBEB", text: "#92400E" },
+                          "Repeat Patron": { bg: "#F3E8FF", text: "#6B21A8" },
+                          "Active Patron": { bg: "#ECFDF5", text: "#065F46" },
+                          "Guest Buyer": { bg: "#F3F4F6", text: "#374151" },
+                          "Prospective Lead": { bg: "#EFF6FF", text: "#1E40AF" },
+                        };
+                        const segStyle = segmentColors[customer.rfm_segment || "Active Patron"] || segmentColors["Active Patron"];
+
+                        return (
+                          <tr
+                            key={customer.id}
+                            style={{ borderBottom: "1px solid #F0E8DF", transition: "background-color 0.15s ease" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#FCFAF7")}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                          >
+                            <td style={{ padding: "14px 18px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                <div
+                                  style={{
+                                    width: "36px",
+                                    height: "36px",
+                                    borderRadius: "50%",
+                                    backgroundColor: customer.is_guest ? "#F3F4F6" : "#FAF7F2",
+                                    border: "1px solid #CFBEAD",
+                                    color: "#866951",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: 700,
+                                    fontSize: "12px",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {customer.full_name
+                                    ? customer.full_name
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .slice(0, 2)
+                                        .join("")
+                                    : "P"}
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 600, color: "#261B13", display: "flex", alignItems: "center", gap: "6px" }}>
+                                    <span>{customer.full_name}</span>
+                                    {customer.is_guest && (
+                                      <span
+                                        style={{
+                                          fontSize: "10px",
+                                          padding: "1px 6px",
+                                          borderRadius: "4px",
+                                          backgroundColor: "#E5E7EB",
+                                          color: "#4B5563",
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        Guest
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: "11px", color: "#866951", marginTop: "2px" }}>
+                                    Joined: {customer.created_at ? new Date(customer.created_at).toLocaleDateString() : "—"}
+                                  </div>
+                                </div>
                               </div>
-                              <span style={{ fontWeight: 600, color: "#261B13" }}>{customer.full_name}</span>
-                            </div>
-                          </td>
+                            </td>
 
-                          <td style={{ padding: "16px 18px", color: "#543E2E" }}>
-                            <div>{customer.email || "—"}</div>
-                            <div style={{ fontSize: "11px", color: "#866951" }}>{customer.phone_number || "—"}</div>
-                          </td>
+                            <td style={{ padding: "14px 18px", color: "#543E2E" }}>
+                              <div>{customer.email || "—"}</div>
+                              <div style={{ fontSize: "11px", color: "#866951" }}>
+                                {customer.phone_number || "—"} {customer.primary_city ? `· 📍 ${customer.primary_city}` : ""}
+                              </div>
+                            </td>
 
-                          <td style={{ padding: "16px 18px" }}>
-                            <span
-                              style={{
-                                display: "inline-block",
-                                padding: "3px 9px",
-                                borderRadius: "14px",
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                backgroundColor: st.bg,
-                                color: st.text,
-                                border: `1px solid ${st.border}`,
-                              }}
-                            >
-                              ● {customer.status || "Active"}
-                            </span>
-                          </td>
+                            <td style={{ padding: "14px 18px" }}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    padding: "2px 8px",
+                                    borderRadius: "12px",
+                                    fontSize: "10.5px",
+                                    fontWeight: 700,
+                                    backgroundColor: segStyle.bg,
+                                    color: segStyle.text,
+                                  }}
+                                >
+                                  {customer.rfm_segment || "Active Patron"}
+                                </span>
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    padding: "2px 8px",
+                                    borderRadius: "12px",
+                                    fontSize: "10.5px",
+                                    fontWeight: 600,
+                                    backgroundColor: colors.bg,
+                                    color: colors.text,
+                                    border: `1px solid ${colors.border}`,
+                                  }}
+                                >
+                                  ★ {customer.membership_tier}
+                                </span>
+                              </div>
+                            </td>
 
-                          <td style={{ padding: "16px 18px" }}>
-                            <span
-                              style={{
-                                display: "inline-block",
-                                padding: "4px 10px",
-                                borderRadius: "20px",
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                backgroundColor: colors.bg,
-                                color: colors.text,
-                                border: `1px solid ${colors.border}`,
-                              }}
-                            >
-                              ★ {customer.membership_tier}
-                            </span>
-                          </td>
+                            <td style={{ padding: "14px 18px", fontWeight: 700, color: "#1E5E3A" }}>
+                              ₹{(customer.total_spend || 0).toLocaleString("en-IN")}
+                            </td>
 
-                          <td style={{ padding: "16px 18px", fontWeight: 600, color: "#866951" }}>
-                            {(customer.reward_points ?? 0).toLocaleString()} pts
-                          </td>
-
-                          <td style={{ padding: "16px 18px", color: "#866951" }}>
-                            {new Date(customer.created_at).toLocaleDateString()}
-                          </td>
-
-                          <td style={{ padding: "16px 18px", textAlign: "right" }}>
-                            <div style={{ display: "inline-flex", gap: "6px" }}>
+                            <td style={{ padding: "14px 18px", fontWeight: 600, color: "#261B13" }}>
                               <button
-                                onClick={() => openEditCustomerModal(customer)}
-                                title="Edit Customer"
+                                onClick={() => openViewCustomerModal(customer)}
                                 style={{
-                                  padding: "7px",
-                                  borderRadius: "8px",
-                                  border: "1px solid #E8DED3",
-                                  backgroundColor: "#FFFFFF",
-                                  color: "#261B13",
+                                  background: "none",
+                                  border: "none",
+                                  color: "#866951",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  textDecoration: "underline",
+                                  padding: 0,
+                                  fontSize: "13px",
                                 }}
                               >
-                                <EditIcon size={14} />
+                                {customer.order_count || (customer.orders?.length || 0)} Orders
                               </button>
-                              <button
-                                onClick={() => setDeletingCustomer(customer)}
-                                title="Delete Customer Account"
+                            </td>
+
+                            <td style={{ padding: "14px 18px", fontWeight: 600, color: "#866951" }}>
+                              {(customer.reward_points ?? 0).toLocaleString()} pts
+                            </td>
+
+                            <td style={{ padding: "14px 18px" }}>
+                              <span
                                 style={{
-                                  padding: "7px",
-                                  borderRadius: "8px",
-                                  border: "1px solid #FCA5A5",
-                                  backgroundColor: "#FFF5F5",
-                                  color: "#DC2626",
+                                  display: "inline-block",
+                                  padding: "3px 9px",
+                                  borderRadius: "14px",
+                                  fontSize: "11px",
+                                  fontWeight: 600,
+                                  backgroundColor: st.bg,
+                                  color: st.text,
+                                  border: `1px solid ${st.border}`,
                                 }}
                               >
-                                <TrashIcon size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                                ● {customer.status || "Active"}
+                              </span>
+                            </td>
+
+                            <td style={{ padding: "14px 18px", textAlign: "right" }}>
+                              <div style={{ display: "inline-flex", gap: "6px" }}>
+                                <button
+                                  onClick={() => openViewCustomerModal(customer)}
+                                  title="View 360° CRM Profile"
+                                  style={{
+                                    padding: "7px 10px",
+                                    borderRadius: "8px",
+                                    border: "1px solid #E8DED3",
+                                    backgroundColor: "#FFFFFF",
+                                    color: "#866951",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <EyeIcon size={14} />
+                                  <span>CRM</span>
+                                </button>
+                                <button
+                                  onClick={() => openEditCustomerModal(customer)}
+                                  title="Edit Customer"
+                                  style={{
+                                    padding: "7px",
+                                    borderRadius: "8px",
+                                    border: "1px solid #E8DED3",
+                                    backgroundColor: "#FFFFFF",
+                                    color: "#261B13",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <EditIcon size={14} />
+                                </button>
+                                <button
+                                  onClick={() => setDeletingCustomer(customer)}
+                                  title="Delete Customer Account"
+                                  style={{
+                                    padding: "7px",
+                                    borderRadius: "8px",
+                                    border: "1px solid #FCA5A5",
+                                    backgroundColor: "#FFF5F5",
+                                    color: "#DC2626",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <TrashIcon size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -3778,6 +4599,8 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                     >
                       <option value="Sarees">Sarees</option>
                       <option value="Dresses">Dresses</option>
+                      <option value="Co-ords">Co-ords</option>
+                      <option value="Men's Wear">Men's Wear</option>
                       <option value="New Arrivals">New Arrivals</option>
                       <option value="Occasion Wear">Occasion Wear</option>
                     </select>
@@ -3785,16 +4608,11 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
 
                   <div>
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#866951", marginBottom: "6px" }}>
-                      Price (₹ INR) *
+                      Promotional Tag / Deal Badge
                     </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.01"
-                      value={productForm.price}
-                      onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                      placeholder="e.g. 24999"
+                    <select
+                      value={productForm.promo_tag}
+                      onChange={(e) => setProductForm({ ...productForm, promo_tag: e.target.value })}
                       style={{
                         width: "100%",
                         padding: "10px 14px",
@@ -3804,20 +4622,174 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                         fontSize: "14px",
                         color: "#261B13",
                       }}
-                    />
+                    >
+                      <option value="">None (Standard Catalog)</option>
+                      <option value="Special Promo">🏷️ Special Promo</option>
+                      <option value="Festive Offer">✨ Festive Offer</option>
+                      <option value="Sale">🔥 Sale</option>
+                      <option value="Under ₹1,299">💎 Under ₹1,299</option>
+                      <option value="Flash Deal">⚡ Flash Deal</option>
+                      <option value="Limited Deal">⏳ Limited Deal</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ padding: "14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px solid #E8DED3" }}>
+                  <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase", marginBottom: "10px", letterSpacing: "0.06em" }}>
+                    Pricing, Promo Discount & Inventory
+                  </span>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "10px" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                        Sale Price (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        step="0.01"
+                        value={productForm.price}
+                        onChange={(e) => {
+                          const p = e.target.value;
+                          const numP = Number(p);
+                          const numM = Number(productForm.mrp);
+                          let disc = productForm.discount_percent;
+                          if (numM > numP && numP > 0) {
+                            disc = String(Math.round(((numM - numP) / numM) * 100));
+                          }
+                          setProductForm({ ...productForm, price: p, discount_percent: disc });
+                        }}
+                        placeholder="e.g. 24999"
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #CFBEAD",
+                          backgroundColor: "#FFFFFF",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          color: "#261B13",
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#866951", marginBottom: "4px" }}>
+                        Original MRP (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={productForm.mrp}
+                        onChange={(e) => {
+                          const m = e.target.value;
+                          const numM = Number(m);
+                          const numP = Number(productForm.price);
+                          let disc = productForm.discount_percent;
+                          if (numM > numP && numP > 0) {
+                            disc = String(Math.round(((numM - numP) / numM) * 100));
+                          }
+                          setProductForm({ ...productForm, mrp: m, discount_percent: disc });
+                        }}
+                        placeholder="e.g. 31999"
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #CFBEAD",
+                          backgroundColor: "#FFFFFF",
+                          fontSize: "13px",
+                          color: "#866951",
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#866951", marginBottom: "4px" }}>
+                        Discount (%)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={productForm.discount_percent}
+                        onChange={(e) => setProductForm({ ...productForm, discount_percent: e.target.value })}
+                        placeholder="0"
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #CFBEAD",
+                          backgroundColor: "#FFFFFF",
+                          fontSize: "13px",
+                          color: "#261B13",
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#866951", marginBottom: "4px" }}>
+                        Stock Units
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={productForm.stock_count}
+                        onChange={(e) => setProductForm({ ...productForm, stock_count: e.target.value })}
+                        placeholder="10"
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #CFBEAD",
+                          backgroundColor: "#FFFFFF",
+                          fontSize: "13px",
+                          color: "#261B13",
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#866951", marginBottom: "6px" }}>
-                    Garment Imagery URL *
-                  </label>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <label style={{ fontSize: "12px", fontWeight: 600, color: "#866951" }}>
+                      Garment Imagery URL *
+                    </label>
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "5px 10px",
+                        borderRadius: "6px",
+                        backgroundColor: isUploadingProductPhoto ? "#CFBEAD" : "#866951",
+                        color: "#FAF7F2",
+                        fontSize: "11.5px",
+                        fontWeight: 600,
+                        cursor: isUploadingProductPhoto ? "not-allowed" : "pointer",
+                        userSelect: "none",
+                        transition: "background-color 0.2s ease",
+                      }}
+                    >
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/jpg"
+                        disabled={isUploadingProductPhoto}
+                        onChange={handleUploadProductPhoto}
+                        style={{ display: "none" }}
+                      />
+                      <span>{isUploadingProductPhoto ? "Compressing & Uploading..." : "📷 Upload & Compress Photo"}</span>
+                    </label>
+                  </div>
+
                   <input
                     type="text"
                     required
                     value={productForm.image_url}
                     onChange={(e) => setProductForm({ ...productForm, image_url: e.target.value })}
-                    placeholder="/images/banarasi_silk_saree.jpg"
+                    placeholder="https://pub-xxxx.r2.dev/products/saree-01.webp (Paste Cloudflare URL)"
                     style={{
                       width: "100%",
                       padding: "10px 14px",
@@ -3828,25 +4800,160 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                       color: "#261B13",
                     }}
                   />
-                  <div style={{ marginTop: "8px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                    {PRESET_PRODUCT_IMAGES.map((preset) => (
-                      <button
-                        key={preset.url}
-                        type="button"
-                        onClick={() => setProductForm({ ...productForm, image_url: preset.url })}
+
+                  {productPhotoUploadNotice && (
+                    <div style={{ fontSize: "11px", color: "#1E5E3A", marginTop: "4px", fontWeight: 600 }}>
+                      {productPhotoUploadNotice}
+                    </div>
+                  )}
+
+                  {productForm.image_url && (
+                    <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div
                         style={{
-                          fontSize: "11px",
-                          padding: "4px 8px",
+                          width: "50px",
+                          height: "65px",
                           borderRadius: "6px",
-                          border: "1px solid #E8DED3",
-                          backgroundColor: productForm.image_url === preset.url ? "#261B13" : "#FAF7F2",
-                          color: productForm.image_url === preset.url ? "#F7F2EE" : "#866951",
+                          overflow: "hidden",
+                          border: "1px solid #CFBEAD",
+                          position: "relative",
+                          backgroundColor: "#F2EBE3",
                         }}
                       >
-                        {preset.label}
-                      </button>
-                    ))}
+                        <img
+                          src={productForm.image_url}
+                          alt="Preview"
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      </div>
+                      <span style={{ fontSize: "11px", color: "#866951" }}>
+                        Preview active · Cloudflare CDN
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: "6px", fontSize: "11px", color: "#866951" }}>
+                    ☁️ <strong>Cloudflare CDN:</strong> Supports Cloudflare R2 public bucket URLs (<code>https://pub-*.r2.dev/...</code>) and Cloudflare Images (<code>https://imagedelivery.net/...</code>).
                   </div>
+                </div>
+
+                {/* Additional Gallery Photos Section */}
+                <div style={{ padding: "14px", backgroundColor: "#F7F3EE", borderRadius: "8px", border: "1px dashed #CFBEAD" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div>
+                      <label style={{ fontSize: "12px", fontWeight: 600, color: "#866951", display: "block" }}>
+                        Additional Gallery Drapes & Angles ({productForm.gallery_images?.length || 0})
+                      </label>
+                      <span style={{ fontSize: "10.5px", color: "#866951" }}>
+                        Auto-organized to Cloudflare: <code>products/&#123;cat&#125;/&#123;slug&#125;-gallery-*.webp</code>
+                      </span>
+                    </div>
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "5px 10px",
+                        borderRadius: "6px",
+                        backgroundColor: isUploadingGallery ? "#CFBEAD" : "#866951",
+                        color: "#FAF7F2",
+                        fontSize: "11.5px",
+                        fontWeight: 600,
+                        cursor: isUploadingGallery ? "not-allowed" : "pointer",
+                        userSelect: "none",
+                        transition: "background-color 0.2s ease",
+                      }}
+                    >
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/jpeg,image/png,image/webp,image/jpg"
+                        disabled={isUploadingGallery}
+                        onChange={handleUploadGalleryPhotos}
+                        style={{ display: "none" }}
+                      />
+                      <span>{isUploadingGallery ? "Uploading..." : "📷 + Add Angles (Multi)"}</span>
+                    </label>
+                  </div>
+
+                  {galleryUploadNotice && (
+                    <div style={{ fontSize: "11px", color: "#1E5E3A", marginBottom: "8px", fontWeight: 600 }}>
+                      {galleryUploadNotice}
+                    </div>
+                  )}
+
+                  {productForm.gallery_images && productForm.gallery_images.length > 0 ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(70px, 1fr))", gap: "8px", marginTop: "8px" }}>
+                      {productForm.gallery_images.map((imgUrl, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            position: "relative",
+                            width: "100%",
+                            paddingTop: "125%",
+                            borderRadius: "6px",
+                            overflow: "hidden",
+                            border: "1px solid #CFBEAD",
+                            backgroundColor: "#EDE4D8",
+                          }}
+                        >
+                          <img
+                            src={imgUrl}
+                            alt={`Gallery ${idx + 1}`}
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveGalleryImage(idx)}
+                            title="Remove image"
+                            style={{
+                              position: "absolute",
+                              top: "3px",
+                              right: "3px",
+                              backgroundColor: "rgba(38, 27, 19, 0.75)",
+                              color: "#FFFFFF",
+                              border: "none",
+                              borderRadius: "50%",
+                              width: "18px",
+                              height: "18px",
+                              fontSize: "10px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✕
+                          </button>
+                          <span
+                            style={{
+                              position: "absolute",
+                              bottom: "2px",
+                              left: "3px",
+                              fontSize: "9px",
+                              color: "#FFFFFF",
+                              backgroundColor: "rgba(0,0,0,0.5)",
+                              padding: "1px 4px",
+                              borderRadius: "3px",
+                            }}
+                          >
+                            #{idx + 1}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "11px", color: "#866951", fontStyle: "italic", textAlign: "center", padding: "8px 0" }}>
+                      No extra gallery angles added yet. Click &quot;+ Add Angles&quot; to upload multiple side/back/detail views.
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -3907,6 +5014,232 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: BULK PRODUCT INGESTION (CSV)                                   */}
+      {/* ===================================================================== */}
+      {showBulkImportModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 999,
+            backgroundColor: "rgba(38,27,19,0.65)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !bulkImporting) setShowBulkImportModal(false);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "680px",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              padding: "28px",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px" }}>
+              <div>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase" }}>
+                  Catalog Scaling Utility
+                </span>
+                <h3 style={{ fontSize: "20px", fontWeight: 700, color: "#261B13", marginTop: "2px" }}>
+                  Bulk Import Products via CSV
+                </h3>
+                <p style={{ fontSize: "12.5px", color: "#6E5B4E", marginTop: "4px" }}>
+                  Draft hundreds of products in your favorite spreadsheet and ingest them in one batch.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBulkImportModal(false)}
+                disabled={bulkImporting}
+                style={{ padding: "6px", color: "#866951", background: "none", border: "none", cursor: "pointer" }}
+              >
+                <CloseIcon size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "20px", padding: "12px 14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px dashed #CFBEAD" }}>
+              <div style={{ flex: 1, fontSize: "12px", color: "#5A4535" }}>
+                <strong>Need the format?</strong> Download our verified pre-filled spreadsheet template with sample sarees and dresses.
+              </div>
+              <a
+                href="/api/admin/products/template"
+                download="avsaraa-products-template.csv"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "8px 12px",
+                  backgroundColor: "#261B13",
+                  color: "#FAF7F2",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span>📥 Download Template</span>
+              </a>
+            </div>
+
+            {/* Upload Area */}
+            <div
+              style={{
+                border: "2px dashed #CFBEAD",
+                borderRadius: "12px",
+                padding: "24px",
+                textAlign: "center",
+                backgroundColor: "#FCFAF7",
+                marginBottom: "20px",
+              }}
+            >
+              <input
+                type="file"
+                id="csv-file-input"
+                accept=".csv,text/csv"
+                onChange={handleCsvFileSelected}
+                disabled={bulkImporting}
+                style={{ display: "none" }}
+              />
+              <label
+                htmlFor="csv-file-input"
+                style={{
+                  cursor: bulkImporting ? "not-allowed" : "pointer",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <span style={{ fontSize: "28px" }}>📄</span>
+                <span style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13" }}>
+                  {bulkCsvFile ? bulkCsvFile.name : "Click to select or drop CSV spreadsheet"}
+                </span>
+                <span style={{ fontSize: "11px", color: "#866951" }}>
+                  {bulkCsvFile ? `${(bulkCsvFile.size / 1024).toFixed(1)} KB` : "Supports UTF-8 CSV with commas & quotes"}
+                </span>
+              </label>
+            </div>
+
+            {/* Error Message */}
+            {bulkImportError && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  backgroundColor: "#FDF2F2",
+                  color: "#991B1B",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  marginBottom: "16px",
+                  border: "1px solid #FCA5A5",
+                }}
+              >
+                {bulkImportError}
+              </div>
+            )}
+
+            {/* Preview Parsed Rows */}
+            {bulkParsedProducts.length > 0 && (
+              <div style={{ marginBottom: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#1E5E3A" }}>
+                    ✓ Ready to Import: {bulkParsedProducts.length} Valid Products
+                  </span>
+                  <span style={{ fontSize: "11px", color: "#866951" }}>
+                    Showing first {Math.min(5, bulkParsedProducts.length)} items
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    maxHeight: "180px",
+                    overflowY: "auto",
+                    borderRadius: "8px",
+                    border: "1px solid #EAE0D5",
+                    fontSize: "11.5px",
+                  }}
+                >
+                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                    <thead>
+                      <tr style={{ backgroundColor: "#F7F2EE", borderBottom: "1px solid #EAE0D5" }}>
+                        <th style={{ padding: "8px 10px" }}>#</th>
+                        <th style={{ padding: "8px 10px" }}>Name</th>
+                        <th style={{ padding: "8px 10px" }}>Category</th>
+                        <th style={{ padding: "8px 10px" }}>Price</th>
+                        <th style={{ padding: "8px 10px" }}>Stock</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkParsedProducts.slice(0, 5).map((p, idx) => (
+                        <tr key={idx} style={{ borderBottom: "1px solid #F0E8DF" }}>
+                          <td style={{ padding: "6px 10px", color: "#866951" }}>{idx + 1}</td>
+                          <td style={{ padding: "6px 10px", fontWeight: 600, color: "#261B13" }}>{String(p.name)}</td>
+                          <td style={{ padding: "6px 10px", color: "#6E5B4E" }}>{String(p.category)}</td>
+                          <td style={{ padding: "6px 10px", color: "#261B13", fontWeight: 600 }}>₹{Number(p.price).toLocaleString("en-IN")}</td>
+                          <td style={{ padding: "6px 10px", color: "#1E5E3A" }}>{String(p.stock_count || 10)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button
+                type="button"
+                onClick={() => setShowBulkImportModal(false)}
+                disabled={bulkImporting}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid #CFBEAD",
+                  backgroundColor: "#FAF7F2",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#866951",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteBulkImport}
+                disabled={bulkImporting || bulkParsedProducts.length === 0}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  backgroundColor: bulkParsedProducts.length > 0 ? "#1E5E3A" : "#CFBEAD",
+                  color: "#FAF7F2",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  border: "none",
+                  cursor: bulkParsedProducts.length > 0 && !bulkImporting ? "pointer" : "not-allowed",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <span>{bulkImporting ? "Importing to Catalog..." : `Import ${bulkParsedProducts.length} Products`}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -4287,6 +5620,29 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                       }}
                     />
                   </div>
+
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#866951", marginBottom: "6px" }}>
+                      Private Concierge Notes / CRM Observations
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Special size preferences, personal styling requests, bespoke sizing notes..."
+                      value={customerForm.concierge_notes}
+                      onChange={(e) => setCustomerForm({ ...customerForm, concierge_notes: e.target.value })}
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        borderRadius: "8px",
+                        border: "1px solid #CFBEAD",
+                        backgroundColor: "#FCFAF7",
+                        fontSize: "13px",
+                        color: "#261B13",
+                        fontFamily: "inherit",
+                        resize: "vertical",
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -4325,6 +5681,625 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 5B: CUSTOMER 360° CRM PROFILE DRAWER / MODAL                   */}
+      {/* ===================================================================== */}
+      {viewingCustomer && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 999,
+            backgroundColor: "rgba(38,27,19,0.72)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#FAF7F2",
+              border: "1px solid #CFBEAD",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "880px",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 60px rgba(38,27,19,0.35)",
+              overflow: "hidden",
+            }}
+          >
+            {/* Drawer Header */}
+            <div
+              style={{
+                padding: "20px 24px",
+                borderBottom: "1px solid #E8DFD5",
+                backgroundColor: "#F4EEE7",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "16px",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    backgroundColor: "#261B13",
+                    color: "#FAF7F2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontSize: "18px",
+                    fontFamily: "serif",
+                  }}
+                >
+                  {viewingCustomer.full_name?.charAt(0).toUpperCase() || "P"}
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <h2 style={{ fontSize: "19px", fontWeight: 700, color: "#261B13", fontFamily: "serif", margin: 0 }}>
+                      {viewingCustomer.full_name}
+                    </h2>
+                    {viewingCustomer.rfm_segment && (
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: "12px",
+                          backgroundColor:
+                            viewingCustomer.rfm_segment === "VIP Atelier"
+                              ? "#FDF6B2"
+                              : viewingCustomer.rfm_segment === "Repeat Patron"
+                              ? "#E1EFFE"
+                              : viewingCustomer.rfm_segment === "Active Patron"
+                              ? "#DEF7EC"
+                              : viewingCustomer.rfm_segment === "Guest Buyer"
+                              ? "#FEF08A"
+                              : "#F3F4F6",
+                          color:
+                            viewingCustomer.rfm_segment === "VIP Atelier"
+                              ? "#723B13"
+                              : viewingCustomer.rfm_segment === "Repeat Patron"
+                              ? "#1E429F"
+                              : viewingCustomer.rfm_segment === "Active Patron"
+                              ? "#03543F"
+                              : viewingCustomer.rfm_segment === "Guest Buyer"
+                              ? "#854D0E"
+                              : "#374151",
+                          border: "1px solid rgba(0,0,0,0.06)",
+                        }}
+                      >
+                        {viewingCustomer.rfm_segment}
+                      </span>
+                    )}
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: "12px",
+                        backgroundColor: viewingCustomer.status === "Suspended" ? "#FDE8E8" : "#EDFDF2",
+                        color: viewingCustomer.status === "Suspended" ? "#9B1C1C" : "#0E7044",
+                      }}
+                    >
+                      {viewingCustomer.status || "Active"}
+                    </span>
+                    {viewingCustomer.is_guest && (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: "6px",
+                          backgroundColor: "#FEF3C7",
+                          color: "#92400E",
+                          border: "1px solid #FCD34D",
+                        }}
+                      >
+                        Guest Checkout Account
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#866951", marginTop: "3px" }}>
+                    {viewingCustomer.email || "No email"} • {viewingCustomer.phone_number || "No phone"} • Registered{" "}
+                    {new Date(viewingCustomer.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons in header */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {viewingCustomer.is_guest && (
+                  <button
+                    onClick={handleConvertGuestToPatron}
+                    disabled={isConvertingGuest}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      backgroundColor: "#866951",
+                      color: "#FAF7F2",
+                      border: "none",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {isConvertingGuest ? "Converting..." : "✨ Convert to Registered Patron"}
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    openEditCustomerModal(viewingCustomer);
+                    setViewingCustomer(null);
+                  }}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid #CFBEAD",
+                    backgroundColor: "#FAF7F2",
+                    color: "#261B13",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Edit Profile
+                </button>
+                <button
+                  onClick={() => setViewingCustomer(null)}
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "8px",
+                    border: "1px solid #CFBEAD",
+                    backgroundColor: "#FAF7F2",
+                    color: "#866951",
+                    fontSize: "16px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Quick KPI Strip */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                gap: "12px",
+                padding: "16px 24px",
+                backgroundColor: "#FCFAF7",
+                borderBottom: "1px solid #E8DFD5",
+              }}
+            >
+              <div style={{ padding: "10px 14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px solid #E8DFD5" }}>
+                <div style={{ fontSize: "11px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.5px" }}>Lifetime Spend</div>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: "#261B13", marginTop: "2px" }}>
+                  ₹{(viewingCustomer.total_spend || 0).toLocaleString("en-IN")}
+                </div>
+              </div>
+
+              <div style={{ padding: "10px 14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px solid #E8DFD5" }}>
+                <div style={{ fontSize: "11px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.5px" }}>Total Orders</div>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: "#261B13", marginTop: "2px" }}>
+                  {viewingCustomer.order_count || viewingCustomer.orders?.length || 0}
+                </div>
+              </div>
+
+              <div style={{ padding: "10px 14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px solid #E8DFD5" }}>
+                <div style={{ fontSize: "11px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.5px" }}>Avg Order Value</div>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: "#261B13", marginTop: "2px" }}>
+                  ₹{viewingCustomer.order_count ? Math.round((viewingCustomer.total_spend || 0) / viewingCustomer.order_count).toLocaleString("en-IN") : "0"}
+                </div>
+              </div>
+
+              <div style={{ padding: "10px 14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px solid #E8DFD5" }}>
+                <div style={{ fontSize: "11px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.5px" }}>Reward Points</div>
+                <div style={{ fontSize: "18px", fontWeight: 700, color: "#866951", marginTop: "2px" }}>
+                  {(viewingCustomer.reward_points ?? 0).toLocaleString()} pts
+                </div>
+              </div>
+
+              <div style={{ padding: "10px 14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px solid #E8DFD5" }}>
+                <div style={{ fontSize: "11px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.5px" }}>Primary City</div>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "#261B13", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {viewingCustomer.primary_city || "Not recorded"}
+                </div>
+              </div>
+            </div>
+
+            {/* Subtabs Bar */}
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                padding: "12px 24px 0",
+                borderBottom: "1px solid #E8DFD5",
+                backgroundColor: "#FAF7F2",
+              }}
+            >
+              {[
+                { key: "orders", label: `Orders (${viewingCustomer.orders?.length || 0})`, icon: "🛍️" },
+                { key: "addresses", label: `Addresses (${viewingCustomer.addresses?.length || 0})`, icon: "📍" },
+                { key: "inquiries", label: `Inquiries (${viewingCustomer.inquiries?.length || 0})`, icon: "💬" },
+                { key: "notes", label: "Concierge Notes", icon: "📝" },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setCustomerDetailSubTab(tab.key as any)}
+                  style={{
+                    padding: "10px 16px",
+                    border: "none",
+                    borderBottom: customerDetailSubTab === tab.key ? "2px solid #261B13" : "2px solid transparent",
+                    backgroundColor: "transparent",
+                    color: customerDetailSubTab === tab.key ? "#261B13" : "#866951",
+                    fontWeight: customerDetailSubTab === tab.key ? 700 : 500,
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <span>{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Scrollable Subtab Content Area */}
+            <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1, maxHeight: "calc(90vh - 280px)" }}>
+              {/* SUBTAB 1: ORDERS */}
+              {customerDetailSubTab === "orders" && (
+                <div>
+                  {!viewingCustomer.orders || viewingCustomer.orders.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "40px 20px", color: "#866951" }}>
+                      <p style={{ fontSize: "14px", margin: 0 }}>No purchase transactions on record for this customer.</p>
+                      <p style={{ fontSize: "12px", color: "#A89481", marginTop: "4px" }}>Orders placed with this email or phone number will automatically appear here.</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                      {viewingCustomer.orders.map((order) => (
+                        <div
+                          key={order.id}
+                          style={{
+                            border: "1px solid #E8DFD5",
+                            borderRadius: "12px",
+                            backgroundColor: "#FCFAF7",
+                            padding: "16px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              borderBottom: "1px solid #F0E8DF",
+                              paddingBottom: "10px",
+                              marginBottom: "10px",
+                              flexWrap: "wrap",
+                              gap: "8px",
+                            }}
+                          >
+                            <div>
+                              <span style={{ fontWeight: 700, fontSize: "14px", color: "#261B13" }}>
+                                Order #{order.order_number}
+                              </span>
+                              <span style={{ fontSize: "12px", color: "#866951", marginLeft: "10px" }}>
+                                {new Date(order.created_at).toLocaleDateString("en-IN", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  padding: "3px 8px",
+                                  borderRadius: "6px",
+                                  backgroundColor:
+                                    order.order_status === "DELIVERED"
+                                      ? "#DEF7EC"
+                                      : order.order_status === "CANCELLED"
+                                      ? "#FDE8E8"
+                                      : "#E1EFFE",
+                                  color:
+                                    order.order_status === "DELIVERED"
+                                      ? "#03543F"
+                                      : order.order_status === "CANCELLED"
+                                      ? "#9B1C1C"
+                                      : "#1E429F",
+                                }}
+                              >
+                                {order.order_status}
+                              </span>
+                              <span style={{ fontWeight: 700, fontSize: "15px", color: "#261B13" }}>
+                                ₹{Number(order.total_amount).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Order Items */}
+                          {order.order_items && order.order_items.length > 0 ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                              {order.order_items.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    fontSize: "13px",
+                                    padding: "4px 0",
+                                    color: "#543E2E",
+                                  }}
+                                >
+                                  <div>
+                                    <span style={{ fontWeight: 600, color: "#261B13" }}>{item.product_name}</span>
+                                    {(item.color || item.size) && (
+                                      <span style={{ fontSize: "11px", color: "#866951", marginLeft: "6px" }}>
+                                        ({[item.color, item.size].filter(Boolean).join(", ")})
+                                      </span>
+                                    )}
+                                    <span style={{ fontSize: "11px", color: "#866951", marginLeft: "6px" }}>
+                                      × {item.quantity}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontWeight: 600, color: "#261B13" }}>
+                                    ₹{Number(item.total_price).toLocaleString("en-IN")}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: "12px", color: "#866951" }}>Items details recorded in fulfillment ledger.</div>
+                          )}
+
+                          {/* Shipping address summary */}
+                          {order.shipping_address_snapshot && (
+                            <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: "1px dashed #E8DFD5", fontSize: "11px", color: "#866951" }}>
+                              Delivered to: {order.shipping_address_snapshot.recipient_name} • {order.shipping_address_snapshot.city}, {order.shipping_address_snapshot.state} • Ph: {order.shipping_address_snapshot.phone}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SUBTAB 2: ADDRESSES */}
+              {customerDetailSubTab === "addresses" && (
+                <div>
+                  {!viewingCustomer.addresses || viewingCustomer.addresses.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "40px 20px", color: "#866951" }}>
+                      <p style={{ fontSize: "14px", margin: 0 }}>No saved delivery addresses found.</p>
+                      <p style={{ fontSize: "12px", color: "#A89481", marginTop: "4px" }}>Addresses saved during checkout or profile updates will be listed here.</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "14px" }}>
+                      {viewingCustomer.addresses.map((addr) => (
+                        <div
+                          key={addr.id}
+                          style={{
+                            border: "1px solid #E8DFD5",
+                            borderRadius: "12px",
+                            backgroundColor: "#FCFAF7",
+                            padding: "16px",
+                            position: "relative",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                            <div style={{ fontWeight: 700, fontSize: "14px", color: "#261B13" }}>
+                              {addr.recipient_name}
+                            </div>
+                            {addr.is_default && (
+                              <span
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  padding: "2px 6px",
+                                  borderRadius: "4px",
+                                  backgroundColor: "#261B13",
+                                  color: "#FAF7F2",
+                                }}
+                              >
+                                Default
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "13px", color: "#543E2E", lineHeight: "1.5" }}>
+                            <div>{addr.address_line1}</div>
+                            <div>{addr.city}, {addr.state} - {addr.postal_code}</div>
+                            <div style={{ marginTop: "6px", fontSize: "12px", color: "#866951" }}>
+                              📞 {addr.phone_number}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SUBTAB 3: INQUIRIES */}
+              {customerDetailSubTab === "inquiries" && (
+                <div>
+                  {!viewingCustomer.inquiries || viewingCustomer.inquiries.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "40px 20px", color: "#866951" }}>
+                      <p style={{ fontSize: "14px", margin: 0 }}>No customer inquiries on record.</p>
+                      <p style={{ fontSize: "12px", color: "#A89481", marginTop: "4px" }}>Support requests submitted via the contact form appear here.</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {viewingCustomer.inquiries.map((inq) => (
+                        <div
+                          key={inq.id}
+                          style={{
+                            border: "1px solid #E8DFD5",
+                            borderRadius: "12px",
+                            backgroundColor: "#FCFAF7",
+                            padding: "16px",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                            <span style={{ fontWeight: 700, fontSize: "14px", color: "#261B13" }}>
+                              {inq.subject}
+                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  padding: "2px 8px",
+                                  borderRadius: "6px",
+                                  backgroundColor:
+                                    inq.status === "Resolved"
+                                      ? "#DEF7EC"
+                                      : inq.status === "In Progress"
+                                      ? "#FEF08A"
+                                      : "#F3F4F6",
+                                  color:
+                                    inq.status === "Resolved"
+                                      ? "#03543F"
+                                      : inq.status === "In Progress"
+                                      ? "#854D0E"
+                                      : "#374151",
+                                }}
+                              >
+                                {inq.status}
+                              </span>
+                              <span style={{ fontSize: "12px", color: "#866951" }}>
+                                {new Date(inq.created_at).toLocaleDateString("en-IN", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                          <p style={{ fontSize: "13px", color: "#543E2E", margin: 0, lineHeight: "1.5" }}>
+                            {inq.message}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SUBTAB 4: CONCIERGE NOTES */}
+              {customerDetailSubTab === "notes" && (
+                <div>
+                  <div
+                    style={{
+                      backgroundColor: "#FFFBEB",
+                      border: "1px solid #FDE68A",
+                      borderRadius: "8px",
+                      padding: "12px 16px",
+                      marginBottom: "16px",
+                      fontSize: "12px",
+                      color: "#92400E",
+                      lineHeight: "1.5",
+                    }}
+                  >
+                    💡 <strong>Atelier Concierge Notes:</strong> Internal notes visible only to administrative staff. Use this space for bespoke sizing observations, personal stylist feedback, preferred fabric textures, gifting schedules, and VIP preferences.
+                  </div>
+
+                  <textarea
+                    rows={8}
+                    value={crmNoteDraft}
+                    onChange={(e) => setCrmNoteDraft(e.target.value)}
+                    placeholder="Enter private concierge notes regarding styling preferences, bespoke alterations, or customer history..."
+                    style={{
+                      width: "100%",
+                      padding: "14px",
+                      borderRadius: "10px",
+                      border: "1px solid #CFBEAD",
+                      backgroundColor: "#FFFFFF",
+                      fontSize: "14px",
+                      color: "#261B13",
+                      fontFamily: "inherit",
+                      lineHeight: "1.6",
+                      resize: "vertical",
+                      boxSizing: "border-box",
+                    }}
+                  />
+
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "14px" }}>
+                    <button
+                      onClick={handleSaveCrmNote}
+                      disabled={isSavingCrmNote}
+                      style={{
+                        padding: "10px 22px",
+                        borderRadius: "8px",
+                        backgroundColor: "#261B13",
+                        color: "#FAF7F2",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        border: "none",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      {isSavingCrmNote ? "Saving Notes..." : "💾 Save Concierge Note"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: "14px 24px",
+                borderTop: "1px solid #E8DFD5",
+                backgroundColor: "#F4EEE7",
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                onClick={() => setViewingCustomer(null)}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: "8px",
+                  backgroundColor: "#261B13",
+                  color: "#FAF7F2",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Close Drawer
+              </button>
+            </div>
           </div>
         </div>
       )}

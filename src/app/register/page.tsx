@@ -89,7 +89,7 @@ export default function RegisterPage() {
             }}
           >
             <Image
-              src="/images/saree_model_hero.jpg"
+              src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=85"
               alt="Avsaraa Sarees"
               fill
               sizes="(min-width: 900px) 50vw, 100vw"

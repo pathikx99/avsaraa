@@ -22,7 +22,8 @@ export async function GET() {
       .order("is_default", { ascending: false });
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      console.error("Address query error:", error);
+      return NextResponse.json({ success: false, error: "Failed to retrieve addresses." }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, addresses: addresses || [] });
@@ -96,7 +97,8 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      console.error("Address insert error:", error);
+      return NextResponse.json({ success: false, error: "Failed to save delivery address." }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, address: created });
@@ -119,10 +121,10 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, ...updates } = body;
+    const { id } = body;
 
-    if (!id) {
-      return NextResponse.json({ success: false, error: "Address ID required" }, { status: 400 });
+    if (!id || typeof id !== "string") {
+      return NextResponse.json({ success: false, error: "Valid Address ID required" }, { status: 400 });
     }
 
     const adminClient = getAdminSupabaseClient();
@@ -142,16 +144,60 @@ export async function PUT(request: Request) {
       );
     }
 
+    // Strict Whitelisting to prevent Mass Assignment and ownership tampering
+    const allowedFields = [
+      "recipient_name",
+      "phone_number",
+      "address_line1",
+      "address_line2",
+      "landmark",
+      "city",
+      "state",
+      "postal_code",
+      "country",
+      "address_type",
+      "is_default",
+    ] as const;
+
+    const sanitizedUpdates: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (field in body) {
+        if (field === "is_default") {
+          sanitizedUpdates[field] = Boolean(body[field]);
+        } else if (body[field] === null) {
+          sanitizedUpdates[field] = null;
+        } else {
+          sanitizedUpdates[field] = String(body[field]).trim();
+        }
+      }
+    }
+
+    if (Object.keys(sanitizedUpdates).length === 0) {
+      return NextResponse.json(
+        { success: false, error: "No editable address fields provided" },
+        { status: 400 }
+      );
+    }
+
+    // If making this address the default, unmark other user addresses
+    if (sanitizedUpdates.is_default) {
+      await adminClient
+        .from("addresses")
+        .update({ is_default: false })
+        .eq("user_id", user.id);
+    }
+
     const { data: updated, error } = await adminClient
       .from("addresses")
-      .update(updates)
+      .update(sanitizedUpdates)
       .eq("id", id)
       .eq("user_id", user.id)
       .select()
       .single();
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      console.error("Address query error:", error);
+      return NextResponse.json({ success: false, error: "Failed to retrieve addresses." }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, address: updated });
@@ -190,7 +236,8 @@ export async function DELETE(request: Request) {
       .eq("user_id", user.id);
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      console.error("Address query error:", error);
+      return NextResponse.json({ success: false, error: "Failed to retrieve addresses." }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, message: "Address deleted successfully" });

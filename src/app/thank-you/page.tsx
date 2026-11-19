@@ -47,7 +47,7 @@ export default function ThankYouPage() {
           Thank You for Shopping with Avsaraa
         </h1>
         <p style={{ fontSize: "14px", color: "#6A5C52", lineHeight: 1.6, margin: "0 0 32px" }}>
-          Your order has been safely placed with our Surat atelier artisans. You can track your parcel anytime using your Order Number and phone number.
+          Your order has been placed successfully. You can track your parcel anytime using your Order Number and phone number.
         </p>
         <div style={{ display: "flex", justifyContent: "center", gap: "16px" }}>
           <Link
