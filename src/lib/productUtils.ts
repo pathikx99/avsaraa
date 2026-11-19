@@ -28,7 +28,6 @@ export function extractMetaFromDescription(description?: string): ExtractedMeta 
  */
 const LOCAL_IMAGE_FILES = new Set([
   "account_hero.jpg",
-  "avsaraa-logo.png",
   "avsaraa_wordmark.png",
   "botanical_flowers.jpg",
   "desktop_hero_cinematic_1.jpg",
