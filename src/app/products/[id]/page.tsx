@@ -3,12 +3,6 @@ import { notFound } from "next/navigation";
 import { fetchProductById } from "@/lib/productDetailData";
 import ProductDetailClient from "./ProductDetailClient";
 
-export const dynamicParams = true;
-
-export async function generateStaticParams() {
-  return [];
-}
-
 interface PageProps {
   params: Promise<{ id: string }>;
 }

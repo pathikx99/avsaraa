@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   const auth = await authenticateAdminRequest();
   if (!auth.authorized) {

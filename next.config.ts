@@ -38,8 +38,6 @@ const nextConfig: NextConfig = {
     ],
   },
   devIndicators: false,
-  cacheComponents: true,
-  partialPrefetching: true,
   allowedDevOrigins: [
     "192.168.29.223",
     "192.168.*.*",

@@ -3,8 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { fetchProductById } from "@/lib/productDetailData";
 import ProductDetailClient from "@/app/products/[id]/ProductDetailClient";
 
-export const dynamicParams = true;
-
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
