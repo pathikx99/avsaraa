@@ -190,7 +190,7 @@ export default function CheckoutPage() {
   }, [loadAddresses]);
 
   // Handle Apply Coupon
-  const handleApplyCoupon = async (codeToApply?: string) => {
+  const handleApplyCoupon = useCallback(async (codeToApply?: string) => {
     const targetCode = (codeToApply || couponCodeInput).trim().toUpperCase();
     if (!targetCode) return;
 
@@ -220,7 +220,7 @@ export default function CheckoutPage() {
     } finally {
       setValidatingCoupon(false);
     }
-  };
+  }, [couponCodeInput, subtotal]);
 
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
@@ -241,7 +241,7 @@ export default function CheckoutPage() {
         return () => clearTimeout(timer);
       }
     } catch {}
-  }, [subtotal, appliedCoupon, validatingCoupon]);
+  }, [subtotal, appliedCoupon, validatingCoupon, handleApplyCoupon]);
 
   // Handle Save New Address
   const handleSaveAddress = async (e: React.FormEvent) => {

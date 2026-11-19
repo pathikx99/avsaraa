@@ -271,7 +271,7 @@ export function generateCustomerTaxInvoiceEmailHtml(order: Order): string {
     <!-- Footer -->
     <tr>
       <td style="padding: 20px 32px; text-align: center; font-size: 12px; color: #866951; border-top: 1px solid #EAE3D9;">
-        <p style="margin: 0 0 4px 0;">Concierge Support: <a href="mailto:contact.avsaraa@gmail.com" style="color: #261B13; font-weight: 600; text-decoration: none;">contact.avsaraa@gmail.com</a> | +91 98765 43210</p>
+        <p style="margin: 0 0 4px 0;">Concierge Support: <a href="mailto:support@avsaraa.in" style="color: #261B13; font-weight: 600; text-decoration: none;">support@avsaraa.in</a> | Order Inquiries: <a href="mailto:order@avsaraa.in" style="color: #261B13; font-weight: 600; text-decoration: none;">order@avsaraa.in</a></p>
         <p style="margin: 0; font-size: 11px; color: #A89887;">© ${new Date().getFullYear()} AVSARAA. All rights reserved.</p>
       </td>
     </tr>
@@ -417,4 +417,212 @@ export function generateAdminOrderAlertEmailHtml(order: Order): string {
 </body>
 </html>
   `;
+}
+
+export interface InquiryAcknowledgementDetails {
+  customerName: string;
+  customerEmail?: string;
+  subject?: string;
+  message: string;
+  inquiryId?: string;
+}
+
+/**
+ * Generates brand-aligned enquiry acknowledgement HTML email for customers.
+ * Sent from support@avsaraa.in when a customer submits a contact inquiry or bespoke question.
+ */
+export function generateInquiryAcknowledgementEmailHtml(details: InquiryAcknowledgementDetails): string {
+  const safeName = escapeHtml(details.customerName || "Valued Customer");
+  const safeSubject = escapeHtml(details.subject || "Customer Inquiry");
+  const safeMessage = escapeHtml(details.message || "").replace(/\n/g, "<br />");
+  const safeRef = details.inquiryId ? escapeHtml(details.inquiryId.slice(0, 8).toUpperCase()) : null;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inquiry Received · AVSARAA Support</title>
+</head>
+<body style="margin: 0; padding: 24px; background-color: #F5F2EB; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #261B13; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 620px; margin: 0 auto; background-color: #FAF7F2; border-radius: 8px; border: 1px solid #EAE3D9; overflow: hidden; box-shadow: 0 4px 16px rgba(38, 27, 19, 0.05);">
+    
+    <!-- Top Header & Monogram -->
+    <tr>
+      <td style="padding: 32px 32px 20px 32px; text-align: center; border-bottom: 2px solid #C5A265; background-color: #261B13;">
+        <span style="font-family: Georgia, serif; font-size: 26px; font-weight: 700; letter-spacing: 4px; color: #FAF7F2; text-transform: uppercase; display: block;">AVSARAA</span>
+        <span style="display: block; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #C4AB94; margin-top: 4px;">Atelier & Concierge Support</span>
+      </td>
+    </tr>
+
+    <!-- Badge & Hero Title -->
+    <tr>
+      <td style="padding: 32px 32px 16px 32px; text-align: center;">
+        <div style="display: inline-block; padding: 4px 12px; background-color: #F3EBDD; border: 1px solid #DFD2C0; border-radius: 16px; font-size: 11px; font-weight: 600; color: #866951; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px;">
+          ✦ Inquiry Acknowledged ✦
+        </div>
+        <h1 style="font-family: Georgia, serif; font-size: 24px; font-weight: 600; color: #261B13; margin: 0 0 10px 0; line-height: 1.3;">
+          We Have Received Your Inquiry
+        </h1>
+        <p style="font-size: 14px; color: #6E5C4E; line-height: 1.6; margin: 0 auto; max-width: 500px;">
+          Dear ${safeName}, thank you for reaching out to Avsaraa. Our concierge support team has received your message and will review it promptly.
+        </p>
+      </td>
+    </tr>
+
+    <!-- Inquiry Details Box -->
+    <tr>
+      <td style="padding: 12px 32px 24px 32px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #FFFFFF; border: 1px solid #EAE3D9; border-radius: 6px; padding: 20px;">
+          ${
+            safeRef
+              ? `<tr>
+            <td style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #866951; font-weight: 700; padding-bottom: 6px;">Reference Number:</td>
+            <td style="font-size: 13px; font-weight: 600; color: #261B13; text-align: right; padding-bottom: 6px;">#INQ-${safeRef}</td>
+          </tr>`
+              : ""
+          }
+          <tr>
+            <td style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #866951; font-weight: 700; padding-bottom: 6px;">Subject:</td>
+            <td style="font-size: 13px; font-weight: 600; color: #261B13; text-align: right; padding-bottom: 6px;">${safeSubject}</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding-top: 12px; border-top: 1px solid #F5F2EB;">
+              <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #866951; font-weight: 700; display: block; margin-bottom: 6px;">Your Message:</span>
+              <div style="font-size: 13px; color: #4A3A2F; background-color: #FAF7F2; border-left: 3px solid #C5A265; padding: 12px 14px; line-height: 1.6; font-style: italic;">
+                ${safeMessage}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Resolution Commitment Note -->
+    <tr>
+      <td style="padding: 0 32px 28px 32px;">
+        <div style="background-color: #F8F5EE; border: 1px dashed #D6C7B8; border-radius: 6px; padding: 16px; font-size: 13px; color: #5C4B3E; line-height: 1.6;">
+          <strong style="color: #261B13;">What to expect next:</strong>
+          <p style="margin: 6px 0 0 0;">
+            A dedicated concierge representative will review your enquiry and respond to you within <strong>24 to 48 business hours</strong>. If you have additional details or images to share, simply reply directly to this email at <a href="mailto:support@avsaraa.in" style="color: #261B13; font-weight: 600; text-decoration: underline;">support@avsaraa.in</a>.
+          </p>
+        </div>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td style="padding: 20px 32px; text-align: center; font-size: 12px; color: #866951; border-top: 1px solid #EAE3D9; background-color: #FAF7F2;">
+        <p style="margin: 0 0 4px 0;">Customer Care & Support: <a href="mailto:support@avsaraa.in" style="color: #261B13; font-weight: 600; text-decoration: none;">support@avsaraa.in</a></p>
+        <p style="margin: 0; font-size: 11px; color: #A89887;">© ${new Date().getFullYear()} AVSARAA Atelier. All rights reserved.</p>
+      </td>
+    </tr>
+
+  </table>
+</body>
+</html>`;
+}
+
+export interface EmailVerificationDetails {
+  to?: string;
+  otp?: string;
+  verificationUrl?: string;
+  name?: string;
+}
+
+/**
+ * Generates brand-aligned email verification HTML email.
+ * Sent from support@avsaraa.in when verifying customer email addresses or login OTPs.
+ */
+export function generateEmailVerificationHtml(details: EmailVerificationDetails): string {
+  const safeName = escapeHtml(details.name || "Valued Patron");
+  const safeOtp = details.otp ? escapeHtml(details.otp) : null;
+  const safeUrl = details.verificationUrl ? escapeHtml(details.verificationUrl) : null;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Your Email · AVSARAA Support</title>
+</head>
+<body style="margin: 0; padding: 24px; background-color: #F5F2EB; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #261B13; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 620px; margin: 0 auto; background-color: #FAF7F2; border-radius: 8px; border: 1px solid #EAE3D9; overflow: hidden; box-shadow: 0 4px 16px rgba(38, 27, 19, 0.05);">
+    
+    <!-- Top Header & Monogram -->
+    <tr>
+      <td style="padding: 32px 32px 20px 32px; text-align: center; border-bottom: 2px solid #C5A265; background-color: #261B13;">
+        <span style="font-family: Georgia, serif; font-size: 26px; font-weight: 700; letter-spacing: 4px; color: #FAF7F2; text-transform: uppercase; display: block;">AVSARAA</span>
+        <span style="display: block; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #C4AB94; margin-top: 4px;">Atelier & Concierge Support</span>
+      </td>
+    </tr>
+
+    <!-- Badge & Hero Title -->
+    <tr>
+      <td style="padding: 32px 32px 16px 32px; text-align: center;">
+        <div style="display: inline-block; padding: 4px 12px; background-color: #F3EBDD; border: 1px solid #DFD2C0; border-radius: 16px; font-size: 11px; font-weight: 600; color: #866951; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px;">
+          ✦ EMAIL VERIFICATION ✦
+        </div>
+        <h1 style="font-family: Georgia, serif; font-size: 24px; font-weight: 600; color: #261B13; margin: 0 0 10px 0; line-height: 1.3;">
+          Verify Your Email Address
+        </h1>
+        <p style="font-size: 14px; color: #6E5C4E; line-height: 1.6; margin: 0 auto; max-width: 500px;">
+          Dear ${safeName}, please use the verification details below to verify your email address with Avsaraa Atelier.
+        </p>
+      </td>
+    </tr>
+
+    <!-- OTP Code Display Card -->
+    ${
+      safeOtp
+        ? `<tr>
+      <td style="padding: 12px 32px 20px 32px; text-align: center;">
+        <div style="background-color: #FFFFFF; border: 2px dashed #C5A265; border-radius: 8px; padding: 24px; max-width: 380px; margin: 0 auto;">
+          <span style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: #866951; font-weight: 700; margin-bottom: 8px;">Your 6-Digit Verification Code</span>
+          <div style="font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 700; letter-spacing: 10px; color: #261B13; padding: 6px 0;">
+            ${safeOtp}
+          </div>
+          <span style="display: block; font-size: 12px; color: #8E7D70; margin-top: 8px;">Valid for 5 minutes</span>
+        </div>
+      </td>
+    </tr>`
+        : ""
+    }
+
+    <!-- Verification Button (if link provided) -->
+    ${
+      safeUrl
+        ? `<tr>
+      <td style="padding: 12px 32px 20px 32px; text-align: center;">
+        <a href="${safeUrl}" target="_blank" style="display: inline-block; background-color: #261B13; color: #FAF7F2; text-decoration: none; padding: 14px 28px; border-radius: 28px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">
+          Verify Email Address →
+        </a>
+      </td>
+    </tr>`
+        : ""
+    }
+
+    <!-- Security Notice -->
+    <tr>
+      <td style="padding: 0 32px 28px 32px;">
+        <div style="background-color: #F8F5EE; border: 1px solid #E8DED3; border-radius: 6px; padding: 14px 18px; font-size: 12.5px; color: #6E5C4E; line-height: 1.6;">
+          <strong>Security Notice:</strong>
+          <p style="margin: 4px 0 0 0;">
+            This verification code was requested for your Avsaraa account. If you did not initiate this request, please disregard this email or contact concierge support immediately at <a href="mailto:support@avsaraa.in" style="color: #261B13; font-weight: 600; text-decoration: underline;">support@avsaraa.in</a>.
+          </p>
+        </div>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td style="padding: 20px 32px; text-align: center; font-size: 12px; color: #866951; border-top: 1px solid #EAE3D9; background-color: #FAF7F2;">
+        <p style="margin: 0 0 4px 0;">Concierge Support: <a href="mailto:support@avsaraa.in" style="color: #261B13; font-weight: 600; text-decoration: none;">support@avsaraa.in</a></p>
+        <p style="margin: 0; font-size: 11px; color: #A89887;">© ${new Date().getFullYear()} AVSARAA Atelier. All rights reserved.</p>
+      </td>
+    </tr>
+
+  </table>
+</body>
+</html>`;
 }

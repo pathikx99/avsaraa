@@ -44,7 +44,18 @@ export async function POST(request: Request) {
       );
     }
 
-    let event: Record<string, any> = {};
+    interface ShiprocketWebhookPayload {
+      event_id?: string;
+      awb?: string;
+      order_id?: string;
+      custom_order_id?: string;
+      current_status?: string;
+      courier_name?: string;
+      tracking_number?: string;
+      [key: string]: unknown;
+    }
+
+    let event: ShiprocketWebhookPayload = {};
     try {
       event = await request.json();
     } catch {

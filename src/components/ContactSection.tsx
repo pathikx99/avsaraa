@@ -38,23 +38,38 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
         data: { user },
       } = await supabase.auth.getUser();
 
-      const { error } = await supabase.from("contact_inquiries").insert([
-        {
+      const res = await fetch("/api/inquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           full_name: fullName.trim(),
           email: email.trim().toLowerCase(),
           phone_number: phone.trim() || null,
           subject: "Customer Inquiry",
           message: message.trim(),
           user_id: user?.id || null,
-        },
-      ]);
+        }),
+      });
 
-      if (error) {
-        console.warn("Contact form note:", error.message);
+      if (!res.ok) {
+        // Fallback to client-side insert if API endpoint is unreachable
+        const { error } = await supabase.from("contact_inquiries").insert([
+          {
+            full_name: fullName.trim(),
+            email: email.trim().toLowerCase(),
+            phone_number: phone.trim() || null,
+            subject: "Customer Inquiry",
+            message: message.trim(),
+            user_id: user?.id || null,
+          },
+        ]);
+        if (error) {
+          console.warn("Contact form fallback insert note:", error.message);
+        }
       }
 
       setSubmitted(true);
-      showToast("Thank you! We received your message and will reply soon.");
+      showToast("Thank you! We received your message and sent an acknowledgement to your email.");
       setFullName("");
       setEmail("");
       setPhone("");
@@ -261,10 +276,10 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
                       Customer Care & Inquiries
                     </span>
                     <a
-                      href="mailto:contact.avsaraa@gmail.com"
+                      href="mailto:support@avsaraa.in"
                       style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}
                     >
-                      contact.avsaraa@gmail.com
+                      support@avsaraa.in
                     </a>
                   </div>
                 </div>

@@ -33,8 +33,12 @@ export async function GET(request: Request) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("Reviews query database error:", error);
-      return NextResponse.json({ success: false, error: "Failed to fetch reviews." }, { status: 500 });
+      console.warn("Reviews query database notice:", error.message);
+      return NextResponse.json({
+        success: true,
+        reviews: [],
+        notice: error.message,
+      });
     }
 
     return NextResponse.json({

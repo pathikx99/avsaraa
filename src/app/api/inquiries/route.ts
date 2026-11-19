@@ -1,0 +1,81 @@
+import { NextResponse } from "next/server";
+import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
+import { sendInquiryAcknowledgementEmail } from "@/lib/emailService";
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { success: false, error: "Invalid request payload." },
+        { status: 400 }
+      );
+    }
+
+    const fullName = String(body.full_name || body.name || "").trim();
+    const email = String(body.email || "").trim().toLowerCase();
+    const phone = String(body.phone_number || body.phone || "").trim() || null;
+    const subject = String(body.subject || "Customer Inquiry").trim();
+    const message = String(body.message || "").trim();
+    const userId = body.user_id && typeof body.user_id === "string" ? body.user_id : null;
+
+    if (!fullName || !email || !message) {
+      return NextResponse.json(
+        { success: false, error: "Please provide your name, email, and message." },
+        { status: 400 }
+      );
+    }
+
+    if (!email.includes("@") || email.length < 5) {
+      return NextResponse.json(
+        { success: false, error: "Please provide a valid email address." },
+        { status: 400 }
+      );
+    }
+
+    const supabaseAdmin = getAdminSupabaseClient();
+    const { data, error } = await supabaseAdmin
+      .from("contact_inquiries")
+      .insert([
+        {
+          full_name: fullName,
+          email,
+          phone_number: phone,
+          subject,
+          message,
+          user_id: userId,
+          status: "Unread",
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[InquiriesAPI:InsertError]", error);
+      return NextResponse.json(
+        { success: false, error: "Failed to submit inquiry. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    // Automatically send brand-aligned acknowledgement email from support@avsaraa.in
+    const emailResult = await sendInquiryAcknowledgementEmail({
+      customerName: fullName,
+      customerEmail: email,
+      subject,
+      message,
+      inquiryId: data?.id,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Thank you! Your inquiry has been received and an acknowledgement email has been sent.",
+      data,
+      emailResult,
+    });
+  } catch (err: unknown) {
+    console.error("[InquiriesAPI:Exception]", err);
+    const message = err instanceof Error ? err.message : "Internal error occurred";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  }
+}

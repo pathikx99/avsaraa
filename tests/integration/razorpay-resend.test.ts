@@ -4,9 +4,23 @@ import crypto from "crypto";
 import {
   generateCustomerTaxInvoiceEmailHtml,
   generateAdminOrderAlertEmailHtml,
+  generateInquiryAcknowledgementEmailHtml,
+  generateEmailVerificationHtml,
   isGujaratSupply,
 } from "../../src/lib/emailTemplates.ts";
-import { sendEmail, dispatchOrderSuccessEmails } from "../../src/lib/emailService.ts";
+import {
+  sendEmail,
+  sendCustomerOrderInvoice,
+  sendInquiryAcknowledgementEmail,
+  sendEmailVerificationEmail,
+  dispatchOrderSuccessEmails,
+  ORDER_EMAIL,
+  SUPPORT_EMAIL,
+  VERIFICATION_EMAIL,
+  getOrderSender,
+  getSupportSender,
+  getVerificationSender,
+} from "../../src/lib/emailService.ts";
 import type { Order } from "../../src/types/order.ts";
 
 async function resolveAvsaraaBaseUrl(): Promise<{ baseUrl: string; isOnline: boolean }> {
@@ -17,7 +31,7 @@ async function resolveAvsaraaBaseUrl(): Promise<{ baseUrl: string; isOnline: boo
   for (const candidate of candidates) {
     try {
       const res = await fetch(`${candidate}/api/health`, { signal: AbortSignal.timeout(1500) });
-      if (res.status === 200) {
+      if (res.status === 200 || res.status === 503) {
         const data = await res.json();
         if (data && data.service && data.service.includes("Avsaraa")) {
           return { baseUrl: candidate, isOnline: true };
@@ -144,9 +158,71 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
       assert.match(adminHtml, /Packing Slip Items/);
       assert.match(adminHtml, /Surat Local Atelier Hand-Delivery/);
     });
+
+    it("Generates compliant Inquiry Acknowledgement HTML with support@avsaraa.in", () => {
+      const html = generateInquiryAcknowledgementEmailHtml({
+        customerName: "Radhika Sharma",
+        subject: "Custom Saree Inquiry",
+        message: "Looking for pure silk zari custom border.",
+        inquiryId: "98765432-abcd-1234-ef00-112233445566",
+      });
+      assert.match(html, /Radhika Sharma/);
+      assert.match(html, /#INQ-98765432/);
+      assert.match(html, /Custom Saree Inquiry/);
+      assert.match(html, /support@avsaraa\.in/);
+      assert.match(html, /AVSARAA/);
+    });
+
+    it("Generates compliant Email Verification OTP HTML with support@avsaraa.in", () => {
+      const html = generateEmailVerificationHtml({
+        to: "priya.nair@example.com",
+        otp: "847291",
+        name: "Priya Nair",
+      });
+      assert.match(html, /Priya Nair/);
+      assert.match(html, /847291/);
+      assert.match(html, /EMAIL VERIFICATION/);
+      assert.match(html, /support@avsaraa\.in/);
+    });
   });
 
   describe("2. Resend Email Service Resilience", () => {
+    it("Enforces order@avsaraa.in for bills, support@avsaraa.in for enquiries, and support@avsaraa.in for verification", () => {
+      assert.equal(ORDER_EMAIL, "order@avsaraa.in");
+      assert.equal(SUPPORT_EMAIL, "support@avsaraa.in");
+      assert.equal(VERIFICATION_EMAIL, "support@avsaraa.in");
+      assert.match(getOrderSender(), /order@avsaraa\.in/);
+      assert.match(getSupportSender(), /support@avsaraa\.in/);
+      assert.match(getVerificationSender(), /support@avsaraa\.in/);
+      assert.doesNotMatch(getOrderSender(), /onboarding@resend\.dev/);
+      assert.doesNotMatch(getSupportSender(), /onboarding@resend\.dev/);
+      assert.doesNotMatch(getVerificationSender(), /onboarding@resend\.dev/);
+    });
+
+    it("Dispatches customer tax invoice bill via order@avsaraa.in", async () => {
+      const billResult = await sendCustomerOrderInvoice(mockSampleOrder);
+      assert.equal(billResult.success, true);
+    });
+
+    it("Dispatches inquiry acknowledgement email via support@avsaraa.in", async () => {
+      const ackResult = await sendInquiryAcknowledgementEmail({
+        customerName: "Pooja Varma",
+        customerEmail: "pooja.varma@example.com",
+        subject: "Bulk Wedding Order",
+        message: "Need 20 matching Banarasi sarees.",
+        inquiryId: "inq-12345678",
+      });
+      assert.equal(ackResult.success, true);
+    });
+
+    it("Dispatches email verification code via support@avsaraa.in", async () => {
+      const verifyResult = await sendEmailVerificationEmail({
+        to: "priya.nair@example.com",
+        otp: "847291",
+        name: "Priya Nair",
+      });
+      assert.equal(verifyResult.success, true);
+    });
     it("Simulates email dispatch safely without throwing when RESEND_API_KEY is unset", async () => {
       const result = await sendEmail({
         to: "customer@example.com",

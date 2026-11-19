@@ -31,12 +31,13 @@ export default function B2BWholesalePage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/admin/inquiries", {
+      const res = await fetch("/api/inquiries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: `${form.contactPerson} (${form.businessName})`,
           email: form.email,
+          phone: form.phone,
           subject: `[B2B Wholesale / Bulk Inquiry] - ${form.orderVolume}`,
           message: `Business: ${form.businessName}\nCity: ${form.city}\nInquiry Type: ${form.inquiryType}\nVolume: ${form.orderVolume}\nPhone: ${form.phone}\nNotes: ${form.message}`,
         }),
@@ -45,7 +46,7 @@ export default function B2BWholesalePage() {
       if (res.ok) {
         setSuccess(true);
       } else {
-        setError("Failed to register B2B inquiry. Please reach us at contact.avsaraa@gmail.com.");
+        setError("Failed to register B2B inquiry. Please reach us at support@avsaraa.in.");
       }
     } catch {
       setError("Connection issue. Please retry in a moment.");

@@ -81,24 +81,35 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: existingProfiles, error: queryError } = await query;
+    let existingProfiles: Array<{ id: string; email?: string; full_name?: string; phone_number?: string }> | null = null;
+    let phoneExists = false;
 
-    if (queryError) {
-      console.error("Database error while checking phone uniqueness:", queryError);
-      return NextResponse.json(
-        {
-          valid: true,
-          available: false,
-          error: "Could not verify phone availability. Please try again.",
-        },
-        { status: 500 }
-      );
+    const { data: queryData, error: queryError } = await query;
+
+    if (!queryError && queryData) {
+      existingProfiles = queryData;
+      phoneExists = queryData.length > 0;
+    } else {
+      // Fallback: Query via SECURITY DEFINER RPC check_phone_exists
+      try {
+        const { data: rpcExists, error: rpcErr } = await supabaseAdmin.rpc("check_phone_exists", {
+          phone_to_check: digitsOnly,
+          current_user_id: currentUserId || null,
+        });
+        if (!rpcErr) {
+          phoneExists = Boolean(rpcExists);
+        } else {
+          console.warn("Notice: Phone validation RPC lookup notice:", rpcErr.message);
+        }
+      } catch (ex) {
+        console.warn("Notice: Phone validation lookup exception:", ex);
+      }
     }
 
     // 3. Handle conflict if existing profile found
-    if (existingProfiles && existingProfiles.length > 0) {
-      const match = existingProfiles[0];
-      const maskedMail = match.email ? maskEmail(match.email) : undefined;
+    if (phoneExists) {
+      const match = existingProfiles && existingProfiles.length > 0 ? existingProfiles[0] : null;
+      const maskedMail = match?.email ? maskEmail(match.email) : undefined;
       const maskedPhone = maskPhoneNumber(formatted);
 
       return NextResponse.json({
@@ -113,7 +124,7 @@ export async function POST(request: Request) {
         maskedPhone,
         recoveryOptions: {
           canLogin: true,
-          canResetPassword: Boolean(match.email),
+          canResetPassword: Boolean(match?.email),
           loginUrl: "/login",
           forgotPasswordUrl: "/forgot-password",
         },

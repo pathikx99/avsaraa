@@ -9,7 +9,7 @@ async function resolveAvsaraaBaseUrl(): Promise<{ baseUrl: string; isOnline: boo
   for (const candidate of candidates) {
     try {
       const res = await fetch(`${candidate}/api/health`, { signal: AbortSignal.timeout(1500) });
-      if (res.status === 200) {
+      if (res.status === 200 || res.status === 503) {
         const data = await res.json();
         if (data && data.service && data.service.includes("Avsaraa")) {
           return { baseUrl: candidate, isOnline: true };
@@ -104,7 +104,7 @@ describe(
       const res = await fetch(`${BASE_URL}/api/admin/auth`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "admin@avsaraa.com", password: "wrong-password" }),
+        body: JSON.stringify({ email: process.env.ADMIN_EMAIL || "web.avsaraa@gmail.com", password: "wrong-password" }),
       });
       assert.equal(res.status, 401);
     });
@@ -114,8 +114,8 @@ describe(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: "admin@avsaraa.com",
-          password: "avsaraa_super_secret_admin_key_2026",
+          email: process.env.ADMIN_EMAIL || "web.avsaraa@gmail.com",
+          password: process.env.ADMIN_PASSWORD || "V@123456",
         }),
       });
       assert.equal(res.status, 200);

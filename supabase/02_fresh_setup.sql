@@ -131,7 +131,7 @@ INSERT INTO public.admin_users (
     permissions
 ) VALUES (
     'Avsaraa Master Authority',
-    'contact.avsaraa@gmail.com',
+    'web.avsaraa@gmail.com',
     'Super Admin',
     'Executive Leadership',
     'Active',
@@ -379,6 +379,92 @@ CREATE POLICY "Only super admin can update products"
 CREATE POLICY "Only super admin can delete products" 
     ON public.products FOR DELETE 
     USING (public.is_admin());
+
+-- Seed Initial Atelier Handloom & Festive Products
+INSERT INTO public.products (
+    id, name, category, price, mrp, discount_percent, image_url, gallery_images, description, fabric, occasion_tags, stock_count, sales_count, product_type
+) VALUES 
+(
+    'e0000000-0000-0000-0000-000000000001',
+    'Royal Banarasi Katan Silk Saree',
+    'Sarees',
+    24999.00,
+    32500.00,
+    23,
+    '/images/saree_model_hero.jpg',
+    '["/images/saree_model_hero.jpg", "/images/occasion_traditional.jpg", "/images/occasion_wedding.jpg"]'::jsonb,
+    'Pure mulberry Katan silk handwoven on traditional Varanasi handlooms with intricate real zari kadhwa floral jaal and a regal gold brocade pallu.',
+    'Pure Mulberry Katan Silk',
+    ARRAY['Traditional & Ceremonial Wear', 'Wedding Guest', 'Festive Edit'],
+    10,
+    320,
+    'standalone'
+),
+(
+    'e0000000-0000-0000-0000-000000000004',
+    'Festive Chanderi Foil Print Dress',
+    'Dresses',
+    12500.00,
+    16900.00,
+    26,
+    '/images/occasion_festive.jpg',
+    '["/images/occasion_festive.jpg", "/images/occasion_party.jpg", "/images/botanical_flowers.jpg"]'::jsonb,
+    'Contemporary silhouette crafted from lightweight Chanderi weave featuring artisanal metallic foil accents, soft inner lining, and a flowing flared hem.',
+    'Pure Chanderi Silk Blend',
+    ARRAY['Festive Edit', 'Haldi & Mehendi', 'Party & Special Occasions'],
+    15,
+    215,
+    'top'
+),
+(
+    'e0000000-0000-0000-0000-000000000002',
+    'Emerald Organza Embroidered Saree',
+    'Sarees',
+    18450.00,
+    23900.00,
+    23,
+    '/images/occasion_traditional.jpg',
+    '["/images/occasion_traditional.jpg", "/images/occasion_party.jpg", "/images/saree_model_hero.jpg"]'::jsonb,
+    'Whisper-light handloom organza saree in deep emerald adorned with scalloped hand-cut resham embroidery and delicate badla zari accents.',
+    'Pure Sheer Handloom Organza Silk',
+    ARRAY['Traditional & Ceremonial Wear', 'Party & Special Occasions'],
+    8,
+    190,
+    'standalone'
+),
+(
+    'e1000000-0000-0000-0000-000000000003',
+    'Indigo Floral Handblock Printed Suit Set',
+    'Dresses',
+    1299.00,
+    1899.00,
+    32,
+    '/images/occasion_everyday.jpg',
+    '["/images/occasion_everyday.jpg", "/images/occasion_festive.jpg", "/images/botanical_flowers.jpg"]'::jsonb,
+    'Breathable pure cotton slub suit set in deep indigo blue, featuring traditional handblock botanical motifs, comfortable straight-fit trousers, and matching lightweight stole.',
+    '100% Breathable Pure Cotton Slub',
+    ARRAY['Everyday Essentials', 'Festive Edit'],
+    25,
+    210,
+    'set'
+),
+(
+    'e1000000-0000-0000-0000-000000000009',
+    'Sage Minimalist Linen Everyday Kurta',
+    'Dresses',
+    1250.00,
+    1750.00,
+    29,
+    '/images/occasion_everyday.jpg',
+    '["/images/occasion_everyday.jpg", "/images/occasion_party.jpg"]'::jsonb,
+    'Minimalist hand-spun linen kurta in soothing sage green. Tailored with a relaxed silhouette, side slits, and mother-of-pearl button detailing for effortless everyday elegance.',
+    'Pure Handloom Linen & Breathable Cotton Blend',
+    ARRAY['Everyday Essentials'],
+    20,
+    88,
+    'top'
+)
+ON CONFLICT (id) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
 -- 7. CONTACT & CONCIERGE INQUIRIES
@@ -925,3 +1011,17 @@ BEGIN
     RETURN v_restored_count;
 END;
 $$;
+
+-- ------------------------------------------------------------------------------
+-- 10. POSTGRES TABLE & SEQUENCE PRIVILEGES (ESSENTIAL FOR POSTGREST & RLS)
+-- ------------------------------------------------------------------------------
+-- Grants table and sequence access to Supabase system roles so RLS policies
+-- are evaluated properly instead of failing with PostgreSQL 42501 (permission denied).
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO postgres, anon, authenticated, service_role;

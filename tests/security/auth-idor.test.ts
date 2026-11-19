@@ -71,9 +71,10 @@ describe("Security Architecture & Cryptographic Verification Tests", () => {
     assert.strictEqual(isSuperAdminUser({ app_metadata: { role: "admin" } }), true);
 
     // 2. Verified admin emails
+    assert.strictEqual(isSuperAdminEmail("web.avsaraa@gmail.com"), true);
     assert.strictEqual(isSuperAdminEmail("contact.avsaraa@gmail.com"), true);
     assert.strictEqual(isSuperAdminEmail("admin@avsaraa.com"), true);
-    assert.strictEqual(isSuperAdminUser({ email: "contact.avsaraa@gmail.com" }), true);
+    assert.strictEqual(isSuperAdminUser({ email: "web.avsaraa@gmail.com" }), true);
 
     // 3. Reject regular patron or malicious user
     assert.strictEqual(isSuperAdminUser({ app_metadata: { role: "customer" }, email: "customer@gmail.com" }), false);

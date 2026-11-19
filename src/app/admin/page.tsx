@@ -111,6 +111,7 @@ export default function AdminDashboardPage() {
   const [showEditSuperAdminModal, setShowEditSuperAdminModal] = useState(false);
   const [viewingInquiry, setViewingInquiry] = useState<ContactInquiry | null>(null);
   const [deletingInquiry, setDeletingInquiry] = useState<ContactInquiry | null>(null);
+  const [sendingAckId, setSendingAckId] = useState<string | null>(null);
 
   // Bulk Product Ingestion & Image Upload States
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
@@ -1164,6 +1165,28 @@ export default function AdminDashboardPage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Update failed";
       showToast(message, "error");
+    }
+  };
+
+  const handleSendInquiryAcknowledgement = async (inq: ContactInquiry) => {
+    try {
+      setSendingAckId(inq.id);
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/inquiries", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ action: "acknowledge", id: inq.id }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        showToast(`Acknowledgement email dispatched to ${inq.email} from support@avsaraa.in`, "success");
+      } else {
+        showToast(json.error || "Failed to send acknowledgement email", "error");
+      }
+    } catch {
+      showToast("Error sending acknowledgement email", "error");
+    } finally {
+      setSendingAckId(null);
     }
   };
 
@@ -2578,7 +2601,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                   <option value="Sarees">Sarees</option>
                   <option value="Dresses">Dresses</option>
                   <option value="Co-ords">Co-ords</option>
-                  <option value="Men's Wear">Men's Wear</option>
+                  <option value="Men's Wear">{"Men's Wear"}</option>
                   <option value="New Arrivals">New Arrivals</option>
                   <option value="Occasion Wear">Occasion Wear</option>
                 </select>
@@ -4600,7 +4623,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                       <option value="Sarees">Sarees</option>
                       <option value="Dresses">Dresses</option>
                       <option value="Co-ords">Co-ords</option>
-                      <option value="Men's Wear">Men's Wear</option>
+                      <option value="Men's Wear">{"Men's Wear"}</option>
                       <option value="New Arrivals">New Arrivals</option>
                       <option value="Occasion Wear">Occasion Wear</option>
                     </select>
@@ -4820,6 +4843,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                           backgroundColor: "#F2EBE3",
                         }}
                       >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={productForm.image_url}
                           alt="Preview"
@@ -4897,6 +4921,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                             backgroundColor: "#EDE4D8",
                           }}
                         >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={imgUrl}
                             alt={`Gallery ${idx + 1}`}
@@ -5944,7 +5969,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               ].map((tab) => (
                 <button
                   key={tab.key}
-                  onClick={() => setCustomerDetailSubTab(tab.key as any)}
+                  onClick={() => setCustomerDetailSubTab(tab.key as "orders" | "addresses" | "inquiries" | "notes")}
                   style={{
                     padding: "10px 16px",
                     border: "none",
@@ -6515,6 +6540,24 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                   }}
                 >
                   Mark In Progress
+                </button>
+                <button
+                  type="button"
+                  disabled={sendingAckId === viewingInquiry.id}
+                  onClick={() => handleSendInquiryAcknowledgement(viewingInquiry)}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid #C5A265",
+                    backgroundColor: "#FBF7EF",
+                    color: "#846124",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: sendingAckId === viewingInquiry.id ? "not-allowed" : "pointer",
+                    opacity: sendingAckId === viewingInquiry.id ? 0.7 : 1,
+                  }}
+                >
+                  {sendingAckId === viewingInquiry.id ? "Sending..." : "✉️ Send Ack (support@avsaraa.in)"}
                 </button>
               </div>
 

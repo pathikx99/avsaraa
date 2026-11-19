@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { rateLimitOtpSend } from "@/lib/rateLimit";
+import { sendEmailVerificationEmail } from "@/lib/emailService";
 import crypto from "crypto";
 
 // Store OTPs in memory with timestamp (In production, backed by Redis or SMS Gateway)
@@ -40,12 +41,20 @@ export async function POST(request: Request) {
 
     otpStore.set(cleanContact, { otp, expiresAt });
 
-    // In a live environment, dispatch via WhatsApp Cloud API / Twilio / Resend
-    // For test and auditing convenience, return simulated dispatch confirmation
+    // When verifying email, dispatch verification OTP email using support@avsaraa.in
+    let emailResult = null;
+    if (channel === "email" || cleanContact.includes("@")) {
+      emailResult = await sendEmailVerificationEmail({
+        to: cleanContact,
+        otp,
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Verification code sent via ${channel === "whatsapp" ? "WhatsApp" : "Email"}.`,
+      message: `Verification code sent via ${channel === "whatsapp" ? "WhatsApp" : "Email"} from support@avsaraa.in.`,
       expiresInSeconds: 300,
+      emailResult: emailResult ? { success: emailResult.success } : undefined,
       // For automated verification in tests
       debugOtp: process.env.NODE_ENV !== "production" ? otp : undefined,
     });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { generateOrderConfirmationEmailHtml, escapeHtml } from "@/lib/emailTemplates";
+import { sendCustomerOrderInvoice } from "@/lib/emailService";
 import { Order } from "@/types/order";
 import { isSuperAdminUser } from "@/lib/adminConstants";
 import { verifyAdminSession } from "@/lib/jwtAdmin";
@@ -63,18 +64,30 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate sanitized HTML email with escapeHtml on all parameters
-    const emailHtml = generateOrderConfirmationEmailHtml(order as Order);
+    // Prepare order copy with target email if specified
+    const orderForDispatch: Order = {
+      ...(order as Order),
+      shipping_address_snapshot: {
+        ...(order.shipping_address_snapshot || {}),
+        email: targetEmail,
+      },
+    };
 
-    // In production with RESEND_API_KEY, post to Resend API:
-    // await fetch("https://api.resend.com/emails", { ... })
-    // For audit and delivery assurance:
+    // Generate sanitized HTML email with escapeHtml on all parameters
+    const emailHtml = generateOrderConfirmationEmailHtml(orderForDispatch);
+
+    // Dispatch official tax invoice / bill via order@avsaraa.in
+    const dispatchResult = await sendCustomerOrderInvoice(orderForDispatch);
+
     return NextResponse.json({
-      success: true,
-      message: `Invoice email rendered and queued for ${escapeHtml(targetEmail)}.`,
+      success: dispatchResult.success,
+      message: dispatchResult.success
+        ? `Invoice bill dispatched to ${escapeHtml(targetEmail)} from order@avsaraa.in.`
+        : `Invoice queued. Dispatch note: ${dispatchResult.error || "Simulated mode"}`,
       recipient: escapeHtml(targetEmail),
       orderNumber: order.order_number,
       htmlPreviewLength: emailHtml.length,
+      simulated: dispatchResult.simulated,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";

@@ -26,9 +26,15 @@ export async function POST(request: Request) {
       );
     }
 
-    if (process.env.NODE_ENV === "production" && razorpay_payment_id.startsWith("pay_test_")) {
+    const isLiveGateway = (
+      process.env.RAZORPAY_KEY_ID ||
+      process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
+      ""
+    ).startsWith("rzp_live_");
+
+    if (isLiveGateway && process.env.NODE_ENV === "production" && razorpay_payment_id.startsWith("pay_test_")) {
       return NextResponse.json(
-        { success: false, error: "Sandbox test payments are prohibited in production environment." },
+        { success: false, error: "Sandbox test payments are prohibited in live production environment." },
         { status: 403 }
       );
     }

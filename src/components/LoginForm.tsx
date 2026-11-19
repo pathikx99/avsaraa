@@ -35,9 +35,101 @@ export default function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [authMode, setAuthMode] = useState<"otp" | "password">("otp");
+  const [otpCode, setOtpCode] = useState("");
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [isOtpLoading, setIsOtpLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(
     urlError ? decodeURIComponent(urlError) : null
   );
+
+  const handleSendEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes("@")) {
+      showToast("Please enter a valid email address.");
+      return;
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    setIsOtpLoading(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: cleanEmail,
+        options: {
+          shouldCreateUser: true,
+        },
+      });
+
+      if (error) {
+        showToast(error.message);
+        setIsOtpLoading(false);
+        return;
+      }
+
+      setIsOtpSent(true);
+      showToast(`6-digit code sent to ${cleanEmail}. Check your inbox!`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to send verification code";
+      showToast(msg);
+    } finally {
+      setIsOtpLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode || otpCode.trim().length !== 6) {
+      showToast("Please enter the 6-digit verification code.");
+      return;
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    setIsOtpLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: cleanEmail,
+        token: otpCode.trim(),
+        type: "email",
+      });
+
+      if (error) {
+        showToast(error.message || "Invalid or expired verification code.");
+        setIsOtpLoading(false);
+        return;
+      }
+
+      showToast("Email verified! Welcome to Avsaraa.");
+
+      if (data.user) {
+        try {
+          await supabase.from("profiles").upsert({
+            id: data.user.id,
+            email: cleanEmail,
+            full_name: data.user.user_metadata?.full_name || cleanEmail.split("@")[0],
+            status: "Active",
+            membership_tier: "Standard",
+            reward_points: 100,
+            updated_at: new Date().toISOString(),
+          });
+        } catch {
+          // Ignore background profile sync error
+        }
+      }
+
+      const isSuperAdmin = isSuperAdminUser(data.user);
+      const targetDestination = isSuperAdmin ? "/admin" : redirectTo;
+
+      setTimeout(() => {
+        router.push(targetDestination);
+        router.refresh();
+      }, 500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification failed";
+      showToast(msg);
+      setIsOtpLoading(false);
+    }
+  };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +163,18 @@ export default function LoginForm({
       showToast("Welcome back to Avsaraa!");
 
       const isSuperAdmin = isSuperAdminUser(data.user);
+
+      if (isSuperAdmin) {
+        try {
+          await fetch("/api/admin/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: cleanEmail, password }),
+          });
+        } catch {
+          // Ignore background admin cookie sync error
+        }
+      }
 
       const targetDestination = isSuperAdmin ? "/admin" : redirectTo;
 
@@ -404,118 +508,336 @@ export default function LoginForm({
             <div style={{ flex: 1, height: "1px", backgroundColor: "#E6DBD0" }} />
           </div>
 
-          {/* Email & Password Form */}
-          <form onSubmit={handleEmailLogin} className="fade-in">
-            {/* Email Field */}
-            <div style={{ marginBottom: "12px" }}>
-              <div
-                className="avsaraa-input-group"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  height: "52px",
-                  padding: "0 14px",
-                }}
-              >
-                <MailIcon size={18} color="#786556" />
-                <input
-                  type="email"
-                  autoComplete="username"
-                  placeholder="Enter your email address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{ flex: 1, fontSize: "14px", color: "#261B13" }}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Password Field */}
-            <div style={{ marginBottom: "8px" }}>
-              <div
-                className="avsaraa-input-group"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  height: "52px",
-                  padding: "0 14px",
-                }}
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#786556"
-                  strokeWidth="1.6"
-                >
-                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ flex: 1, fontSize: "14px", color: "#261B13" }}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#866951",
-                    fontSize: "12px",
-                    cursor: "pointer",
-                    padding: "4px",
-                  }}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </div>
-            </div>
-
-            {/* Forgot Password Link */}
-            <div
+          {/* Auth Method Selector (Email Code OTP vs Password) */}
+          <div
+            style={{
+              display: "flex",
+              backgroundColor: "#EFE6DC",
+              borderRadius: "10px",
+              padding: "3px",
+              marginBottom: "16px",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("otp");
+                setIsOtpSent(false);
+              }}
               style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                marginBottom: "18px",
+                flex: 1,
+                padding: "8px 12px",
+                borderRadius: "8px",
+                fontSize: "12.5px",
+                fontWeight: 600,
+                border: "none",
+                cursor: "pointer",
+                backgroundColor: authMode === "otp" ? "#FFFFFF" : "transparent",
+                color: authMode === "otp" ? "#261B13" : "#7E6E62",
+                boxShadow: authMode === "otp" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                transition: "all 0.2s ease",
               }}
             >
-              <Link
-                href="/forgot-password"
+              ✉️ Email Code (Verify)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("password");
+                setIsOtpSent(false);
+              }}
+              style={{
+                flex: 1,
+                padding: "8px 12px",
+                borderRadius: "8px",
+                fontSize: "12.5px",
+                fontWeight: 600,
+                border: "none",
+                cursor: "pointer",
+                backgroundColor: authMode === "password" ? "#FFFFFF" : "transparent",
+                color: authMode === "password" ? "#261B13" : "#7E6E62",
+                boxShadow: authMode === "password" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                transition: "all 0.2s ease",
+              }}
+            >
+              🔑 Password
+            </button>
+          </div>
+
+          {/* MODE 1: Email Code (OTP) Form */}
+          {authMode === "otp" && (
+            <div className="fade-in">
+              {!isOtpSent ? (
+                <form onSubmit={handleSendEmailOtp}>
+                  {/* Email Field */}
+                  <div style={{ marginBottom: "14px" }}>
+                    <div
+                      className="avsaraa-input-group"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        height: "52px",
+                        padding: "0 14px",
+                      }}
+                    >
+                      <MailIcon size={18} color="#786556" />
+                      <input
+                        type="email"
+                        autoComplete="email"
+                        placeholder="Enter your email address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        style={{ flex: 1, fontSize: "14px", color: "#261B13" }}
+                        required
+                        disabled={isOtpLoading}
+                      />
+                    </div>
+                    <span style={{ display: "block", fontSize: "11.5px", color: "#8E7D70", marginTop: "6px", paddingLeft: "4px" }}>
+                      We will send a 6-digit verification code to verify your email.
+                    </span>
+                  </div>
+
+                  {/* Send Code Button */}
+                  <button
+                    type="submit"
+                    disabled={isOtpLoading || isGoogleLoading || !email}
+                    className="avsaraa-btn-primary"
+                    style={{ height: "52px", width: "100%" }}
+                  >
+                    {isOtpLoading ? (
+                      <SpinnerIcon size={18} color="#FFFFFF" />
+                    ) : (
+                      "Send Verification Code →"
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyEmailOtp}>
+                  {/* Notice & Edit Email */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      backgroundColor: "#F5EFE6",
+                      borderRadius: "8px",
+                      marginBottom: "14px",
+                      fontSize: "12.5px",
+                    }}
+                  >
+                    <span style={{ color: "#5A493D" }}>
+                      Code sent to <strong>{email}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsOtpSent(false)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#846124",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        fontSize: "12px",
+                      }}
+                    >
+                      Change
+                    </button>
+                  </div>
+
+                  {/* 6-Digit OTP Input */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <div
+                      className="avsaraa-input-group"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        height: "54px",
+                        padding: "0 14px",
+                        backgroundColor: "#FFFFFF",
+                        border: "1.5px solid #C5A265",
+                      }}
+                    >
+                      <input
+                        type="text"
+                        maxLength={6}
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        placeholder="• • • • • •"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                        style={{
+                          flex: 1,
+                          fontSize: "22px",
+                          fontWeight: 700,
+                          letterSpacing: "8px",
+                          textAlign: "center",
+                          color: "#261B13",
+                        }}
+                        required
+                        autoFocus
+                        disabled={isOtpLoading}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Verify & Sign In Button */}
+                  <button
+                    type="submit"
+                    disabled={isOtpLoading || otpCode.trim().length !== 6}
+                    className="avsaraa-btn-primary"
+                    style={{
+                      height: "52px",
+                      width: "100%",
+                      opacity: otpCode.trim().length !== 6 ? 0.7 : 1,
+                    }}
+                  >
+                    {isOtpLoading ? (
+                      <SpinnerIcon size={18} color="#FFFFFF" />
+                    ) : (
+                      "Verify Code & Sign In →"
+                    )}
+                  </button>
+
+                  {/* Resend Link */}
+                  <div style={{ textAlign: "center", marginTop: "14px" }}>
+                    <button
+                      type="button"
+                      onClick={handleSendEmailOtp}
+                      disabled={isOtpLoading}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#866951",
+                        fontSize: "12.5px",
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      Didn&apos;t receive code? Resend
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* MODE 2: Email & Password Form */}
+          {authMode === "password" && (
+            <form onSubmit={handleEmailLogin} className="fade-in">
+              {/* Email Field */}
+              <div style={{ marginBottom: "12px" }}>
+                <div
+                  className="avsaraa-input-group"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    height: "52px",
+                    padding: "0 14px",
+                  }}
+                >
+                  <MailIcon size={18} color="#786556" />
+                  <input
+                    type="email"
+                    autoComplete="username"
+                    placeholder="Enter your email address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={{ flex: 1, fontSize: "14px", color: "#261B13" }}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div style={{ marginBottom: "8px" }}>
+                <div
+                  className="avsaraa-input-group"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    height: "52px",
+                    padding: "0 14px",
+                  }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#786556"
+                    strokeWidth="1.6"
+                  >
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{ flex: 1, fontSize: "14px", color: "#261B13" }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#866951",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      padding: "4px",
+                    }}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Forgot Password Link */}
+              <div
                 style={{
-                  fontSize: "12.5px",
-                  color: "#866951",
-                  textDecoration: "underline",
-                  textUnderlineOffset: "3px",
-                  fontWeight: 500,
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginBottom: "18px",
                 }}
               >
-                Forgot Password?
-              </Link>
-            </div>
+                <Link
+                  href="/forgot-password"
+                  style={{
+                    fontSize: "12.5px",
+                    color: "#866951",
+                    textDecoration: "underline",
+                    textUnderlineOffset: "3px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Forgot Password?
+                </Link>
+              </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading || isGoogleLoading}
-              className="avsaraa-btn-primary"
-              style={{ height: "52px", width: "100%" }}
-            >
-              {isLoading ? (
-                <SpinnerIcon size={18} color="#FFFFFF" />
-              ) : (
-                "Sign In with Email →"
-              )}
-            </button>
-          </form>
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading || isGoogleLoading}
+                className="avsaraa-btn-primary"
+                style={{ height: "52px", width: "100%" }}
+              >
+                {isLoading ? (
+                  <SpinnerIcon size={18} color="#FFFFFF" />
+                ) : (
+                  "Sign In with Password →"
+                )}
+              </button>
+            </form>
+          )}
         </div>
 
         {/* Footer: Create an Account */}

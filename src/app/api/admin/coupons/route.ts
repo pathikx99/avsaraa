@@ -2,40 +2,12 @@ import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
 import { Coupon } from "@/types/order";
-import { enrichCoupon, saveCouponMetadata, removeCouponMetadata } from "@/lib/couponManager";
-
-const FALLBACK_COUPONS: Coupon[] = [
-  {
-    id: "default-avsaraa10",
-    code: "AVSARAA10",
-    discount_type: "percentage",
-    discount_value: 10,
-    min_order_amount: 0,
-    max_discount_amount: 10000,
-    is_active: true,
-    usage_limit: 1000,
-    used_count: 42,
-    valid_from: new Date().toISOString(),
-    valid_until: null,
-    created_at: new Date().toISOString(),
-    per_user_limit: 5,
-  },
-  {
-    id: "default-welcome500",
-    code: "WELCOME500",
-    discount_type: "fixed",
-    discount_value: 500,
-    min_order_amount: 2999,
-    max_discount_amount: 500,
-    is_active: true,
-    usage_limit: 500,
-    used_count: 18,
-    valid_from: new Date().toISOString(),
-    valid_until: null,
-    created_at: new Date().toISOString(),
-    per_user_limit: 1,
-  },
-];
+import {
+  enrichCoupon,
+  saveCouponMetadata,
+  removeCouponMetadata,
+  FALLBACK_COUPONS,
+} from "@/lib/couponManager";
 
 export async function GET() {
   try {

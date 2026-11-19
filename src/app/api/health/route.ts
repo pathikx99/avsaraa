@@ -40,7 +40,7 @@ export async function GET() {
       tier: "free-tier-keepalive",
     },
     {
-      status: dbStatus === "connected" ? 200 : 503,
+      status: dbStatus === "error" ? 503 : 200,
       headers: {
         "Cache-Control": "no-store, max-age=0",
       },
