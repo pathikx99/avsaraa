@@ -1,0 +1,8 @@
+# Gitleaks ignore list for known historical commits and mock test fixtures
+9df5b9f402a6332f7443cfba25b6a858fc7ea24e:src/app/api/razorpay/verify/route.ts:generic-api-key:47
+9df5b9f402a6332f7443cfba25b6a858fc7ea24e:src/app/api/razorpay/create-order/route.ts:generic-api-key:276
+9df5b9f402a6332f7443cfba25b6a858fc7ea24e:src/app/api/razorpay/create-order/route.ts:generic-api-key:331
+2a2e1567b098b66b3e6847cedf1bea4cbee2b9c6:src/app/api/razorpay/verify/route.ts:generic-api-key:28
+fce78dfa8ba526436af3d3579c985e6dfa15ae61:src/lib/supabaseAdmin.ts:generic-api-key:22
+2253fd06a83294e55c35ffaedb6c27978946a6ec:src/lib/supabaseServer.ts:generic-api-key:10
+2253fd06a83294e55c35ffaedb6c27978946a6ec:src/lib/supabaseClient.ts:generic-api-key:6
