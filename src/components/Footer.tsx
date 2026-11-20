@@ -118,7 +118,7 @@ export default function Footer() {
               fontWeight: 600,
               letterSpacing: "0.14em",
               textTransform: "uppercase",
-              color: "#866951",
+              color: "#5A4535",
               display: "block",
               marginBottom: "8px",
             }}
@@ -222,17 +222,20 @@ export default function Footer() {
             {/* Social Icons with SVG */}
             <div style={{ display: "flex", gap: "10px", marginTop: "18px" }}>
               {[
-                { name: "Instagram", icon: <InstagramIcon size={16} color="#261B13" /> },
-                { name: "Pinterest", icon: <PinterestIcon size={16} color="#261B13" /> },
-                { name: "Facebook", icon: <FacebookIcon size={16} color="#261B13" /> },
-                { name: "YouTube", icon: <YoutubeIcon size={16} color="#261B13" /> },
+                { name: "Instagram", href: "https://instagram.com/avsaraa.in", icon: <InstagramIcon size={16} color="#261B13" /> },
+                { name: "Pinterest", href: "https://pinterest.com/avsaraa", icon: <PinterestIcon size={16} color="#261B13" /> },
+                { name: "Facebook", href: "https://facebook.com/avsaraa", icon: <FacebookIcon size={16} color="#261B13" /> },
+                { name: "YouTube", href: "https://youtube.com/@avsaraa", icon: <YoutubeIcon size={16} color="#261B13" /> },
               ].map((item) => (
-                <div
+                <a
                   key={item.name}
-                  aria-label={item.name}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Follow Avsaraa on ${item.name}`}
                   style={{
-                    width: "34px",
-                    height: "34px",
+                    width: "36px",
+                    height: "36px",
                     borderRadius: "50%",
                     border: "1px solid #CFBEAD",
                     backgroundColor: "#FAF7F2",
@@ -241,17 +244,18 @@ export default function Footer() {
                     justifyContent: "center",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
+                    textDecoration: "none",
                   }}
                 >
                   {item.icon}
-                </div>
+                </a>
               ))}
             </div>
           </div>
 
           {/* PAGES Column */}
           <div>
-            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#5A4535", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
               PAGES
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
@@ -267,7 +271,7 @@ export default function Footer() {
 
           {/* ABOUT Column */}
           <div>
-            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#5A4535", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
               ABOUT
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
@@ -279,7 +283,7 @@ export default function Footer() {
 
           {/* HELP Column */}
           <div>
-            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#5A4535", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
               HELP & SUPPORT
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
@@ -291,7 +295,7 @@ export default function Footer() {
 
           {/* POLICIES Column */}
           <div>
-            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#866951", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+            <h3 style={{ fontSize: "11.5px", letterSpacing: "0.14em", textTransform: "uppercase", color: "#5A4535", marginBottom: "16px", fontFamily: "var(--font-sans)", fontWeight: 600 }}>
               POLICIES
             </h3>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
@@ -379,19 +383,19 @@ export default function Footer() {
               justifyContent: "center",
               gap: "8px 16px",
               fontSize: "12px",
-              color: "#7E6E62",
+              color: "#544439",
               textAlign: "center",
             }}
           >
             <span>© 2026 Avsaraa. All rights reserved.</span>
             <span>·</span>
-            <Link href="/privacy" style={{ color: "#7E6E62", textDecoration: "none" }}>Privacy Policy</Link>
+            <Link href="/privacy" style={{ color: "#544439", textDecoration: "none" }}>Privacy Policy</Link>
             <span>·</span>
-            <Link href="/terms" style={{ color: "#7E6E62", textDecoration: "none" }}>Terms &amp; Conditions</Link>
+            <Link href="/terms" style={{ color: "#544439", textDecoration: "none" }}>Terms &amp; Conditions</Link>
             <span>·</span>
-            <Link href="/shipping" style={{ color: "#7E6E62", textDecoration: "none" }}>Shipping &amp; Delivery</Link>
+            <Link href="/shipping" style={{ color: "#544439", textDecoration: "none" }}>Shipping &amp; Delivery</Link>
             <span>·</span>
-            <Link href="/returns" style={{ color: "#7E6E62", textDecoration: "none" }}>Returns &amp; Refunds</Link>
+            <Link href="/returns" style={{ color: "#544439", textDecoration: "none" }}>Returns &amp; Refunds</Link>
           </div>
         </div>
       </div>

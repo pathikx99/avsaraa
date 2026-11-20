@@ -93,8 +93,8 @@ export default function NewArrivals() {
                 onClick={() => handleScroll("left")}
                 aria-label="Scroll products left"
                 style={{
-                  width: "40px",
-                  height: "40px",
+                  width: "44px",
+                  height: "44px",
                   borderRadius: "50%",
                   border: "1px solid rgba(197, 160, 89, 0.4)",
                   backgroundColor: "#FFFFFF",
@@ -117,8 +117,8 @@ export default function NewArrivals() {
                 onClick={() => handleScroll("right")}
                 aria-label="Scroll products right"
                 style={{
-                  width: "40px",
-                  height: "40px",
+                  width: "44px",
+                  height: "44px",
                   borderRadius: "50%",
                   border: "1px solid rgba(197, 160, 89, 0.4)",
                   backgroundColor: "#FFFFFF",

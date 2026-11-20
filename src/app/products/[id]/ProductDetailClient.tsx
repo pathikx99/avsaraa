@@ -12,8 +12,6 @@ import { isValidGujaratPincode } from "@/lib/financials";
 import { ProductReview } from "@/types/review";
 import Footer from "@/components/Footer";
 import NavigationDrawer from "@/components/NavigationDrawer";
-import CartDrawer from "@/components/CartDrawer";
-import AuthRequiredModal from "@/components/AuthRequiredModal";
 import {
   HeartIcon,
   ShoppingBagIcon,
@@ -645,8 +643,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   return (
     <div className="product-page-wrapper" style={{ backgroundColor: "#FAF7F2", minHeight: "100vh" }}>
       <NavigationDrawer isOpen={isNavDrawerOpen} onClose={() => setIsNavDrawerOpen(false)} />
-      <CartDrawer />
-      <AuthRequiredModal />
 
       {/* =========================================================================
           1. HEADER (Minimal, Luxury Mobile Header)

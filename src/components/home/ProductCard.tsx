@@ -211,23 +211,38 @@ export default function ProductCard({
                   key={v.name}
                   type="button"
                   title={v.name}
+                  aria-label={`Select shade ${v.name}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedColor(v.name);
                   }}
+                  className="product-swatch-btn"
                   style={{
-                    width: "12px",
-                    height: "12px",
-                    borderRadius: "50%",
-                    backgroundColor: v.hex,
-                    border: isSelected ? "2px solid #261B13" : "1px solid #D0C3B5",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: "24px",
+                    minHeight: "24px",
                     padding: 0,
+                    background: "transparent",
+                    border: "none",
                     cursor: "pointer",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                    transform: isSelected ? "scale(1.2)" : "scale(1)",
-                    transition: "transform 0.15s ease",
                   }}
-                />
+                >
+                  <span
+                    style={{
+                      display: "block",
+                      width: "14px",
+                      height: "14px",
+                      borderRadius: "50%",
+                      backgroundColor: v.hex,
+                      border: isSelected ? "2px solid #261B13" : "1px solid #D0C3B5",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      transform: isSelected ? "scale(1.2)" : "scale(1)",
+                      transition: "transform 0.15s ease",
+                    }}
+                  />
+                </button>
               );
             })}
             <span style={{ fontSize: "10px", color: "#8E7D70", marginLeft: "4px" }}>

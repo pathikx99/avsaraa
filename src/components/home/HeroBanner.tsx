@@ -19,8 +19,8 @@ export const HERO_SLIDES = [
     ctaLink: "/products?category=New%20Arrivals",
     secondaryText: "EXPLORE SAREES",
     secondaryLink: "/products?category=Sarees",
-    mobileBanner: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=900&q=85",
-    desktopBanner: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1920&q=85",
+    mobileBanner: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1080&q=75",
+    desktopBanner: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1920&q=75",
     alt: "Avsaraa New Collection - Handcrafted Saree in Natural Sunlight",
     pieceNo: "№ 108",
     craft: "Pure Katan Silk & Zari Weave",
@@ -39,8 +39,8 @@ export const HERO_SLIDES = [
     ctaLink: "/products?category=Sarees",
     secondaryText: "VIEW ALL PRODUCTS",
     secondaryLink: "/products",
-    mobileBanner: "https://images.unsplash.com/photo-1641699862936-be9f49b1c38d?auto=format&fit=crop&w=900&q=85",
-    desktopBanner: "https://images.unsplash.com/photo-1641699862936-be9f49b1c38d?auto=format&fit=crop&w=1920&q=85",
+    mobileBanner: "https://images.unsplash.com/photo-1641699862936-be9f49b1c38d?auto=format&fit=crop&w=1080&q=75",
+    desktopBanner: "https://images.unsplash.com/photo-1641699862936-be9f49b1c38d?auto=format&fit=crop&w=1920&q=75",
     alt: "Handcrafted Banarasi Silk Sarees",
     pieceNo: "№ 247",
     craft: "Varanasi Pit Loom Katan Silk",
@@ -59,8 +59,8 @@ export const HERO_SLIDES = [
     ctaLink: "/products?category=Dresses",
     secondaryText: "VIEW ALL PRODUCTS",
     secondaryLink: "/products",
-    mobileBanner: "https://images.unsplash.com/photo-1756483510859-c0ab4c45782c?auto=format&fit=crop&w=900&q=85",
-    desktopBanner: "https://images.unsplash.com/photo-1756483510859-c0ab4c45782c?auto=format&fit=crop&w=1920&q=85",
+    mobileBanner: "https://images.unsplash.com/photo-1756483510859-c0ab4c45782c?auto=format&fit=crop&w=1080&q=75",
+    desktopBanner: "https://images.unsplash.com/photo-1756483510859-c0ab4c45782c?auto=format&fit=crop&w=1920&q=75",
     alt: "Royal Occasion Wear & Handcrafted Festive Dresses",
     pieceNo: "№ 312",
     craft: "Handwoven Chanderi & Gota Patti",
@@ -136,7 +136,7 @@ export default function HeroBanner() {
               src={HERO_SLIDES[heroSlide].mobileBanner}
               alt={HERO_SLIDES[heroSlide].alt}
               fill
-              priority
+              priority={heroSlide === 0}
               sizes="(max-width: 899px) 94vw, 1px"
               className="hero-arch-img"
             />
@@ -223,7 +223,7 @@ export default function HeroBanner() {
             src={HERO_SLIDES[heroSlide].desktopBanner}
             alt={HERO_SLIDES[heroSlide].alt}
             fill
-            priority
+            priority={heroSlide === 0}
             sizes="(max-width: 899px) 1px, 100vw"
             className="hero-cinematic-img"
             style={{

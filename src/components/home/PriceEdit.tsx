@@ -13,7 +13,6 @@ export default function PriceEdit() {
           <Link
             href="/products?maxPrice=1299"
             className="price-edit-box-card luxury-hover-card"
-            aria-label="Explore The ₹1,299 Edit - All pieces up to ₹1,299"
           >
             {/* Gilded Corner Filigrees */}
             <div className="price-edit-corner top-left" aria-hidden="true" />

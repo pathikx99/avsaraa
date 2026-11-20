@@ -34,12 +34,14 @@ export const metadata: Metadata = {
 };
 
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { CartProvider } from "@/context/CartContext";
 import { WishlistProvider } from "@/context/WishlistContext";
-import CartDrawer from "@/components/CartDrawer";
-import AuthRequiredModal from "@/components/AuthRequiredModal";
 import MobileBottomNav from "@/components/MobileBottomNav";
-import RecentlyViewedBar from "@/components/RecentlyViewedBar";
+
+const CartDrawer = dynamic(() => import("@/components/CartDrawer"));
+const AuthRequiredModal = dynamic(() => import("@/components/AuthRequiredModal"));
+const RecentlyViewedBar = dynamic(() => import("@/components/RecentlyViewedBar"));
 
 export default function RootLayout({
   children,

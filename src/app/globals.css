@@ -1319,17 +1319,30 @@ a {
 }
 
 .hero-arch-dot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.hero-arch-dot::after {
+  content: "";
+  display: block;
   width: 7px;
   height: 7px;
   border-radius: 4px;
   border: 1.2px solid rgba(197, 160, 89, 0.7);
   background: transparent;
-  padding: 0;
-  cursor: pointer;
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.hero-arch-dot.active {
+.hero-arch-dot.active::after {
   width: 24px;
   background: linear-gradient(90deg, #C5A059 0%, #ECC880 100%);
   border-color: #C5A059;
