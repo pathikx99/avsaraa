@@ -179,6 +179,19 @@ describe(
       const data = await res.json();
       assert.equal(data.valid, false);
     });
+
+    it("Validates free delivery promocode FREEDEL", async () => {
+      const res = await fetch(`${BASE_URL}/api/coupons/validate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "FREEDEL", subtotal: 350 }),
+      });
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.equal(data.valid, true);
+      assert.equal(data.coupon.discount_type, "free_shipping");
+      assert.equal(data.coupon.discount_amount, 0);
+    });
   });
 
   describe("5. Shipping, Logistics & Geolocation Boundaries", () => {

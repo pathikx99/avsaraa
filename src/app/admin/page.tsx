@@ -16,7 +16,6 @@ import {
   SearchIcon,
   CloseIcon,
   EyeIcon,
-  DatabaseIcon,
   SpinnerIcon,
   CheckIcon,
   MailIcon,
@@ -24,6 +23,7 @@ import {
   StarIcon,
   DeliveryVanIcon,
   TagIcon,
+  DiamondCrownIcon,
 } from "@/components/Icons";
 import { AdminUser, CustomerProfile, ContactInquiry, NewsletterSubscriber, ProductReview } from "@/types/admin";
 import { Product, ProductCategory } from "@/types/product";
@@ -57,15 +57,15 @@ const DEFAULT_SUPER_ADMIN: AdminUser = {
 export default function AdminDashboardPage() {
   // Navigation tabs - Orders & Fulfillment, Customer Accounts, etc.
   const [activeTab, setActiveTab] = useState<
-    "orders" | "customers" | "reviews" | "super_admin" | "sql_guide" | "products" | "inquiries" | "coupons"
+    "orders" | "customers" | "reviews" | "super_admin" | "products" | "inquiries" | "coupons"
   >("orders");
 
   // Authentication & Security State
   const [sessionUser, setSessionUser] = useState<User | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [isAuthorizedAdmin, setIsAuthorizedAdmin] = useState(false);
-  const [authGateEmail, setAuthGateEmail] = useState("");
   const [authGatePassword, setAuthGatePassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [authGateError, setAuthGateError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -126,9 +126,8 @@ export default function AdminDashboardPage() {
 
   // Form states
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
 
-  // Product Form state (with Promotional & Stock capabilities)
+  // Product Form state (with Promotional, Stock, Sizes & Colourways capabilities)
   const [productForm, setProductForm] = useState<{
     name: string;
     category: ProductCategory;
@@ -139,6 +138,19 @@ export default function AdminDashboardPage() {
     promo_tag: string;
     image_url: string;
     gallery_images: string[];
+    available_sizes: string[];
+    size_inventory: Record<string, number>;
+    color_variants: Array<{
+      name: string;
+      hex: string;
+      image_url: string;
+      gallery_images?: string[];
+      stock?: number;
+      sizes?: Array<{
+        size: string;
+        stock: number;
+      }>;
+    }>;
     description: string;
   }>({
     name: "",
@@ -150,8 +162,14 @@ export default function AdminDashboardPage() {
     promo_tag: "",
     image_url: "",
     gallery_images: [],
+    available_sizes: ["Free Size"],
+    size_inventory: { "Free Size": 10 },
+    color_variants: [],
     description: "",
   });
+
+  const [customSizeInput, setCustomSizeInput] = useState("");
+  const [uploadingColorVariantIdx, setUploadingColorVariantIdx] = useState<number | null>(null);
 
   // Customer Form state (with Concierge Notes)
   const [customerForm, setCustomerForm] = useState<{
@@ -205,6 +223,83 @@ export default function AdminDashboardPage() {
     }
     return headers;
   }, []);
+
+  // Drag-and-Drop Catalog Showcase Ordering State
+  const [draggedProductIndex, setDraggedProductIndex] = useState<number | null>(null);
+  const [dragOverProductIndex, setDragOverProductIndex] = useState<number | null>(null);
+  const [isReorderingShowcase, setIsReorderingShowcase] = useState(false);
+
+  const saveShowcaseOrder = async (orderedList: Product[]) => {
+    setIsReorderingShowcase(true);
+    try {
+      const headers = await getAuthHeaders();
+      const orderedIds = orderedList.map((p) => p.id);
+      const res = await fetch("/api/admin/products", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ orderedIds, action: "reorder" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("✨ Catalog Showcase Order updated & published live!");
+      } else {
+        showToast(`Error: ${data.error || "Failed to save order"}`, "error");
+      }
+    } catch {
+      showToast("Failed to save showcase ordering.", "error");
+    } finally {
+      setIsReorderingShowcase(false);
+    }
+  };
+
+  const handleProductDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedProductIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  };
+
+  const handleProductDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverProductIndex !== index) {
+      setDragOverProductIndex(index);
+    }
+  };
+
+  const handleProductDragEnd = () => {
+    setDraggedProductIndex(null);
+    setDragOverProductIndex(null);
+  };
+
+  const handleProductDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedProductIndex === null || draggedProductIndex === targetIndex) {
+      setDraggedProductIndex(null);
+      setDragOverProductIndex(null);
+      return;
+    }
+
+    const reordered = [...products];
+    const [moved] = reordered.splice(draggedProductIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    setProducts(reordered);
+    setDraggedProductIndex(null);
+    setDragOverProductIndex(null);
+    void saveShowcaseOrder(reordered);
+  };
+
+  const handleNudgeProductOrder = (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= products.length) return;
+
+    const reordered = [...products];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    setProducts(reordered);
+    void saveShowcaseOrder(reordered);
+  };
 
   // Fetch all administrative data with auth headers
   const fetchData = useCallback(async () => {
@@ -269,83 +364,66 @@ export default function AdminDashboardPage() {
     }
   }, [getAuthHeaders]);
 
+  // Live Dashboard Refresh Handler
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchData();
+      showToast("Live dashboard synchronized with database!", "success");
+    } catch {
+      showToast("Failed to refresh dashboard data", "error");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   // Initial authentication check & data mount
   useEffect(() => {
     let active = true;
 
     const checkSecurityAndLoad = async () => {
       try {
+        // 1. Primary check: verify standalone HttpOnly JWT session ('admin-auth' cookie)
+        const authRes = await fetch("/api/admin/auth");
+        if (authRes.ok) {
+          const authJson = await authRes.json();
+          if (authJson.authenticated && authJson.admin) {
+            if (!active) return;
+            const mockAdminUser: User = {
+              id: "admin-master",
+              email: authJson.admin.email || ADMIN_EMAIL,
+              app_metadata: { role: "super_admin" },
+              user_metadata: { role: "super_admin", full_name: authJson.admin.full_name || "Super Admin" },
+              aud: "authenticated",
+              created_at: new Date().toISOString(),
+            } as User;
+            setSessionUser(mockAdminUser);
+            setIsAuthorizedAdmin(true);
+            void fetchData();
+            return;
+          }
+        }
+
+        // 2. Fallback check: Supabase Auth session
         const { data: authData } = await supabase.auth.getUser();
         if (!active) return;
 
         const user = authData?.user ?? null;
         setSessionUser(user);
 
-        if (user) {
-          const isSuperAdmin = isSuperAdminUser(user);
+        if (user && isSuperAdminUser(user)) {
+          setIsAuthorizedAdmin(true);
+          void fetchData();
+          return;
+        }
 
-          setIsAuthorizedAdmin(isSuperAdmin);
-
-          if (isSuperAdmin) {
-            // Fetch data securely for authenticated admin
-            const headers = await getAuthHeaders();
-
-            const [usersRes, productsRes, inqRes, reviewsRes, ordersRes] = await Promise.all([
-              fetch("/api/admin/users", { headers }),
-              fetch("/api/admin/products", { headers }),
-              fetch("/api/admin/inquiries", { headers }),
-              fetch("/api/admin/reviews", { headers }),
-              fetch("/api/admin/orders", { headers }),
-            ]);
-
-            if (!active) return;
-
-            if (usersRes.ok) {
-              const usersJson = await usersRes.json();
-              if (usersJson.success) {
-                if (usersJson.adminUsers && usersJson.adminUsers.length > 0) {
-                  setSuperAdmin(usersJson.adminUsers[0]);
-                }
-                if (usersJson.customerProfiles) {
-                  setCustomerProfiles(usersJson.customerProfiles);
-                }
-              }
-            }
-
-            if (productsRes.ok) {
-              const productsJson = await productsRes.json();
-              if (productsJson.success && productsJson.products) {
-                setProducts(productsJson.products);
-              }
-            }
-
-            if (inqRes.ok) {
-              const inqJson = await inqRes.json();
-              if (inqJson.success) {
-                setInquiries(inqJson.inquiries || []);
-                setSubscribers(inqJson.subscribers || []);
-              }
-            }
-
-            if (reviewsRes.ok) {
-              const reviewsJson = await reviewsRes.json();
-              if (reviewsJson.success && reviewsJson.reviews) {
-                setReviews(reviewsJson.reviews);
-              }
-            }
-
-            if (ordersRes.ok) {
-              const ordersJson = await ordersRes.json();
-              if (ordersJson.success && ordersJson.orders) {
-                setAdminOrders(ordersJson.orders);
-              }
-            }
-          }
-        } else {
+        setIsAuthorizedAdmin(false);
+      } catch (err) {
+        console.warn("Initial admin auth verification error:", err);
+        if (active) {
           setIsAuthorizedAdmin(false);
         }
-      } catch (err) {
-        console.warn("Initial load error:", err);
       } finally {
         if (active) {
           setAuthChecking(false);
@@ -366,8 +444,6 @@ export default function AdminDashboardPage() {
         if (isSuperAdmin) {
           void fetchData();
         }
-      } else {
-        setIsAuthorizedAdmin(false);
       }
     });
 
@@ -377,11 +453,11 @@ export default function AdminDashboardPage() {
     };
   }, [fetchData, getAuthHeaders]);
 
-  // Admin Login Handler for the Security Gate (Login on /admin route only)
+  // Admin Login Handler for the Security Gate (Login on /admin route with master password)
   const handleAdminGateLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!authGateEmail || !authGatePassword) {
-      setAuthGateError("Please enter your Super Admin credentials.");
+    if (!authGatePassword) {
+      setAuthGateError("Please enter the master password.");
       return;
     }
 
@@ -389,74 +465,45 @@ export default function AdminDashboardPage() {
     setAuthGateError(null);
 
     try {
-      let signInResult = await supabase.auth.signInWithPassword({
-        email: authGateEmail.trim().toLowerCase(),
-        password: authGatePassword,
+      // Direct verification against backend master credential authority
+      const syncRes = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: authGatePassword,
+        }),
       });
 
-      // If Supabase sign-in fails, attempt sync against environment admin credentials
-      if (signInResult.error) {
-        try {
-          const syncRes = await fetch("/api/admin/auth", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: authGateEmail.trim().toLowerCase(),
-              password: authGatePassword,
-            }),
-          });
-          const syncJson = await syncRes.json();
-          if (syncJson.success) {
-            // Retry sign-in with newly provisioned/synced credentials
-            signInResult = await supabase.auth.signInWithPassword({
-              email: authGateEmail.trim().toLowerCase(),
-              password: authGatePassword,
-            });
+      const syncJson = await syncRes.json();
 
-            if (signInResult.error) {
-              // Environment authentication succeeded; authorize session user
-              const mockAdminUser: User = {
-                id: "admin-env-user",
-                email: authGateEmail.trim().toLowerCase(),
-                app_metadata: { role: "super_admin" },
-                user_metadata: { role: "super_admin", full_name: "Kratos Lord" },
-                aud: "authenticated",
-                created_at: new Date().toISOString(),
-              } as User;
-
-              setSessionUser(mockAdminUser);
-              setIsAuthorizedAdmin(true);
-              showToast("Super Admin Authenticated. Master Console Unlocked.");
-              void fetchData();
-              return;
-            }
-          }
-        } catch {
-          // Fall through to original error
-        }
-      }
-
-      if (signInResult.error) {
-        setAuthGateError(signInResult.error.message);
+      if (!syncRes.ok || !syncJson.success) {
+        setAuthGateError(syncJson.error || "Invalid master password. Access denied.");
         return;
       }
 
-      const user = signInResult.data?.user;
-      if (user) {
-        const isSuperAdmin = isSuperAdminUser(user);
+      // Successful verification: HttpOnly admin-auth cookie is set
+      const mockAdminUser: User = {
+        id: "admin-master",
+        email: ADMIN_EMAIL,
+        app_metadata: { role: "super_admin" },
+        user_metadata: { role: "super_admin", full_name: "Super Admin" },
+        aud: "authenticated",
+        created_at: new Date().toISOString(),
+      } as User;
 
-        if (!isSuperAdmin) {
-          setAuthGateError("Access Denied: Only the Super Admin is authorized to access this console.");
-          await supabase.auth.signOut();
-          setSessionUser(null);
-          setIsAuthorizedAdmin(false);
-          return;
-        }
+      setSessionUser(mockAdminUser);
+      setIsAuthorizedAdmin(true);
+      showToast("Master Password Verified. Admin Console Unlocked.");
+      void fetchData();
 
-        setSessionUser(user);
-        setIsAuthorizedAdmin(true);
-        showToast("Super Admin Authenticated. Master Console Unlocked.");
-        void fetchData();
+      // Background attempt to sync client-side Supabase auth session
+      try {
+        await supabase.auth.signInWithPassword({
+          email: ADMIN_EMAIL,
+          password: authGatePassword,
+        });
+      } catch {
+        // Standalone JWT cookie handles all admin route authorization
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Authentication failed.";
@@ -467,9 +514,19 @@ export default function AdminDashboardPage() {
   };
 
   const handleAdminSignOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await fetch("/api/admin/auth", { method: "DELETE" });
+    } catch {
+      // ignore
+    }
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // ignore
+    }
     setSessionUser(null);
     setIsAuthorizedAdmin(false);
+    setAuthGatePassword("");
     showToast("Super Admin signed out securely.", "info");
   };
 
@@ -542,8 +599,12 @@ export default function AdminDashboardPage() {
       promo_tag: "",
       image_url: "",
       gallery_images: [],
+      available_sizes: ["Free Size"],
+      size_inventory: { "Free Size": 10 },
+      color_variants: [],
       description: "",
     });
+    setCustomSizeInput("");
     setProductPhotoUploadNotice(null);
     setGalleryUploadNotice(null);
     setShowAddProductModal(true);
@@ -555,6 +616,38 @@ export default function AdminDashboardPage() {
       ["Special Promo", "Festive Offer", "Sale", "Under ₹1,299", "Flash Deal", "Limited Deal"].includes(t)
     ) || "";
 
+    const sizes = Array.isArray(product.available_sizes) && product.available_sizes.length > 0
+      ? product.available_sizes
+      : product.category === "Sarees"
+      ? ["Free Size"]
+      : ["S", "M", "L", "XL"];
+
+    const existingSizeInv: Record<string, number> =
+      product.size_inventory ||
+      (product.specifications?.size_inventory as Record<string, number> | undefined) ||
+      {};
+
+    const sizeInv: Record<string, number> = {};
+    sizes.forEach((sz) => {
+      sizeInv[sz] = existingSizeInv[sz] !== undefined ? existingSizeInv[sz] : 10;
+    });
+
+    const colors = Array.isArray(product.color_variants)
+      ? product.color_variants.map((v) => ({
+          name: v.name || "",
+          hex: v.hex || "#8B0000",
+          image_url: v.image_url || v.primary_image || "",
+          gallery_images: Array.isArray(v.gallery_images) ? v.gallery_images : [],
+          stock: v.stock !== undefined ? v.stock : undefined,
+          sizes: Array.isArray(v.sizes)
+            ? v.sizes.map((s) => ({
+                size: s.size || "",
+                stock: s.stock !== undefined ? s.stock : 5,
+              }))
+            : [],
+        }))
+      : [];
+
     setProductForm({
       name: product.name,
       category: product.category,
@@ -565,8 +658,12 @@ export default function AdminDashboardPage() {
       promo_tag: promoTag,
       image_url: product.image_url,
       gallery_images: Array.isArray(product.gallery_images) ? product.gallery_images : [],
+      available_sizes: sizes,
+      size_inventory: sizeInv,
+      color_variants: colors,
       description: product.description || "",
     });
+    setCustomSizeInput("");
     setProductPhotoUploadNotice(null);
     setGalleryUploadNotice(null);
   };
@@ -584,6 +681,31 @@ export default function AdminDashboardPage() {
         ? [productForm.promo_tag]
         : [];
 
+      const cleanColors = (productForm.color_variants || [])
+        .filter((c) => c.name.trim().length > 0)
+        .map((c) => {
+          const cleanSizes = (c.sizes || [])
+            .filter((s) => s.size.trim().length > 0)
+            .map((s) => ({
+              size: s.size.trim(),
+              stock: Math.max(0, Number(s.stock) || 0),
+            }));
+          const colorStock = cleanSizes.length > 0
+            ? cleanSizes.reduce((sum, s) => sum + s.stock, 0)
+            : c.stock !== undefined
+            ? Math.max(0, Number(c.stock) || 0)
+            : undefined;
+          return {
+            name: c.name.trim(),
+            hex: c.hex.trim() || "#8B0000",
+            image_url: c.image_url.trim(),
+            primary_image: c.image_url.trim(),
+            gallery_images: c.gallery_images || [],
+            ...(cleanSizes.length > 0 ? { sizes: cleanSizes } : {}),
+            ...(colorStock !== undefined ? { stock: colorStock } : {}),
+          };
+        });
+
       const payload = {
         name: productForm.name,
         category: productForm.category,
@@ -594,6 +716,9 @@ export default function AdminDashboardPage() {
         occasion_tags: occasionTags,
         image_url: productForm.image_url,
         gallery_images: productForm.gallery_images,
+        available_sizes: productForm.available_sizes,
+        size_inventory: productForm.size_inventory,
+        color_variants: cleanColors,
         description: productForm.description,
       };
 
@@ -639,6 +764,31 @@ export default function AdminDashboardPage() {
         ? [productForm.promo_tag]
         : [];
 
+      const cleanColors = (productForm.color_variants || [])
+        .filter((c) => c.name.trim().length > 0)
+        .map((c) => {
+          const cleanSizes = (c.sizes || [])
+            .filter((s) => s.size.trim().length > 0)
+            .map((s) => ({
+              size: s.size.trim(),
+              stock: Math.max(0, Number(s.stock) || 0),
+            }));
+          const colorStock = cleanSizes.length > 0
+            ? cleanSizes.reduce((sum, s) => sum + s.stock, 0)
+            : c.stock !== undefined
+            ? Math.max(0, Number(c.stock) || 0)
+            : undefined;
+          return {
+            name: c.name.trim(),
+            hex: c.hex.trim() || "#8B0000",
+            image_url: c.image_url.trim(),
+            primary_image: c.image_url.trim(),
+            gallery_images: c.gallery_images || [],
+            ...(cleanSizes.length > 0 ? { sizes: cleanSizes } : {}),
+            ...(colorStock !== undefined ? { stock: colorStock } : {}),
+          };
+        });
+
       const payload = {
         id: editingProduct.id,
         name: productForm.name,
@@ -650,6 +800,9 @@ export default function AdminDashboardPage() {
         occasion_tags: occasionTags,
         image_url: productForm.image_url,
         gallery_images: productForm.gallery_images,
+        available_sizes: productForm.available_sizes,
+        size_inventory: productForm.size_inventory,
+        color_variants: cleanColors,
         description: productForm.description,
       };
 
@@ -1337,6 +1490,10 @@ export default function AdminDashboardPage() {
         );
       } else if (categoryFilter === "UNDER_1299") {
         matchCategory = p.price <= 1299;
+      } else if (categoryFilter === "LOW_STOCK") {
+        matchCategory = Boolean(p.stock_count !== undefined && p.stock_count > 0 && p.stock_count <= 3);
+      } else if (categoryFilter === "OUT_OF_STOCK") {
+        matchCategory = p.stock_count === 0;
       } else if (categoryFilter !== "ALL") {
         matchCategory = p.category === categoryFilter;
       }
@@ -1392,199 +1549,76 @@ export default function AdminDashboardPage() {
     });
   }, [inquiries, searchQuery, inquiryStatusFilter]);
 
-  const totalCatalogValue = useMemo(() => {
-    return products.reduce((acc, curr) => acc + (Number(curr.price) || 0), 0);
+  // Executive KPI Aggregations
+  const orderStats = useMemo(() => {
+    const totalOrders = adminOrders.length;
+    const paidOrders = adminOrders.filter((o) => o.payment_status === "Paid");
+    const totalRevenue = paidOrders.reduce((acc, o) => acc + (Number(o.total_amount) || 0), 0);
+    const avgOrderValue = paidOrders.length > 0 ? Math.round(totalRevenue / paidOrders.length) : 0;
+    const exchangeRequestedCount = adminOrders.filter((o) => o.order_status === "Exchange Requested").length;
+    const inTransitCount = adminOrders.filter((o) => o.order_status === "Dispatched" || o.order_status === "Out for Delivery").length;
+    const deliveredCount = adminOrders.filter((o) => o.order_status === "Delivered").length;
+    return {
+      totalOrders,
+      paidOrdersCount: paidOrders.length,
+      totalRevenue,
+      avgOrderValue,
+      exchangeRequestedCount,
+      inTransitCount,
+      deliveredCount,
+    };
+  }, [adminOrders]);
+
+  const inventoryStats = useMemo(() => {
+    const totalProducts = products.length;
+    const lowStockCount = products.filter((p) => p.stock_count !== undefined && p.stock_count > 0 && p.stock_count <= 3).length;
+    const outOfStockCount = products.filter((p) => p.stock_count === 0).length;
+    const totalStockSum = products.reduce((acc, p) => acc + (Number(p.stock_count) || 0), 0);
+    return {
+      totalProducts,
+      lowStockCount,
+      outOfStockCount,
+      totalStockSum,
+    };
   }, [products]);
 
-  const copyMigrationSql = () => {
-    const sql = `-- ==============================================================================
--- AVSARAA - SINGLE SUPER ADMIN ARCHITECTURE & ROW LEVEL SECURITY
--- Run this in your Supabase SQL Editor:
--- ==============================================================================
+  const inquiryStats = useMemo(() => {
+    const unreadCount = inquiries.filter((i) => i.status === "Unread").length;
+    return {
+      unreadCount,
+      total: inquiries.length,
+    };
+  }, [inquiries]);
 
--- 1. SUPER ADMIN REGISTRY & AUTH HELPER (Must be created first for RLS policies)
-CREATE TABLE IF NOT EXISTS public.admin_users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    full_name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    role TEXT NOT NULL DEFAULT 'Super Admin' CHECK (role = 'Super Admin'),
-    department TEXT DEFAULT 'Executive Leadership',
-    phone_number TEXT,
-    avatar_url TEXT,
-    status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Suspended')),
-    permissions TEXT[] DEFAULT ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'],
-    notes TEXT,
-    last_active TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
-
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN (
-        auth.jwt() IS NOT NULL AND (
-            EXISTS (
-                SELECT 1 FROM public.admin_users
-                WHERE (user_id = auth.uid() OR LOWER(email) = LOWER(auth.jwt()->>'email'))
-                  AND status = 'Active'
-                  AND role = 'Super Admin'
-            )
-            OR (auth.jwt()->'app_metadata'->>'role') = 'super_admin'
-            OR (auth.jwt()->'app_metadata'->>'role') = 'admin'
-            OR LOWER(auth.jwt()->>'email') = '${ADMIN_EMAIL}'
-        )
+  // ---------------------------------------------------------------------------
+  // AUTH CHECKING: CLEAN MINIMAL SPINNER WHILE VERIFYING SECURITY CREDENTIALS
+  // ---------------------------------------------------------------------------
+  if (authChecking) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          backgroundColor: "#F7F2EE",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          gap: "18px",
+        }}
+      >
+        <AvsaraaLogo size="md" width={140} />
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#866951", fontSize: "13.5px" }}>
+          <SpinnerIcon size={18} color="#866951" />
+          <span>Verifying administrative authorization...</span>
+        </div>
+      </div>
     );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
-
-DROP POLICY IF EXISTS "Super admin can view admin users" ON public.admin_users;
-CREATE POLICY "Super admin can view admin users" 
-    ON public.admin_users FOR SELECT 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can update admin users" ON public.admin_users;
-CREATE POLICY "Super admin can update admin users" 
-    ON public.admin_users FOR UPDATE 
-    USING (public.is_admin());
-
--- Cleanup secondary admins and seed ONLY the single Super Admin
-DELETE FROM public.admin_users WHERE email != '${ADMIN_EMAIL}';
-
-INSERT INTO public.admin_users (full_name, email, role, department, phone_number, status, permissions, notes)
-VALUES 
-    ('Kratos Lord', '${ADMIN_EMAIL}', 'Super Admin', 'Executive Leadership', '+91 98765 43210', 'Active', ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'], 'Founding Super Administrator with full system control and supreme authority.')
-ON CONFLICT (email) DO UPDATE SET
-    role = 'Super Admin',
-    status = 'Active';
-
--- 2. PRODUCTS: ONLY Super Admin can add, edit, or delete products
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can view products" ON public.products;
-CREATE POLICY "Anyone can view products" 
-    ON public.products FOR SELECT 
-    USING (true);
-
-DROP POLICY IF EXISTS "Only signed-in users can add products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can add products" ON public.products;
-CREATE POLICY "Only super admin can add products" 
-    ON public.products FOR INSERT 
-    WITH CHECK (public.is_admin());
-
-DROP POLICY IF EXISTS "Users can update their own products" ON public.products;
-DROP POLICY IF EXISTS "Users or admins can update products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can update products" ON public.products;
-CREATE POLICY "Only super admin can update products" 
-    ON public.products FOR UPDATE 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Users can delete their own products" ON public.products;
-DROP POLICY IF EXISTS "Users or admins can delete products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can delete products" ON public.products;
-CREATE POLICY "Only super admin can delete products" 
-    ON public.products FOR DELETE 
-    USING (public.is_admin());
-
--- 3. CONTACT INQUIRIES & NEWSLETTER: Public can submit; Super Admin controls all
-ALTER TABLE public.contact_inquiries ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can submit a contact inquiry" ON public.contact_inquiries;
-CREATE POLICY "Anyone can submit a contact inquiry" 
-    ON public.contact_inquiries FOR INSERT 
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users can view their own contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Users can view their own contact inquiries" 
-    ON public.contact_inquiries FOR SELECT 
-    USING (auth.uid() = user_id OR public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can update contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Super admin can update contact inquiries" 
-    ON public.contact_inquiries FOR UPDATE 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can delete contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Super admin can delete contact inquiries" 
-    ON public.contact_inquiries FOR DELETE 
-    USING (public.is_admin());
-
-ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can subscribe to the newsletter" ON public.newsletter_subscribers;
-CREATE POLICY "Anyone can subscribe to the newsletter" 
-    ON public.newsletter_subscribers FOR INSERT 
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Super admin can view subscribers" ON public.newsletter_subscribers;
-CREATE POLICY "Super admin can view subscribers" 
-    ON public.newsletter_subscribers FOR SELECT 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
-CREATE POLICY "Super admin can delete subscribers" 
-    ON public.newsletter_subscribers FOR DELETE 
-    USING (public.is_admin());
-
--- 4. WISHLISTS & SAVED HEIRLOOMS
-CREATE TABLE IF NOT EXISTS public.wishlists (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    product_id TEXT NOT NULL,
-    product_data JSONB,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    UNIQUE (user_id, product_id)
-);
-ALTER TABLE public.wishlists ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Users can view their own wishlist" ON public.wishlists;
-CREATE POLICY "Users can view their own wishlist" ON public.wishlists FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
-DROP POLICY IF EXISTS "Users can insert their own wishlist" ON public.wishlists;
-CREATE POLICY "Users can insert their own wishlist" ON public.wishlists FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_admin());
-DROP POLICY IF EXISTS "Users can delete their own wishlist" ON public.wishlists;
-CREATE POLICY "Users can delete their own wishlist" ON public.wishlists FOR DELETE USING (auth.uid() = user_id OR public.is_admin());
-
--- 5. PRODUCT REVIEWS & PATRON MEDIA (Photos)
-CREATE TABLE IF NOT EXISTS public.product_reviews (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id TEXT NOT NULL,
-    product_name TEXT,
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    customer_name TEXT NOT NULL,
-    customer_email TEXT,
-    customer_city TEXT,
-    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
-    title TEXT,
-    comment TEXT NOT NULL,
-    photos TEXT[] DEFAULT '{}',
-    verified_purchase BOOLEAN DEFAULT false,
-    helpful_count INTEGER DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'pending', 'hidden', 'flagged')),
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-ALTER TABLE public.product_reviews ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Anyone can view published reviews" ON public.product_reviews;
-CREATE POLICY "Anyone can view published reviews" ON public.product_reviews FOR SELECT USING (status = 'published' OR public.is_admin());
-DROP POLICY IF EXISTS "Anyone can submit a review" ON public.product_reviews;
-CREATE POLICY "Anyone can submit a review" ON public.product_reviews FOR INSERT WITH CHECK (true);
-DROP POLICY IF EXISTS "Super admin can update reviews" ON public.product_reviews;
-CREATE POLICY "Super admin can update reviews" ON public.product_reviews FOR UPDATE USING (public.is_admin());
-DROP POLICY IF EXISTS "Super admin can delete reviews" ON public.product_reviews;
-CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DELETE USING (public.is_admin());`;
-
-    navigator.clipboard.writeText(sql);
-    setCopiedSql(true);
-    showToast("Hardened Single Super Admin SQL copied to clipboard!");
-    setTimeout(() => setCopiedSql(false), 3000);
-  };
+  }
 
   // ---------------------------------------------------------------------------
   // SECURITY GATE: RENDER IF USER IS NOT AN AUTHORIZED SUPER ADMINISTRATOR
   // ---------------------------------------------------------------------------
-  if (!authChecking && !isAuthorizedAdmin) {
+  if (!isAuthorizedAdmin) {
     return (
       <div
         style={{
@@ -1598,7 +1632,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
       >
         <div
           style={{
-            maxWidth: "440px",
+            maxWidth: "420px",
             width: "100%",
             backgroundColor: "#FFFFFF",
             borderRadius: "20px",
@@ -1637,19 +1671,19 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               marginBottom: "8px",
             }}
           >
-            Super Admin Security Gate
+            Admin Console Access
           </h2>
-          <p style={{ fontSize: "13px", color: "#866951", lineHeight: "1.5", marginBottom: "20px" }}>
-            Restricted Master Access. Only the single Super Administrator possesses authority over the Avsaraa platform.
+          <p style={{ fontSize: "13px", color: "#866951", lineHeight: "1.5", marginBottom: "22px" }}>
+            Restricted Master Access. Please enter the master password to unlock the Avsaraa Admin Console.
           </p>
 
-          {sessionUser && (
+          {sessionUser && sessionUser.email && sessionUser.id !== "admin-master" && sessionUser.id !== "admin-env-user" && (
             <div
               style={{
                 backgroundColor: "#FFFBEB",
                 border: "1px solid #FDE68A",
                 color: "#92400E",
-                padding: "12px 14px",
+                padding: "10px 14px",
                 borderRadius: "10px",
                 fontSize: "12px",
                 marginBottom: "16px",
@@ -1657,8 +1691,8 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 lineHeight: "1.5",
               }}
             >
-              <div style={{ fontWeight: 700, marginBottom: "3px" }}>Customer Session Detected</div>
-              You are signed in as <strong>{sessionUser.email}</strong>. Administrative routes require Super Admin authentication. Sign in with your Super Admin credentials below.
+              <div style={{ fontWeight: 700, marginBottom: "2px" }}>Customer Session Active</div>
+              Signed in as <strong>{sessionUser.email}</strong>. Enter master password below to unlock admin privileges.
             </div>
           )}
 
@@ -1679,41 +1713,10 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
             </div>
           )}
 
-          <form onSubmit={handleAdminGateLogin} style={{ display: "flex", flexDirection: "column", gap: "14px", textAlign: "left" }}>
+          <form onSubmit={handleAdminGateLogin} style={{ display: "flex", flexDirection: "column", gap: "16px", textAlign: "left" }}>
             <div>
               <label
-                style={{
-                  display: "block",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  color: "#866951",
-                  marginBottom: "6px",
-                }}
-              >
-                Super Admin Email
-              </label>
-              <input
-                type="email"
-                required
-                value={authGateEmail}
-                onChange={(e) => setAuthGateEmail(e.target.value)}
-                placeholder={ADMIN_EMAIL}
-                style={{
-                  width: "100%",
-                  padding: "12px 14px",
-                  borderRadius: "10px",
-                  border: "1px solid #CFBEAD",
-                  backgroundColor: "#FCFAF7",
-                  fontSize: "14px",
-                  color: "#261B13",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
+                htmlFor="admin-password-input"
                 style={{
                   display: "block",
                   fontSize: "11px",
@@ -1726,22 +1729,49 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               >
                 Master Password
               </label>
-              <input
-                type="password"
-                required
-                value={authGatePassword}
-                onChange={(e) => setAuthGatePassword(e.target.value)}
-                placeholder="••••••••••••"
-                style={{
-                  width: "100%",
-                  padding: "12px 14px",
-                  borderRadius: "10px",
-                  border: "1px solid #CFBEAD",
-                  backgroundColor: "#FCFAF7",
-                  fontSize: "14px",
-                  color: "#261B13",
-                }}
-              />
+              <div style={{ position: "relative" }}>
+                <input
+                  id="admin-password-input"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoFocus
+                  value={authGatePassword}
+                  onChange={(e) => setAuthGatePassword(e.target.value)}
+                  placeholder="Enter password"
+                  style={{
+                    width: "100%",
+                    padding: "12px 42px 12px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #CFBEAD",
+                    backgroundColor: "#FCFAF7",
+                    fontSize: "14px",
+                    color: "#261B13",
+                    boxSizing: "border-box",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "#866951",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "4px",
+                  }}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  <EyeIcon size={18} color="#866951" />
+                </button>
+              </div>
             </div>
 
             <button
@@ -1758,12 +1788,14 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 color: "#F7F2EE",
                 fontSize: "13px",
                 fontWeight: 600,
-                marginTop: "10px",
+                marginTop: "4px",
+                cursor: isLoggingIn ? "not-allowed" : "pointer",
                 boxShadow: "0 4px 14px rgba(38,27,19,0.2)",
+                border: "none",
               }}
             >
               {isLoggingIn ? <SpinnerIcon size={16} color="#FFFFFF" /> : <ShieldCheckIcon size={16} color="#C4AB94" />}
-              <span>Authenticate as Super Admin</span>
+              <span>{isLoggingIn ? "Verifying..." : "Unlock Admin Console"}</span>
             </button>
           </form>
 
@@ -1846,15 +1878,18 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
         </div>
       )}
 
-      {/* Top Header */}
+      {/* Top Header / Executive Command Bar */}
       <header
         style={{
-          backgroundColor: "#FFFFFF",
-          borderBottom: "1px solid #E8DED3",
-          padding: "14px 28px",
+          backgroundColor: "rgba(255, 255, 255, 0.94)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          borderBottom: "1px solid rgba(232, 222, 211, 0.8)",
+          padding: "12px 28px",
           position: "sticky",
           top: 0,
-          zIndex: 40,
+          zIndex: 50,
+          boxShadow: "0 2px 14px rgba(38,27,19,0.03)",
         }}
       >
         <div
@@ -1868,24 +1903,19 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
             gap: "14px",
           }}
         >
+          {/* Left: Brand Wordmark & Security Pill */}
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Link href="/" style={{ display: "inline-block" }}>
-              <AvsaraaLogo size="sm" width={115} />
+            <Link href="/" style={{ display: "inline-block", transition: "opacity 0.15s" }}>
+              <AvsaraaLogo size="sm" width={118} />
             </Link>
-            <div
-              style={{
-                height: "22px",
-                width: "1px",
-                backgroundColor: "#E8DED3",
-              }}
-            />
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ height: "24px", width: "1px", backgroundColor: "#E8DED3" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <span
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "6px",
-                  padding: "3px 10px",
+                  padding: "4px 10px",
                   borderRadius: "20px",
                   backgroundColor: "#F4EFFC",
                   color: "#6F42C1",
@@ -1898,14 +1928,65 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 <ShieldCheckIcon size={12} color="#6F42C1" />
                 SUPER ADMIN CONSOLE
               </span>
-              <span style={{ fontSize: "12px", color: "#866951", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                <span>Master Governance</span>
-                {isLoading && <SpinnerIcon size={12} color="#866951" />}
-              </span>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "4px 10px",
+                  borderRadius: "20px",
+                  backgroundColor: "#EBF8F2",
+                  border: "1px solid #B5E8D2",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "#0F7A50",
+                }}
+                title="Storefront and admin APIs are healthy and responsive"
+              >
+                <span
+                  style={{
+                    width: "7px",
+                    height: "7px",
+                    borderRadius: "50%",
+                    backgroundColor: "#10B981",
+                    display: "inline-block",
+                    boxShadow: "0 0 0 2px rgba(16, 185, 129, 0.25)",
+                  }}
+                />
+                <span>Store Operational</span>
+              </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          {/* Right: Quick Actions & Profile */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {/* Live Data Refresh Button */}
+            <button
+              onClick={handleRefreshData}
+              disabled={isRefreshing || isLoading}
+              title="Synchronize live dashboard data with database"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#6E5B4E",
+                padding: "7px 12px",
+                borderRadius: "8px",
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #CFBEAD",
+                cursor: isRefreshing || isLoading ? "not-allowed" : "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span style={{ display: "inline-block", transform: isRefreshing ? "rotate(360deg)" : "none", transition: "transform 0.6s ease" }}>
+                {isRefreshing ? <SpinnerIcon size={14} color="#866951" /> : "🔄"}
+              </span>
+              <span>{isRefreshing ? "Syncing..." : "Sync Live Data"}</span>
+            </button>
+
+            {/* Storefront Link */}
             <Link
               href="/"
               target="_blank"
@@ -1913,63 +1994,68 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                fontSize: "13px",
-                color: "#866951",
-                padding: "8px 14px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#261B13",
+                padding: "7px 12px",
                 borderRadius: "8px",
-                backgroundColor: "#FCFAF7",
-                border: "1px solid #E8DED3",
+                backgroundColor: "#FAF7F2",
+                border: "1px solid #CFBEAD",
+                textDecoration: "none",
+                transition: "all 0.15s ease",
               }}
+              title="Open customer storefront in a new tab"
             >
               <span>View Storefront</span>
-              <span style={{ fontSize: "11px" }}>↗</span>
+              <span style={{ fontSize: "11px", color: "#866951" }}>↗</span>
             </Link>
 
-            {/* Super Admin Badge & Sign Out */}
+            {/* Super Admin Profile Pill & Sign Out */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
-                padding: "6px 14px",
+                gap: "8px",
+                padding: "4px 6px 4px 10px",
                 borderRadius: "30px",
-                backgroundColor: "#FAF7F2",
+                backgroundColor: "#FFFFFF",
                 border: "1px solid #CFBEAD",
+                boxShadow: "0 2px 6px rgba(38,27,19,0.03)",
               }}
             >
               <div
                 style={{
-                  width: "28px",
-                  height: "28px",
+                  width: "26px",
+                  height: "26px",
                   borderRadius: "50%",
                   backgroundColor: "#261B13",
-                  color: "#F7F2EE",
+                  color: "#C5A059",
+                  border: "1.5px solid #C5A059",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "11px",
+                  fontSize: "10px",
                   fontWeight: 700,
                 }}
               >
-                KL
+                {superAdmin.full_name ? superAdmin.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) : "SA"}
               </div>
-              <div style={{ fontSize: "12px" }}>
-                <span style={{ fontWeight: 600, color: "#261B13" }}>{superAdmin.full_name}</span>
-                <span style={{ color: "#6F42C1", fontWeight: 700, marginLeft: "6px", fontSize: "10px" }}>
-                  [Super Admin]
-                </span>
-              </div>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: "#261B13" }}>
+                {superAdmin.full_name}
+              </span>
               <button
                 onClick={handleAdminSignOut}
                 title="Sign out of Super Admin Console"
                 style={{
-                  marginLeft: "6px",
                   padding: "4px 8px",
                   fontSize: "11px",
-                  color: "#866951",
+                  fontWeight: 600,
+                  color: "#B91C1C",
                   borderRadius: "6px",
-                  border: "1px solid #E8DED3",
-                  backgroundColor: "#FFFFFF",
+                  border: "1px solid #FCA5A5",
+                  backgroundColor: "#FEF2F2",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
                 }}
               >
                 Sign Out
@@ -1981,449 +2067,349 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
 
       {/* Main Container */}
       <main style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 24px" }}>
-        {/* Top Metric Cards */}
+        {/* Executive KPI Metric Cards */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: "16px",
-            marginBottom: "28px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+            gap: "14px",
+            marginBottom: "24px",
           }}
         >
-          {/* Card 1: Super Admin Master Authority */}
-          <div
-            onClick={() => setActiveTab("super_admin")}
-            style={{
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #D8C7F5",
-              borderRadius: "14px",
-              padding: "20px",
-              boxShadow: "0 4px 16px rgba(111,66,193,0.06)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              cursor: "pointer",
-              transition: "transform 0.15s ease",
-            }}
-          >
-            <div>
-              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#6F42C1", fontWeight: 700 }}>
-                Master Authority
-              </span>
-              <div style={{ fontSize: "20px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
-                {superAdmin.full_name}
-              </div>
-              <span style={{ fontSize: "11px", color: "#198754", fontWeight: 600 }}>
-                ● Sole Super Admin (Active)
-              </span>
-            </div>
-            <div
-              style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "12px",
-                backgroundColor: "#F4EFFC",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#6F42C1",
-              }}
-            >
-              <ShieldCheckIcon size={24} color="#6F42C1" />
-            </div>
-          </div>
-
-          {/* Card: Orders & Fulfillment */}
+          {/* Card 1: Gross Revenue */}
           <div
             onClick={() => setActiveTab("orders")}
             style={{
-              backgroundColor: activeTab === "orders" ? "#F9F6F0" : "#FFFFFF",
+              backgroundColor: "#FFFFFF",
               border: activeTab === "orders" ? "2px solid #866951" : "1px solid #E8DED3",
               borderRadius: "14px",
-              padding: "20px",
-              boxShadow: "0 4px 16px rgba(38,27,19,0.03)",
+              padding: "18px 20px",
+              boxShadow: activeTab === "orders" ? "0 8px 24px rgba(134,105,81,0.12)" : "0 3px 12px rgba(38,27,19,0.03)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               cursor: "pointer",
+              transition: "all 0.2s ease",
             }}
           >
             <div>
-              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 600 }}>
-                Orders & Fulfillment
+              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
+                Gross Revenue
               </span>
-              <div style={{ fontSize: "26px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
-                {adminOrders.length}
+              <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
+                ₹{orderStats.totalRevenue.toLocaleString("en-IN")}
               </div>
-              <span style={{ fontSize: "11px", color: adminOrders.some(o => o.order_status === "Exchange Requested") ? "#d97706" : "#28a745", fontWeight: 600 }}>
-                {adminOrders.some(o => o.order_status === "Exchange Requested")
-                  ? `${adminOrders.filter(o => o.order_status === "Exchange Requested").length} Exchange Pending`
-                  : "Active Logistics Pipeline"}
+              <span style={{ fontSize: "11px", color: "#0F7A50", fontWeight: 600 }}>
+                {orderStats.paidOrdersCount} Paid Orders · ₹{orderStats.avgOrderValue} AOV
               </span>
             </div>
             <div
               style={{
-                width: "48px",
-                height: "48px",
+                width: "44px",
+                height: "44px",
+                borderRadius: "12px",
+                backgroundColor: "#FAF5E8",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#C5A059",
+                flexShrink: 0,
+              }}
+            >
+              <DiamondCrownIcon size={22} color="#C5A059" />
+            </div>
+          </div>
+
+          {/* Card 2: Orders & Fulfillment Pipeline */}
+          <div
+            onClick={() => setActiveTab("orders")}
+            style={{
+              backgroundColor: "#FFFFFF",
+              border: activeTab === "orders" ? "2px solid #866951" : "1px solid #E8DED3",
+              borderRadius: "14px",
+              padding: "18px 20px",
+              boxShadow: activeTab === "orders" ? "0 8px 24px rgba(134,105,81,0.12)" : "0 3px 12px rgba(38,27,19,0.03)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <div>
+              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
+                Orders & Logistics
+              </span>
+              <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
+                {adminOrders.length}
+              </div>
+              <span style={{ fontSize: "11px", color: orderStats.exchangeRequestedCount > 0 ? "#D97706" : "#28A745", fontWeight: 600 }}>
+                {orderStats.exchangeRequestedCount > 0
+                  ? `⚠️ ${orderStats.exchangeRequestedCount} Exchange Action Req.`
+                  : `${orderStats.inTransitCount} In Transit · ${orderStats.deliveredCount} Delivered`}
+              </span>
+            </div>
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
                 borderRadius: "12px",
                 backgroundColor: "#F7F2EE",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: "#866951",
+                flexShrink: 0,
               }}
             >
-              <DeliveryVanIcon size={24} color="#866951" />
+              <DeliveryVanIcon size={22} color="#866951" />
             </div>
           </div>
 
-          {/* Card 2: Products */}
+          {/* Card 3: Products in Catalog */}
           <div
             onClick={() => setActiveTab("products")}
             style={{
               backgroundColor: "#FFFFFF",
-              border: "1px solid #E8DED3",
+              border: activeTab === "products" ? "2px solid #866951" : "1px solid #E8DED3",
               borderRadius: "14px",
-              padding: "20px",
-              boxShadow: "0 4px 16px rgba(38,27,19,0.03)",
+              padding: "18px 20px",
+              boxShadow: activeTab === "products" ? "0 8px 24px rgba(134,105,81,0.12)" : "0 3px 12px rgba(38,27,19,0.03)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               cursor: "pointer",
+              transition: "all 0.2s ease",
             }}
           >
             <div>
-              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 600 }}>
-                Products in Catalog
+              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
+                Catalog & Stock
               </span>
-              <div style={{ fontSize: "26px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
-                {products.length}
+              <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
+                {products.length} Items
               </div>
-              <span style={{ fontSize: "11px", color: "#866951" }}>
-                ₹{totalCatalogValue.toLocaleString("en-IN")} Total Value
+              <span style={{ fontSize: "11px", color: inventoryStats.lowStockCount > 0 || inventoryStats.outOfStockCount > 0 ? "#DC2626" : "#866951", fontWeight: 600 }}>
+                {inventoryStats.lowStockCount > 0 || inventoryStats.outOfStockCount > 0
+                  ? `⚠️ ${inventoryStats.outOfStockCount} OOS · ${inventoryStats.lowStockCount} Low Stock`
+                  : `● ${inventoryStats.totalStockSum} Units in Stock`}
               </span>
             </div>
             <div
               style={{
-                width: "48px",
-                height: "48px",
+                width: "44px",
+                height: "44px",
                 borderRadius: "12px",
-                backgroundColor: "#F7F2EE",
+                backgroundColor: "#EBF8F2",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#866951",
+                color: "#0F7A50",
+                flexShrink: 0,
               }}
             >
-              <ShoppingBagIcon size={24} color="#866951" />
+              <ShoppingBagIcon size={22} color="#0F7A50" />
             </div>
           </div>
 
-          {/* Card 3: Customers */}
+          {/* Card 4: Customer Accounts */}
           <div
             onClick={() => setActiveTab("customers")}
             style={{
               backgroundColor: "#FFFFFF",
-              border: "1px solid #E8DED3",
+              border: activeTab === "customers" ? "2px solid #866951" : "1px solid #E8DED3",
               borderRadius: "14px",
-              padding: "20px",
-              boxShadow: "0 4px 16px rgba(38,27,19,0.03)",
+              padding: "18px 20px",
+              boxShadow: activeTab === "customers" ? "0 8px 24px rgba(134,105,81,0.12)" : "0 3px 12px rgba(38,27,19,0.03)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               cursor: "pointer",
+              transition: "all 0.2s ease",
             }}
           >
             <div>
-              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 600 }}>
-                Customer Accounts
+              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
+                Patrons & CRM
               </span>
-              <div style={{ fontSize: "26px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
+              <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 {customerProfiles.length}
               </div>
-              <span style={{ fontSize: "11px", color: "#866951" }}>
-                Registered Club Members
+              <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600 }}>
+                {crmMetrics.vipCount} VIP · {crmMetrics.repeatBuyers} Repeat Buyers
               </span>
             </div>
             <div
               style={{
-                width: "48px",
-                height: "48px",
+                width: "44px",
+                height: "44px",
                 borderRadius: "12px",
-                backgroundColor: "#F7F2EE",
+                backgroundColor: "#EFF6FF",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#866951",
+                color: "#2563EB",
+                flexShrink: 0,
               }}
             >
-              <UserIcon size={24} color="#866951" />
+              <UserIcon size={22} color="#2563EB" />
             </div>
           </div>
 
-          {/* Card 4: Inquiries & Subscribers */}
+          {/* Card 5: Inquiries & Leads */}
           <div
             onClick={() => setActiveTab("inquiries")}
             style={{
               backgroundColor: "#FFFFFF",
-              border: "1px solid #E8DED3",
+              border: activeTab === "inquiries" ? "2px solid #866951" : "1px solid #E8DED3",
               borderRadius: "14px",
-              padding: "20px",
-              boxShadow: "0 4px 16px rgba(38,27,19,0.03)",
+              padding: "18px 20px",
+              boxShadow: activeTab === "inquiries" ? "0 8px 24px rgba(134,105,81,0.12)" : "0 3px 12px rgba(38,27,19,0.03)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               cursor: "pointer",
+              transition: "all 0.2s ease",
             }}
           >
             <div>
-              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 600 }}>
-                Inquiries & Subscribers
+              <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
+                Concierge Inquiries
               </span>
-              <div style={{ fontSize: "26px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
+              <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 {inquiries.length + subscribers.length}
               </div>
-              <span style={{ fontSize: "11px", color: "#866951" }}>
-                {inquiries.filter((i) => i.status === "Unread").length} Unread Messages
+              <span style={{ fontSize: "11px", color: inquiryStats.unreadCount > 0 ? "#DC2626" : "#866951", fontWeight: 600 }}>
+                {inquiryStats.unreadCount > 0 ? `🔔 ${inquiryStats.unreadCount} Unread Messages` : "● All Inquiries Replied"}
               </span>
             </div>
             <div
               style={{
-                width: "48px",
-                height: "48px",
+                width: "44px",
+                height: "44px",
                 borderRadius: "12px",
-                backgroundColor: "#F7F2EE",
+                backgroundColor: "#F5F3FF",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#866951",
+                color: "#7C3AED",
+                flexShrink: 0,
               }}
             >
-              <MailIcon size={24} color="#866951" />
+              <MailIcon size={22} color="#7C3AED" />
             </div>
           </div>
         </div>
 
-        {/* Tab Navigation Controls */}
+        {/* Segmented Luxury Tab Navigation */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            borderBottom: "2px solid #E8DED3",
-            marginBottom: "24px",
+            gap: "14px",
+            marginBottom: "20px",
             flexWrap: "wrap",
-            gap: "12px",
           }}
         >
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {/* Tab: Orders & Fulfillment */}
-            <button
-              onClick={() => {
-                setActiveTab("orders");
-                setSearchQuery("");
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 18px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: activeTab === "orders" ? "#261B13" : "#866951",
-                borderBottom: activeTab === "orders" ? "3px solid #866951" : "3px solid transparent",
-                marginBottom: "-2px",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <ShoppingBagIcon size={18} color={activeTab === "orders" ? "#866951" : "#AC9885"} />
-              <span>Orders & Logistics ({adminOrders.length})</span>
-            </button>
-
-            {/* Tab: Products & Promo Catalog */}
-            <button
-              onClick={() => {
-                setActiveTab("products");
-                setSearchQuery("");
-                setCategoryFilter("ALL");
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 18px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: activeTab === "products" ? "#261B13" : "#866951",
-                borderBottom: activeTab === "products" ? "3px solid #866951" : "3px solid transparent",
-                marginBottom: "-2px",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <ShoppingBagIcon size={18} color={activeTab === "products" ? "#866951" : "#AC9885"} />
-              <span>Products & Promo Catalog ({products.length})</span>
-            </button>
-
-            {/* Tab: Customer CRM & Accounts */}
-            <button
-              onClick={() => {
-                setActiveTab("customers");
-                setSearchQuery("");
-                setCustomerSegmentFilter("ALL");
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 18px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: activeTab === "customers" ? "#261B13" : "#866951",
-                borderBottom: activeTab === "customers" ? "3px solid #866951" : "3px solid transparent",
-                marginBottom: "-2px",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <UserIcon size={18} color={activeTab === "customers" ? "#866951" : "#AC9885"} />
-              <span>Customer CRM & Accounts ({customerProfiles.length})</span>
-            </button>
-
-            {/* Tab: Promotional Coupons */}
-            <button
-              onClick={() => {
-                setActiveTab("coupons");
-                setSearchQuery("");
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 18px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: activeTab === "coupons" ? "#261B13" : "#866951",
-                borderBottom: activeTab === "coupons" ? "3px solid #866951" : "3px solid transparent",
-                marginBottom: "-2px",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <TagIcon size={18} color={activeTab === "coupons" ? "#866951" : "#AC9885"} />
-              <span>Promotions & Coupons</span>
-            </button>
-
-            {/* Tab: Bespoke Inquiries & Concierge */}
-            <button
-              onClick={() => {
-                setActiveTab("inquiries");
-                setSearchQuery("");
-                setInquiryStatusFilter("ALL");
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 18px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: activeTab === "inquiries" ? "#261B13" : "#866951",
-                borderBottom: activeTab === "inquiries" ? "3px solid #866951" : "3px solid transparent",
-                marginBottom: "-2px",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <MailIcon size={18} color={activeTab === "inquiries" ? "#866951" : "#AC9885"} />
-              <span>Concierge Inquiries ({inquiries.length})</span>
-            </button>
-
-            {/* Tab: Patron Reviews & Media */}
-            <button
-              onClick={() => {
-                setActiveTab("reviews");
-                setSearchQuery("");
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 18px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: activeTab === "reviews" ? "#C5A059" : "#866951",
-                borderBottom: activeTab === "reviews" ? "3px solid #C5A059" : "3px solid transparent",
-                marginBottom: "-2px",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <StarIcon size={18} color={activeTab === "reviews" ? "#C5A059" : "#AC9885"} />
-              <span>Patron Reviews & Media ({reviews.length})</span>
-            </button>
-
-            {/* Tab: Super Admin Authority */}
-            <button
-              onClick={() => setActiveTab("super_admin")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 18px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: activeTab === "super_admin" ? "#6F42C1" : "#866951",
-                borderBottom: activeTab === "super_admin" ? "3px solid #6F42C1" : "3px solid transparent",
-                marginBottom: "-2px",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <ShieldCheckIcon size={18} color={activeTab === "super_admin" ? "#6F42C1" : "#AC9885"} />
-              <span>Super Admin Authority</span>
-            </button>
-
-            {/* Tab: SQL & Security Governance */}
-            <button
-              onClick={() => setActiveTab("sql_guide")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 18px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: activeTab === "sql_guide" ? "#261B13" : "#866951",
-                borderBottom: activeTab === "sql_guide" ? "3px solid #866951" : "3px solid transparent",
-                marginBottom: "-2px",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <DatabaseIcon size={18} color={activeTab === "sql_guide" ? "#866951" : "#AC9885"} />
-              <span>Security & Migration</span>
-            </button>
+          {/* Tabs Container */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              backgroundColor: "#EFE8E1",
+              borderRadius: "14px",
+              padding: "4px",
+              overflowX: "auto",
+              maxWidth: "100%",
+              boxShadow: "inset 0 1px 3px rgba(38,27,19,0.06)",
+            }}
+          >
+            {[
+              { id: "orders", label: "Orders & Logistics", count: adminOrders.length, icon: <DeliveryVanIcon size={16} /> },
+              { id: "products", label: "Products & Catalog", count: products.length, icon: <ShoppingBagIcon size={16} /> },
+              { id: "customers", label: "Customer CRM", count: customerProfiles.length, icon: <UserIcon size={16} /> },
+              { id: "coupons", label: "Promotions & Offers", icon: <TagIcon size={16} /> },
+              { id: "inquiries", label: "Concierge Inquiries", count: inquiries.length, icon: <MailIcon size={16} /> },
+              { id: "reviews", label: "Patron Reviews", count: reviews.length, icon: <StarIcon size={16} /> },
+              { id: "super_admin", label: "Authority & Security", icon: <ShieldCheckIcon size={16} /> },
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id as typeof activeTab);
+                    setSearchQuery("");
+                    if (tab.id === "products") setCategoryFilter("ALL");
+                    if (tab.id === "customers") setCustomerSegmentFilter("ALL");
+                    if (tab.id === "inquiries") setInquiryStatusFilter("ALL");
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "7px",
+                    padding: "8px 14px",
+                    borderRadius: "10px",
+                    fontSize: "13px",
+                    fontWeight: isActive ? 700 : 500,
+                    color: isActive ? "#FAF7F2" : "#6E5B4E",
+                    backgroundColor: isActive ? "#261B13" : "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    boxShadow: isActive ? "0 2px 8px rgba(38,27,19,0.18)" : "none",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <span style={{ color: isActive ? "#C5A059" : "inherit" }}>{tab.icon}</span>
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && (
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "1px 6px",
+                        borderRadius: "10px",
+                        backgroundColor: isActive ? "#C5A059" : "rgba(110,91,78,0.14)",
+                        color: isActive ? "#261B13" : "#6E5B4E",
+                      }}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Tab Action Buttons */}
-          <div>
-            {activeTab === "customers" && (
-              <button
-                onClick={openAddCustomerModal}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "10px 18px",
-                  backgroundColor: "#261B13",
-                  color: "#F7F2EE",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  boxShadow: "0 4px 14px rgba(38,27,19,0.15)",
-                }}
-              >
-                <PlusIcon size={16} color="#F7F2EE" />
-                <span>Add Customer Account</span>
-              </button>
-            )}
-
+          {/* Action Buttons for Active Tab */}
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
             {activeTab === "products" && (
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+              <>
+                <button
+                  type="button"
+                  onClick={() => saveShowcaseOrder(products)}
+                  disabled={isReorderingShowcase}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "9px 14px",
+                    backgroundColor: "#FAF7F2",
+                    color: "#866951",
+                    borderRadius: "10px",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    border: "1px solid #C5A059",
+                    cursor: isReorderingShowcase ? "not-allowed" : "pointer",
+                  }}
+                  title="Save and publish current showcase sequence"
+                >
+                  <span>{isReorderingShowcase ? "⏳ Saving..." : "✦ Save Showcase Order"}</span>
+                </button>
+
                 <a
                   href="/api/admin/products/template"
                   download="avsaraa-products-template.csv"
@@ -2431,8 +2417,8 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "6px",
-                    padding: "10px 14px",
-                    backgroundColor: "#FAF7F2",
+                    padding: "9px 13px",
+                    backgroundColor: "#FFFFFF",
                     color: "#866951",
                     borderRadius: "10px",
                     fontSize: "12.5px",
@@ -2440,7 +2426,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                     border: "1px solid #CFBEAD",
                     textDecoration: "none",
                   }}
-                  title="Download CSV template with pre-filled sample rows"
+                  title="Download pre-filled CSV template"
                 >
                   <span>📥 CSV Template</span>
                 </a>
@@ -2456,17 +2442,17 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "6px",
-                    padding: "10px 16px",
-                    backgroundColor: "#866951",
-                    color: "#FAF7F2",
+                    padding: "9px 14px",
+                    backgroundColor: "#FAF7F2",
+                    color: "#866951",
                     borderRadius: "10px",
                     fontSize: "12.5px",
                     fontWeight: 600,
-                    border: "none",
+                    border: "1px solid #CFBEAD",
                     cursor: "pointer",
                   }}
                 >
-                  <span>📦 Bulk Import (CSV)</span>
+                  <span>📦 Bulk CSV Import</span>
                 </button>
 
                 <button
@@ -2474,41 +2460,64 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: "8px",
-                    padding: "10px 18px",
+                    gap: "6px",
+                    padding: "9px 16px",
                     backgroundColor: "#261B13",
-                    color: "#F7F2EE",
+                    color: "#FAF7F2",
                     borderRadius: "10px",
                     fontSize: "13px",
                     fontWeight: 600,
+                    border: "none",
+                    cursor: "pointer",
                     boxShadow: "0 4px 14px rgba(38,27,19,0.15)",
                   }}
                 >
-                  <PlusIcon size={16} color="#F7F2EE" />
-                  <span>Add Product</span>
+                  <PlusIcon size={15} color="#C5A059" />
+                  <span>+ Add Product</span>
                 </button>
-              </div>
+              </>
+            )}
+
+            {activeTab === "customers" && (
+              <button
+                onClick={openAddCustomerModal}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "9px 16px",
+                  backgroundColor: "#261B13",
+                  color: "#FAF7F2",
+                  borderRadius: "10px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 14px rgba(38,27,19,0.15)",
+                }}
+              >
+                <PlusIcon size={15} color="#C5A059" />
+                <span>+ Add Customer Account</span>
+              </button>
             )}
 
             {activeTab === "reviews" && (
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    padding: "8px 14px",
-                    backgroundColor: "#FAF6F0",
-                    border: "1px solid #E8DED3",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#866951",
-                  }}
-                >
-                  <CameraIcon size={14} color="#866951" />
-                  <span>{reviews.reduce((acc, r) => acc + (r.photos?.length || 0), 0)} Photos</span>
-                </span>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "8px 14px",
+                  backgroundColor: "#FAF6F0",
+                  border: "1px solid #E8DED3",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: "#866951",
+                }}
+              >
+                <CameraIcon size={14} color="#866951" />
+                <span>{reviews.reduce((acc, r) => acc + (r.photos?.length || 0), 0)} Patron Photos</span>
               </div>
             )}
 
@@ -2518,13 +2527,15 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "8px",
-                  padding: "10px 18px",
+                  gap: "6px",
+                  padding: "9px 16px",
                   backgroundColor: "#6F42C1",
                   color: "#FFFFFF",
                   borderRadius: "10px",
                   fontSize: "13px",
                   fontWeight: 600,
+                  border: "none",
+                  cursor: "pointer",
                   boxShadow: "0 4px 14px rgba(111,66,193,0.25)",
                 }}
               >
@@ -2535,123 +2546,191 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
           </div>
         </div>
 
-        {/* Search & Filter Toolbar */}
-        {activeTab !== "orders" && activeTab !== "coupons" && activeTab !== "super_admin" && activeTab !== "sql_guide" && (
+        {/* Search & Filter Toolbar with Quick Pills */}
+        {activeTab !== "orders" && activeTab !== "coupons" && activeTab !== "super_admin" && (
           <div
             style={{
               backgroundColor: "#FFFFFF",
               border: "1px solid #E8DED3",
-              borderRadius: "12px",
-              padding: "12px 18px",
+              borderRadius: "14px",
+              padding: "14px 18px",
               marginBottom: "20px",
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: "14px",
+              flexDirection: "column",
+              gap: "12px",
+              boxShadow: "0 2px 10px rgba(38,27,19,0.03)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: "260px" }}>
-              <SearchIcon size={16} color="#866951" />
-              <input
-                type="text"
-                placeholder={
-                  activeTab === "products"
-                    ? "Search products by title, description..."
-                    : activeTab === "customers"
-                    ? "Search customers by name, phone, email..."
-                    : "Search inquiries by sender, subject, message..."
-                }
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+              {/* Search input */}
+              <div
                 style={{
-                  width: "100%",
-                  fontSize: "13px",
-                  color: "#261B13",
-                  backgroundColor: "transparent",
-                  border: "none",
-                  outline: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  flex: 1,
+                  minWidth: "260px",
+                  backgroundColor: "#FCFAF7",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid #CFBEAD",
                 }}
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery("")}>
-                  <CloseIcon size={14} color="#866951" />
-                </button>
-              )}
+              >
+                <SearchIcon size={16} color="#866951" />
+                <input
+                  type="text"
+                  placeholder={
+                    activeTab === "products"
+                      ? "Search catalog by name, zari craft, description..."
+                      : activeTab === "customers"
+                      ? "Search customers by name, phone, email, city..."
+                      : "Search inquiries by sender, subject, message..."
+                  }
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: "100%",
+                    fontSize: "13px",
+                    color: "#261B13",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    outline: "none",
+                  }}
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} style={{ background: "none", border: "none", cursor: "pointer", padding: "2px" }}>
+                    <CloseIcon size={14} color="#866951" />
+                  </button>
+                )}
+              </div>
+
+              {/* Counter badge & select dropdown */}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "12px", color: "#866951", fontWeight: 600 }}>
+                  {activeTab === "products"
+                    ? `Showing ${filteredProducts.length} of ${products.length} products`
+                    : activeTab === "customers"
+                    ? `Showing ${filteredCustomers.length} of ${customerProfiles.length} patrons`
+                    : `Showing ${filteredInquiries.length} of ${inquiries.length} inquiries`}
+                </span>
+
+                {/* Filter Dropdown */}
+                {activeTab === "products" && (
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #CFBEAD",
+                      backgroundColor: "#FCFAF7",
+                      fontSize: "12.5px",
+                      fontWeight: 500,
+                      color: "#261B13",
+                    }}
+                  >
+                    <option value="ALL">All Categories</option>
+                    <option value="PROMO">🏷️ Promo & Sale Deals</option>
+                    <option value="LOW_STOCK">⚠️ Low Stock (≤ 3)</option>
+                    <option value="OUT_OF_STOCK">● Sold Out (0)</option>
+                    <option value="UNDER_1299">💎 Under ₹1,299</option>
+                    <option value="Sarees">Sarees</option>
+                    <option value="Dresses">Dresses</option>
+                    <option value="Co-ords">Co-ords</option>
+                    <option value="Men's Wear">{"Men's Wear"}</option>
+                    <option value="New Arrivals">New Arrivals</option>
+                    <option value="Occasion Wear">Occasion Wear</option>
+                  </select>
+                )}
+
+                {activeTab === "customers" && (
+                  <select
+                    value={customerSegmentFilter}
+                    onChange={(e) => setCustomerSegmentFilter(e.target.value)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #CFBEAD",
+                      backgroundColor: "#FCFAF7",
+                      fontSize: "12.5px",
+                      fontWeight: 500,
+                      color: "#261B13",
+                    }}
+                  >
+                    <option value="ALL">All Segments ({customerProfiles.length})</option>
+                    <option value="VIP Atelier">👑 VIP Atelier Patrons</option>
+                    <option value="Repeat Patron">🔁 Repeat Patrons</option>
+                    <option value="Active Patron">🛍️ Active Patrons</option>
+                    <option value="Guest Buyer">👤 Guest Buyers</option>
+                    <option value="Prospective Lead">✉️ Prospective Leads</option>
+                    <option value="REGISTERED">Registered Accounts Only</option>
+                    <option value="GUEST">Guest Orders Only</option>
+                  </select>
+                )}
+
+                {activeTab === "inquiries" && (
+                  <select
+                    value={inquiryStatusFilter}
+                    onChange={(e) => setInquiryStatusFilter(e.target.value)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #CFBEAD",
+                      backgroundColor: "#FCFAF7",
+                      fontSize: "12.5px",
+                      fontWeight: 500,
+                      color: "#261B13",
+                    }}
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="Unread">Unread</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Archived">Archived</option>
+                  </select>
+                )}
+              </div>
             </div>
 
-            {/* Filter Dropdowns */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-              {activeTab === "products" && (
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #E8DED3",
-                    backgroundColor: "#FAF7F2",
-                    fontSize: "13px",
-                    color: "#261B13",
-                  }}
-                >
-                  <option value="ALL">All Categories</option>
-                  <option value="PROMO">🏷️ Promo & Sale Deals</option>
-                  <option value="UNDER_1299">💎 Under ₹1,299 Deals</option>
-                  <option value="Sarees">Sarees</option>
-                  <option value="Dresses">Dresses</option>
-                  <option value="Co-ords">Co-ords</option>
-                  <option value="Men's Wear">{"Men's Wear"}</option>
-                  <option value="New Arrivals">New Arrivals</option>
-                  <option value="Occasion Wear">Occasion Wear</option>
-                </select>
-              )}
-
-              {activeTab === "customers" && (
-                <select
-                  value={customerSegmentFilter}
-                  onChange={(e) => setCustomerSegmentFilter(e.target.value)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #E8DED3",
-                    backgroundColor: "#FAF7F2",
-                    fontSize: "13px",
-                    color: "#261B13",
-                  }}
-                >
-                  <option value="ALL">All Segments ({customerProfiles.length})</option>
-                  <option value="VIP Atelier">👑 VIP Atelier Patrons</option>
-                  <option value="Repeat Patron">🔁 Repeat Patrons</option>
-                  <option value="Active Patron">🛍️ Active Patrons</option>
-                  <option value="Guest Buyer">👤 Guest Buyers</option>
-                  <option value="Prospective Lead">✉️ Prospective Leads</option>
-                  <option value="REGISTERED">Registered Accounts Only</option>
-                  <option value="GUEST">Guest Orders Only</option>
-                </select>
-              )}
-
-              {activeTab === "inquiries" && (
-                <select
-                  value={inquiryStatusFilter}
-                  onChange={(e) => setInquiryStatusFilter(e.target.value)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #E8DED3",
-                    backgroundColor: "#FAF7F2",
-                    fontSize: "13px",
-                    color: "#261B13",
-                  }}
-                >
-                  <option value="ALL">All Inquiry Statuses</option>
-                  <option value="Unread">Unread</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Resolved">Resolved</option>
-                  <option value="Archived">Archived</option>
-                </select>
-              )}
-            </div>
+            {/* Quick Filter Tag Chips for Single-Click Navigation */}
+            {activeTab === "products" && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", paddingTop: "4px", borderTop: "1px dashed #E8DED3" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase", letterSpacing: "0.04em", marginRight: "4px" }}>
+                  Quick Filters:
+                </span>
+                {[
+                  { key: "ALL", label: `All (${products.length})` },
+                  { key: "PROMO", label: "🏷️ Promo / Sale" },
+                  { key: "LOW_STOCK", label: `⚠️ Low Stock (${inventoryStats.lowStockCount})` },
+                  { key: "OUT_OF_STOCK", label: `● Sold Out (${inventoryStats.outOfStockCount})` },
+                  { key: "Sarees", label: "Sarees" },
+                  { key: "Dresses", label: "Dresses" },
+                  { key: "Co-ords", label: "Co-ords" },
+                  { key: "UNDER_1299", label: "Under ₹1,299" },
+                ].map((chip) => {
+                  const isSel = categoryFilter === chip.key;
+                  return (
+                    <button
+                      key={chip.key}
+                      onClick={() => setCategoryFilter(chip.key)}
+                      style={{
+                        fontSize: "11px",
+                        padding: "3px 10px",
+                        borderRadius: "14px",
+                        fontWeight: isSel ? 700 : 500,
+                        backgroundColor: isSel ? "#261B13" : "#FAF7F2",
+                        color: isSel ? "#FAF7F2" : "#6E5B4E",
+                        border: isSel ? "1px solid #261B13" : "1px solid #CFBEAD",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -2690,10 +2769,42 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
               overflow: "hidden",
             }}
           >
+            {/* Drag & Drop Showcase Ordering Banner */}
+            <div
+              style={{
+                padding: "10px 18px",
+                backgroundColor: "#FAF7F2",
+                borderBottom: "1px solid #E8DED3",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: "12px",
+                color: "#6E5B4E",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "14px" }}>✦</span>
+                <span>
+                  <strong>Drag-and-Drop Showcase Ordering:</strong> Drag rows using the <strong>⋮⋮ handle</strong> (or use ▲ / ▼) to arrange how drapes appear in the storefront catalog. Changes publish live automatically.
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {isReorderingShowcase && (
+                  <span style={{ fontSize: "11px", color: "#C5A059", fontWeight: 700 }}>
+                    ⚡ Saving Sequence...
+                  </span>
+                )}
+                <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600 }}>
+                  {products.length} Drapes in Catalog
+                </span>
+              </div>
+            </div>
+
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
                 <thead>
                   <tr style={{ backgroundColor: "#FAF7F2", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
+                    <th style={{ padding: "14px 12px", fontWeight: 700, width: "70px", textAlign: "center" }}>⋮⋮ Order</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Item</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Category & Promo</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Price & Discount</th>
@@ -2705,18 +2816,151 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                 <tbody>
                   {filteredProducts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "#866951" }}>
-                        No products found matching your search.
+                      <td colSpan={7} style={{ padding: "48px 24px", textAlign: "center" }}>
+                        <div style={{ maxWidth: "340px", margin: "0 auto", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+                          <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#FAF7F2", border: "1px solid #E8DED3", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <ShoppingBagIcon size={22} color="#866951" />
+                          </div>
+                          <div style={{ fontSize: "15px", fontWeight: 600, color: "#261B13" }}>No products found</div>
+                          <p style={{ fontSize: "12.5px", color: "#866951", lineHeight: "1.4" }}>
+                            No items match your search or filter criteria. Try clearing filters or adding a new drape to your catalog.
+                          </p>
+                          <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+                            {(searchQuery || categoryFilter !== "ALL") && (
+                              <button
+                                onClick={() => {
+                                  setSearchQuery("");
+                                  setCategoryFilter("ALL");
+                                }}
+                                style={{
+                                  padding: "7px 14px",
+                                  borderRadius: "6px",
+                                  backgroundColor: "#FAF7F2",
+                                  border: "1px solid #CFBEAD",
+                                  fontSize: "12px",
+                                  fontWeight: 600,
+                                  color: "#866951",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Clear Filters
+                              </button>
+                            )}
+                            <button
+                              onClick={openAddProductModal}
+                              style={{
+                                padding: "7px 14px",
+                                borderRadius: "6px",
+                                backgroundColor: "#261B13",
+                                border: "none",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                color: "#FAF7F2",
+                                cursor: "pointer",
+                              }}
+                            >
+                              + Add New Product
+                            </button>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredProducts.map((product) => (
+                    filteredProducts.map((product) => {
+                      const masterIndex = products.findIndex((p) => p.id === product.id);
+                      const isBeingDragged = draggedProductIndex === masterIndex;
+                      const isDragOver = dragOverProductIndex === masterIndex;
+
+                      return (
                       <tr
                         key={product.id}
-                        style={{ borderBottom: "1px solid #F0E8DF", transition: "background-color 0.15s ease" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#FCFAF7")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                        draggable={!searchQuery && categoryFilter === "ALL"}
+                        onDragStart={(e) => handleProductDragStart(e, masterIndex)}
+                        onDragOver={(e) => handleProductDragOver(e, masterIndex)}
+                        onDragEnd={handleProductDragEnd}
+                        onDrop={(e) => handleProductDrop(e, masterIndex)}
+                        style={{
+                          borderBottom: "1px solid #F0E8DF",
+                          transition: "all 0.15s ease",
+                          backgroundColor: isDragOver
+                            ? "rgba(197, 160, 89, 0.12)"
+                            : isBeingDragged
+                            ? "#FAF6F0"
+                            : "transparent",
+                          opacity: isBeingDragged ? 0.4 : 1,
+                          borderTop: isDragOver ? "3px solid #C5A059" : "none",
+                          cursor: !searchQuery && categoryFilter === "ALL" ? "grab" : "default",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isDragOver && !isBeingDragged) {
+                            e.currentTarget.style.backgroundColor = "#FCFAF7";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isDragOver && !isBeingDragged) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
                       >
+                        {/* 1. Drag Handle & Order Column */}
+                        <td style={{ padding: "14px 10px", textAlign: "center", verticalAlign: "middle" }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                            <div
+                              title="Drag to reorder showcase sequence"
+                              style={{
+                                cursor: !searchQuery && categoryFilter === "ALL" ? "grab" : "default",
+                                color: "#866951",
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                userSelect: "none",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                backgroundColor: "#FAF7F2",
+                                border: "1px solid #E8DED3",
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              ⋮⋮ #{masterIndex + 1}
+                            </div>
+                            <div style={{ display: "flex", gap: "2px", marginTop: "2px" }}>
+                              <button
+                                type="button"
+                                disabled={masterIndex <= 0}
+                                onClick={() => handleNudgeProductOrder(masterIndex, "up")}
+                                title="Move Up in Showcase"
+                                style={{
+                                  border: "none",
+                                  background: "none",
+                                  cursor: masterIndex <= 0 ? "not-allowed" : "pointer",
+                                  opacity: masterIndex <= 0 ? 0.3 : 0.8,
+                                  fontSize: "10px",
+                                  padding: "1px 3px",
+                                  color: "#261B13",
+                                }}
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                disabled={masterIndex < 0 || masterIndex >= products.length - 1}
+                                onClick={() => handleNudgeProductOrder(masterIndex, "down")}
+                                title="Move Down in Showcase"
+                                style={{
+                                  border: "none",
+                                  background: "none",
+                                  cursor: masterIndex < 0 || masterIndex >= products.length - 1 ? "not-allowed" : "pointer",
+                                  opacity: masterIndex < 0 || masterIndex >= products.length - 1 ? 0.3 : 0.8,
+                                  fontSize: "10px",
+                                  padding: "1px 3px",
+                                  color: "#261B13",
+                                }}
+                              >
+                                ▼
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+
                         <td style={{ padding: "14px 18px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                             <div
@@ -2724,7 +2968,7 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                                 width: "48px",
                                 height: "64px",
                                 position: "relative",
-                                borderRadius: "6px",
+                                borderRadius: "8px",
                                 overflow: "hidden",
                                 backgroundColor: "#FAF7F2",
                                 border: "1px solid #E8DED3",
@@ -2738,12 +2982,82 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                                 style={{ objectFit: "cover" }}
                                 sizes="48px"
                               />
+                              {product.stock_count === 0 && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    backgroundColor: "rgba(185, 28, 28, 0.4)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: "9px",
+                                    fontWeight: 700,
+                                    color: "#FFFFFF",
+                                    letterSpacing: "0.04em",
+                                  }}
+                                >
+                                  OOS
+                                </div>
+                              )}
                             </div>
                             <div>
                               <div style={{ fontWeight: 600, color: "#261B13" }}>{product.name}</div>
                               <div style={{ fontSize: "11px", color: "#866951", marginTop: "2px" }}>
                                 Added: {product.created_at ? new Date(product.created_at).toLocaleDateString() : "Catalog Item"}
                               </div>
+
+                              {/* Mini Swatches Preview */}
+                              {product.color_variants && product.color_variants.length > 0 && (
+                                <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "4px" }}>
+                                  {product.color_variants.slice(0, 5).map((cv, cvIdx) => (
+                                    <span
+                                      key={cvIdx}
+                                      title={cv.name}
+                                      style={{
+                                        width: "12px",
+                                        height: "12px",
+                                        borderRadius: "50%",
+                                        backgroundColor: cv.hex || "#261B13",
+                                        border: "1px solid #CFBEAD",
+                                        display: "inline-block",
+                                        boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                                      }}
+                                    />
+                                  ))}
+                                  {product.color_variants.length > 5 && (
+                                    <span style={{ fontSize: "10px", color: "#866951" }}>+{product.color_variants.length - 5}</span>
+                                  )}
+                                  <span style={{ fontSize: "11px", color: "#866951", marginLeft: "2px" }}>
+                                    {product.color_variants.length} {product.color_variants.length === 1 ? "shade" : "shades"}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Sizes preview */}
+                              {product.available_sizes && product.available_sizes.length > 0 && (
+                                <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "4px" }}>
+                                  {product.available_sizes.slice(0, 4).map((sz, szIdx) => (
+                                    <span
+                                      key={szIdx}
+                                      style={{
+                                        fontSize: "10px",
+                                        padding: "1px 5px",
+                                        borderRadius: "3px",
+                                        backgroundColor: "#FAF7F2",
+                                        border: "1px solid #E8DED3",
+                                        color: "#6E5B4E",
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      {sz}
+                                    </span>
+                                  ))}
+                                  {product.available_sizes.length > 4 && (
+                                    <span style={{ fontSize: "10px", color: "#866951" }}>+{product.available_sizes.length - 4}</span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -2811,13 +3125,17 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                         </td>
 
                         <td style={{ padding: "14px 18px" }}>
-                          {(product.stock_count !== undefined && product.stock_count <= 3) ? (
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "#DC2626", fontWeight: 700, fontSize: "12px", backgroundColor: "#FEF2F2", padding: "3px 8px", borderRadius: "6px", border: "1px solid #FCA5A5" }}>
+                          {product.stock_count === 0 ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "#B91C1C", fontWeight: 700, fontSize: "11.5px", backgroundColor: "#FEF2F2", padding: "3px 9px", borderRadius: "20px", border: "1px solid #FCA5A5" }}>
+                              ● Sold Out (0)
+                            </span>
+                          ) : (product.stock_count !== undefined && product.stock_count <= 3) ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "#D97706", fontWeight: 700, fontSize: "11.5px", backgroundColor: "#FFFBEB", padding: "3px 9px", borderRadius: "20px", border: "1px solid #FDE68A" }}>
                               ⚠️ Low: {product.stock_count} left
                             </span>
                           ) : (
-                            <span style={{ color: "#1E5E3A", fontWeight: 600, fontSize: "12px" }}>
-                              ● {product.stock_count !== undefined ? `${product.stock_count} units` : "In stock"}
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "#0F7A50", fontWeight: 600, fontSize: "11.5px", backgroundColor: "#EBF8F2", padding: "3px 9px", borderRadius: "20px", border: "1px solid #B5E8D2" }}>
+                              ● {product.stock_count !== undefined ? `${product.stock_count} in stock` : "In stock"}
                             </span>
                           )}
                         </td>
@@ -2882,7 +3200,8 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                           </div>
                         </td>
                       </tr>
-                    ))
+                    );
+                  })
                   )}
                 </tbody>
               </table>
@@ -4121,250 +4440,6 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
             </div>
           </div>
         )}
-
-        {/* ================================================================= */}
-        {/* VIEW 5: DATABASE ARCHITECTURE & SQL MIGRATION                     */}
-        {/* ================================================================= */}
-        {activeTab === "sql_guide" && (
-          <div
-            style={{
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #E8DED3",
-              borderRadius: "16px",
-              padding: "28px",
-              boxShadow: "0 4px 20px rgba(38,27,19,0.04)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: "16px",
-                flexWrap: "wrap",
-                gap: "12px",
-              }}
-            >
-              <div>
-                <h3 style={{ fontSize: "18px", fontWeight: 600, color: "#261B13" }}>
-                  Single Super Admin SQL Architecture
-                </h3>
-                <p style={{ fontSize: "13px", color: "#866951", marginTop: "4px" }}>
-                  Run this SQL in your Supabase SQL Editor to enforce single Super Admin authority and RLS policies.
-                </p>
-              </div>
-
-              <button
-                onClick={copyMigrationSql}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "10px 18px",
-                  backgroundColor: copiedSql ? "#0F7A50" : "#261B13",
-                  color: "#FFFFFF",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  transition: "background-color 0.2s ease",
-                }}
-              >
-                <CheckIcon size={16} color="#FFFFFF" />
-                <span>{copiedSql ? "Copied to Clipboard!" : "Copy SQL Script"}</span>
-              </button>
-            </div>
-
-            <pre
-              style={{
-                backgroundColor: "#1C140E",
-                color: "#E6DACF",
-                padding: "20px",
-                borderRadius: "10px",
-                fontSize: "12px",
-                lineHeight: "1.6",
-                overflowX: "auto",
-                fontFamily: "monospace",
-              }}
-            >
-{`-- ==============================================================================
--- AVSARAA - SINGLE SUPER ADMIN ARCHITECTURE & ROW LEVEL SECURITY
--- ==============================================================================
-
--- 1. SUPER ADMIN REGISTRY & AUTH HELPER (Must be created first for RLS policies)
-CREATE TABLE IF NOT EXISTS public.admin_users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    full_name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    role TEXT NOT NULL DEFAULT 'Super Admin' CHECK (role = 'Super Admin'),
-    department TEXT DEFAULT 'Executive Leadership',
-    phone_number TEXT,
-    avatar_url TEXT,
-    status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Suspended')),
-    permissions TEXT[] DEFAULT ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'],
-    notes TEXT,
-    last_active TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
-
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN (
-        auth.jwt() IS NOT NULL AND (
-            EXISTS (
-                SELECT 1 FROM public.admin_users
-                WHERE (user_id = auth.uid() OR LOWER(email) = LOWER(auth.jwt()->>'email'))
-                  AND status = 'Active'
-                  AND role = 'Super Admin'
-            )
-            OR (auth.jwt()->'app_metadata'->>'role') = 'super_admin'
-            OR (auth.jwt()->'app_metadata'->>'role') = 'admin'
-            OR LOWER(auth.jwt()->>'email') = '${ADMIN_EMAIL}'
-        )
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
-
-DROP POLICY IF EXISTS "Super admin can view admin users" ON public.admin_users;
-CREATE POLICY "Super admin can view admin users" 
-    ON public.admin_users FOR SELECT 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can update admin users" ON public.admin_users;
-CREATE POLICY "Super admin can update admin users" 
-    ON public.admin_users FOR UPDATE 
-    USING (public.is_admin());
-
--- Cleanup secondary admins and seed ONLY the single Super Admin
-DELETE FROM public.admin_users WHERE email != '${ADMIN_EMAIL}';
-
-INSERT INTO public.admin_users (full_name, email, role, department, phone_number, status, permissions, notes)
-VALUES 
-    ('Kratos Lord', '${ADMIN_EMAIL}', 'Super Admin', 'Executive Leadership', '+91 98765 43210', 'Active', ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin'], 'Founding Super Administrator with full system control and supreme authority.')
-ON CONFLICT (email) DO UPDATE SET
-    role = 'Super Admin',
-    status = 'Active';
-
--- 2. PRODUCTS: ONLY Super Admin can add, edit, or delete products
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can view products" ON public.products;
-CREATE POLICY "Anyone can view products" 
-    ON public.products FOR SELECT 
-    USING (true);
-
-DROP POLICY IF EXISTS "Only signed-in users can add products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can add products" ON public.products;
-CREATE POLICY "Only super admin can add products" 
-    ON public.products FOR INSERT 
-    WITH CHECK (public.is_admin());
-
-DROP POLICY IF EXISTS "Users can update their own products" ON public.products;
-DROP POLICY IF EXISTS "Users or admins can update products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can update products" ON public.products;
-CREATE POLICY "Only super admin can update products" 
-    ON public.products FOR UPDATE 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Users can delete their own products" ON public.products;
-DROP POLICY IF EXISTS "Users or admins can delete products" ON public.products;
-DROP POLICY IF EXISTS "Only super admin can delete products" ON public.products;
-CREATE POLICY "Only super admin can delete products" 
-    ON public.products FOR DELETE 
-    USING (public.is_admin());
-
--- 3. CONTACT INQUIRIES & NEWSLETTER: Public can submit; Super Admin controls all
-ALTER TABLE public.contact_inquiries ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can submit a contact inquiry" ON public.contact_inquiries;
-CREATE POLICY "Anyone can submit a contact inquiry" 
-    ON public.contact_inquiries FOR INSERT 
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Users can view their own contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Users can view their own contact inquiries" 
-    ON public.contact_inquiries FOR SELECT 
-    USING (auth.uid() = user_id OR public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can update contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Super admin can update contact inquiries" 
-    ON public.contact_inquiries FOR UPDATE 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can delete contact inquiries" ON public.contact_inquiries;
-CREATE POLICY "Super admin can delete contact inquiries" 
-    ON public.contact_inquiries FOR DELETE 
-    USING (public.is_admin());
-
-ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can subscribe to the newsletter" ON public.newsletter_subscribers;
-CREATE POLICY "Anyone can subscribe to the newsletter" 
-    ON public.newsletter_subscribers FOR INSERT 
-    WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Super admin can view subscribers" ON public.newsletter_subscribers;
-CREATE POLICY "Super admin can view subscribers" 
-    ON public.newsletter_subscribers FOR SELECT 
-    USING (public.is_admin());
-
-DROP POLICY IF EXISTS "Super admin can delete subscribers" ON public.newsletter_subscribers;
-CREATE POLICY "Super admin can delete subscribers" 
-    ON public.newsletter_subscribers FOR DELETE 
-    USING (public.is_admin());
-
--- 4. WISHLISTS & SAVED HEIRLOOMS
-CREATE TABLE IF NOT EXISTS public.wishlists (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    product_id TEXT NOT NULL,
-    product_data JSONB,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    UNIQUE (user_id, product_id)
-);
-ALTER TABLE public.wishlists ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Users can view their own wishlist" ON public.wishlists;
-CREATE POLICY "Users can view their own wishlist" ON public.wishlists FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
-DROP POLICY IF EXISTS "Users can insert their own wishlist" ON public.wishlists;
-CREATE POLICY "Users can insert their own wishlist" ON public.wishlists FOR INSERT WITH CHECK (auth.uid() = user_id OR public.is_admin());
-DROP POLICY IF EXISTS "Users can delete their own wishlist" ON public.wishlists;
-CREATE POLICY "Users can delete their own wishlist" ON public.wishlists FOR DELETE USING (auth.uid() = user_id OR public.is_admin());
-
--- 5. PRODUCT REVIEWS & PATRON MEDIA (Photos)
-CREATE TABLE IF NOT EXISTS public.product_reviews (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id TEXT NOT NULL,
-    product_name TEXT,
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    customer_name TEXT NOT NULL,
-    customer_email TEXT,
-    customer_city TEXT,
-    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
-    title TEXT,
-    comment TEXT NOT NULL,
-    photos TEXT[] DEFAULT '{}',
-    verified_purchase BOOLEAN DEFAULT false,
-    helpful_count INTEGER DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'pending', 'hidden', 'flagged')),
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-ALTER TABLE public.product_reviews ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Anyone can view published reviews" ON public.product_reviews;
-CREATE POLICY "Anyone can view published reviews" ON public.product_reviews FOR SELECT USING (status = 'published' OR public.is_admin());
-DROP POLICY IF EXISTS "Anyone can submit a review" ON public.product_reviews;
-CREATE POLICY "Anyone can submit a review" ON public.product_reviews FOR INSERT WITH CHECK (true);
-DROP POLICY IF EXISTS "Super admin can update reviews" ON public.product_reviews;
-CREATE POLICY "Super admin can update reviews" ON public.product_reviews FOR UPDATE USING (public.is_admin());
-DROP POLICY IF EXISTS "Super admin can delete reviews" ON public.product_reviews;
-CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DELETE USING (public.is_admin());`}
-            </pre>
-          </div>
-        )}
       </main>
 
       {/* ===================================================================== */}
@@ -4981,6 +5056,736 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
                   )}
                 </div>
 
+                {/* Available Sizes Section */}
+                <div style={{ padding: "14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px solid #E8DED3" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+                    <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#866951", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      Available Sizes & Inventory ({productForm.available_sizes?.length || 0})
+                    </label>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sizes = ["Free Size"];
+                          const inv: Record<string, number> = { "Free Size": 10 };
+                          setProductForm((prev) => ({
+                            ...prev,
+                            available_sizes: sizes,
+                            size_inventory: inv,
+                            stock_count: prev.color_variants.length > 0 && prev.color_variants.some((v) => v.sizes && v.sizes.length > 0)
+                              ? prev.stock_count
+                              : "10",
+                          }));
+                        }}
+                        style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "4px", border: "1px solid #CFBEAD", backgroundColor: "#FFFFFF", color: "#866951", cursor: "pointer" }}
+                      >
+                        Saree (Free Size)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sizes = ["XS", "S", "M", "L", "XL", "XXL"];
+                          const inv: Record<string, number> = { XS: 5, S: 10, M: 10, L: 10, XL: 5, XXL: 5 };
+                          const total = 45;
+                          setProductForm((prev) => ({
+                            ...prev,
+                            available_sizes: sizes,
+                            size_inventory: inv,
+                            stock_count: prev.color_variants.length > 0 && prev.color_variants.some((v) => v.sizes && v.sizes.length > 0)
+                              ? prev.stock_count
+                              : String(total),
+                          }));
+                        }}
+                        style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "4px", border: "1px solid #CFBEAD", backgroundColor: "#FFFFFF", color: "#866951", cursor: "pointer" }}
+                      >
+                        XS–XXL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sizes = ["S", "M", "L", "XL"];
+                          const inv: Record<string, number> = { S: 10, M: 10, L: 10, XL: 10 };
+                          const total = 40;
+                          setProductForm((prev) => ({
+                            ...prev,
+                            available_sizes: sizes,
+                            size_inventory: inv,
+                            stock_count: prev.color_variants.length > 0 && prev.color_variants.some((v) => v.sizes && v.sizes.length > 0)
+                              ? prev.stock_count
+                              : String(total),
+                          }));
+                        }}
+                        style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "4px", border: "1px solid #CFBEAD", backgroundColor: "#FFFFFF", color: "#866951", cursor: "pointer" }}
+                      >
+                        S–XL
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "10px" }}>
+                    {productForm.available_sizes.map((sz, idx) => {
+                      const stockVal = productForm.size_inventory[sz] !== undefined ? productForm.size_inventory[sz] : 5;
+                      const isOos = stockVal === 0;
+                      return (
+                        <span
+                          key={idx}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "4px 8px",
+                            borderRadius: "6px",
+                            backgroundColor: isOos ? "#FEF2F2" : "#FFFFFF",
+                            border: isOos ? "1px solid #FCA5A5" : "1px solid #CFBEAD",
+                            color: "#261B13",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                          }}
+                        >
+                          <span>{sz}</span>
+                          <span style={{ fontSize: "10px", color: "#866951" }}>Stock:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={stockVal}
+                            onChange={(e) => {
+                              const num = Math.max(0, parseInt(e.target.value, 10) || 0);
+                              setProductForm((prev) => {
+                                const newInv = { ...prev.size_inventory, [sz]: num };
+                                const hasColorSizes = prev.color_variants.some((v) => v.sizes && v.sizes.length > 0);
+                                const newTotal = hasColorSizes
+                                  ? prev.stock_count
+                                  : String(prev.available_sizes.reduce((sum, s) => sum + (newInv[s] !== undefined ? newInv[s] : 5), 0));
+                                return {
+                                  ...prev,
+                                  size_inventory: newInv,
+                                  stock_count: newTotal,
+                                };
+                              });
+                            }}
+                            style={{
+                              width: "46px",
+                              padding: "2px 4px",
+                              border: isOos ? "1px solid #EF4444" : "1px solid #CFBEAD",
+                              borderRadius: "4px",
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              color: isOos ? "#DC2626" : "#261B13",
+                              backgroundColor: isOos ? "#FEF2F2" : "#FFFFFF",
+                              textAlign: "center",
+                            }}
+                          />
+                          {isOos ? (
+                            <span style={{ fontSize: "9px", color: "#DC2626", fontWeight: 700 }}>OOS</span>
+                          ) : (
+                            <span style={{ fontSize: "9px", color: "#0F7A50", fontWeight: 600 }}>✓</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProductForm((prev) => {
+                                const newSizes = prev.available_sizes.filter((_, i) => i !== idx);
+                                const newInv = { ...prev.size_inventory };
+                                delete newInv[sz];
+                                const hasColorSizes = prev.color_variants.some((v) => v.sizes && v.sizes.length > 0);
+                                const newTotal = hasColorSizes
+                                  ? prev.stock_count
+                                  : String(newSizes.reduce((sum, s) => sum + (newInv[s] !== undefined ? newInv[s] : 5), 0));
+                                return {
+                                  ...prev,
+                                  available_sizes: newSizes,
+                                  size_inventory: newInv,
+                                  stock_count: newTotal,
+                                };
+                              });
+                            }}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#866951",
+                              cursor: "pointer",
+                              fontSize: "11px",
+                              padding: 0,
+                              lineHeight: 1,
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      );
+                    })}
+                    {productForm.available_sizes.length === 0 && (
+                      <span style={{ fontSize: "11.5px", color: "#B91C1C", fontStyle: "italic" }}>
+                        No sizes selected. Click a preset above or add custom sizes below.
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <input
+                      type="text"
+                      value={customSizeInput}
+                      onChange={(e) => setCustomSizeInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const val = customSizeInput.trim();
+                          if (val && !productForm.available_sizes.includes(val)) {
+                            setProductForm((prev) => {
+                              const newSizes = [...prev.available_sizes, val];
+                              const newInv = { ...prev.size_inventory, [val]: 5 };
+                              const hasColorSizes = prev.color_variants.some((v) => v.sizes && v.sizes.length > 0);
+                              const newTotal = hasColorSizes
+                                ? prev.stock_count
+                                : String(newSizes.reduce((sum, s) => sum + (newInv[s] !== undefined ? newInv[s] : 5), 0));
+                              return {
+                                ...prev,
+                                available_sizes: newSizes,
+                                size_inventory: newInv,
+                                stock_count: newTotal,
+                              };
+                            });
+                            setCustomSizeInput("");
+                          }
+                        }
+                      }}
+                      placeholder="Add custom size (e.g. 38, 40, Custom, Made to Measure) & press Enter"
+                      style={{
+                        flex: 1,
+                        padding: "7px 10px",
+                        borderRadius: "6px",
+                        border: "1px solid #CFBEAD",
+                        backgroundColor: "#FFFFFF",
+                        fontSize: "12px",
+                        color: "#261B13",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const val = customSizeInput.trim();
+                        if (val && !productForm.available_sizes.includes(val)) {
+                          setProductForm((prev) => {
+                            const newSizes = [...prev.available_sizes, val];
+                            const newInv = { ...prev.size_inventory, [val]: 5 };
+                            const hasColorSizes = prev.color_variants.some((v) => v.sizes && v.sizes.length > 0);
+                            const newTotal = hasColorSizes
+                              ? prev.stock_count
+                              : String(newSizes.reduce((sum, s) => sum + (newInv[s] !== undefined ? newInv[s] : 5), 0));
+                            return {
+                              ...prev,
+                              available_sizes: newSizes,
+                              size_inventory: newInv,
+                              stock_count: newTotal,
+                            };
+                          });
+                          setCustomSizeInput("");
+                        }
+                      }}
+                      style={{
+                        padding: "7px 14px",
+                        borderRadius: "6px",
+                        backgroundColor: "#866951",
+                        color: "#FFFFFF",
+                        border: "none",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Colourways & Dedicated Imagery Section */}
+                <div style={{ padding: "16px", backgroundColor: "#FCFAF7", borderRadius: "10px", border: "1px solid #E8DED3" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px", gap: "10px" }}>
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#866951", textTransform: "uppercase", letterSpacing: "0.06em", display: "block" }}>
+                        🎨 Colourways & Dedicated Imagery ({productForm.color_variants?.length || 0})
+                      </label>
+                      <span style={{ fontSize: "11px", color: "#6E5B4E", lineHeight: "1.4", display: "block", marginTop: "2px" }}>
+                        Different colours have different images! When shoppers click a colour on the storefront, the photo gallery automatically changes to show that exact colour.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProductForm((prev) => ({
+                          ...prev,
+                          color_variants: [
+                            ...prev.color_variants,
+                            {
+                              name: "",
+                              hex: "#8B0000",
+                              image_url: "",
+                              gallery_images: [],
+                            },
+                          ],
+                        }))
+                      }
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        backgroundColor: "#261B13",
+                        color: "#FAF7F2",
+                        border: "none",
+                        fontSize: "11.5px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px",
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <PlusIcon size={13} color="#FFFFFF" />
+                      <span>+ Add Colour</span>
+                    </button>
+                  </div>
+
+                  {productForm.color_variants.length === 0 ? (
+                    <div style={{ fontSize: "11.5px", color: "#866951", fontStyle: "italic", textAlign: "center", padding: "12px", backgroundColor: "#F7F2EE", borderRadius: "6px", marginTop: "8px" }}>
+                      No separate colourways added. The garment will use its hero photo. Click <strong>&quot;+ Add Colour&quot;</strong> if this garment is offered in multiple shades (e.g. Crimson Red, Peacock Blue, Emerald Green) with their own photos.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px" }}>
+                      {productForm.color_variants.map((variant, vIdx) => (
+                        <div
+                          key={vIdx}
+                          style={{
+                            padding: "14px",
+                            borderRadius: "8px",
+                            backgroundColor: "#FFFFFF",
+                            border: "1px solid #CFBEAD",
+                            boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span
+                                style={{
+                                  width: "20px",
+                                  height: "20px",
+                                  borderRadius: "50%",
+                                  backgroundColor: variant.hex || "#261B13",
+                                  border: "2px solid #FFFFFF",
+                                  boxShadow: "0 0 0 1px #CFBEAD",
+                                  display: "inline-block",
+                                }}
+                              />
+                              <span style={{ fontSize: "12px", fontWeight: 700, color: "#261B13" }}>
+                                Colourway #{vIdx + 1}: {variant.name || "(Unnamed Shade)"}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setProductForm((prev) => ({
+                                  ...prev,
+                                  color_variants: prev.color_variants.filter((_, i) => i !== vIdx),
+                                }))
+                              }
+                              style={{
+                                fontSize: "11px",
+                                color: "#B91C1C",
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                              }}
+                            >
+                              ✕ Remove Colour
+                            </button>
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "10px", marginBottom: "10px" }}>
+                            <div>
+                              <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#866951", marginBottom: "4px" }}>
+                                Colour Name *
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={variant.name}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setProductForm((prev) => ({
+                                    ...prev,
+                                    color_variants: prev.color_variants.map((v, i) =>
+                                      i === vIdx ? { ...v, name: val } : v
+                                    ),
+                                  }));
+                                }}
+                                placeholder="e.g. Crimson Red, Peacock Blue, Emerald Green"
+                                style={{
+                                  width: "100%",
+                                  padding: "8px 10px",
+                                  borderRadius: "6px",
+                                  border: "1px solid #CFBEAD",
+                                  fontSize: "12.5px",
+                                  color: "#261B13",
+                                }}
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#866951", marginBottom: "4px" }}>
+                                Swatch Hex
+                              </label>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <input
+                                  type="color"
+                                  value={variant.hex || "#8B0000"}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setProductForm((prev) => ({
+                                      ...prev,
+                                      color_variants: prev.color_variants.map((v, i) =>
+                                        i === vIdx ? { ...v, hex: val } : v
+                                      ),
+                                    }));
+                                  }}
+                                  style={{
+                                    width: "34px",
+                                    height: "34px",
+                                    padding: 0,
+                                    border: "1px solid #CFBEAD",
+                                    borderRadius: "6px",
+                                    cursor: "pointer",
+                                  }}
+                                />
+                                <input
+                                  type="text"
+                                  value={variant.hex || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setProductForm((prev) => ({
+                                      ...prev,
+                                      color_variants: prev.color_variants.map((v, i) =>
+                                        i === vIdx ? { ...v, hex: val } : v
+                                      ),
+                                    }));
+                                  }}
+                                  placeholder="#8B0000"
+                                  style={{
+                                    width: "80px",
+                                    padding: "8px 8px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #CFBEAD",
+                                    fontSize: "12px",
+                                    color: "#261B13",
+                                    fontFamily: "monospace",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                              <label style={{ fontSize: "11px", fontWeight: 600, color: "#866951" }}>
+                                Dedicated Photo for this Colour *
+                              </label>
+                              <label
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  padding: "3px 8px",
+                                  borderRadius: "4px",
+                                  backgroundColor: uploadingColorVariantIdx === vIdx ? "#CFBEAD" : "#866951",
+                                  color: "#FAF7F2",
+                                  fontSize: "11px",
+                                  fontWeight: 600,
+                                  cursor: uploadingColorVariantIdx === vIdx ? "not-allowed" : "pointer",
+                                }}
+                              >
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp,image/jpg"
+                                  disabled={uploadingColorVariantIdx === vIdx}
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    setUploadingColorVariantIdx(vIdx);
+                                    try {
+                                      const formData = new FormData();
+                                      formData.append("file", file);
+                                      formData.append("folder", "products");
+                                      if (productForm.name) formData.append("product_name", productForm.name);
+                                      if (productForm.category) formData.append("category", productForm.category);
+                                      const colorRole = (variant.name || `shade-${vIdx + 1}`).toLowerCase().replace(/[^a-z0-9]/g, "-");
+                                      formData.append("role", `color-${colorRole}`);
+
+                                      const res = await fetch("/api/admin/upload", {
+                                        method: "POST",
+                                        body: formData,
+                                      });
+                                      const data = await res.json();
+                                      if (!res.ok || !data.success || !data.url) {
+                                        throw new Error(data.error || "Failed to upload photo for colour");
+                                      }
+                                      setProductForm((prev) => ({
+                                        ...prev,
+                                        color_variants: prev.color_variants.map((v, i) =>
+                                          i === vIdx ? { ...v, image_url: data.url } : v
+                                        ),
+                                      }));
+                                      showToast(`Uploaded dedicated photo for ${variant.name || `Colour #${vIdx + 1}`}!`);
+                                    } catch (err: unknown) {
+                                      const msg = err instanceof Error ? err.message : "Upload error";
+                                      showToast(msg, "error");
+                                    } finally {
+                                      setUploadingColorVariantIdx(null);
+                                      e.target.value = "";
+                                    }
+                                  }}
+                                  style={{ display: "none" }}
+                                />
+                                <span>{uploadingColorVariantIdx === vIdx ? "Uploading..." : "📷 Upload Photo"}</span>
+                              </label>
+                            </div>
+
+                            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                              <input
+                                type="text"
+                                value={variant.image_url || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setProductForm((prev) => ({
+                                    ...prev,
+                                    color_variants: prev.color_variants.map((v, i) =>
+                                      i === vIdx ? { ...v, image_url: val } : v
+                                    ),
+                                  }));
+                                }}
+                                placeholder="Paste Cloudflare URL or click 'Upload Photo' above"
+                                style={{
+                                  flex: 1,
+                                  padding: "7px 10px",
+                                  borderRadius: "6px",
+                                  border: "1px solid #CFBEAD",
+                                  fontSize: "12px",
+                                  color: "#261B13",
+                                }}
+                              />
+
+                              {variant.image_url && (
+                                <div
+                                  style={{
+                                    width: "36px",
+                                    height: "46px",
+                                    borderRadius: "4px",
+                                    overflow: "hidden",
+                                    border: "1px solid #CFBEAD",
+                                    flexShrink: 0,
+                                    position: "relative",
+                                  }}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={variant.image_url}
+                                    alt={variant.name || "Variant"}
+                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Sizes & Stock for this Shade */}
+                          <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px dashed #E8DED3" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span style={{ fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                  Sizes & Stock for {variant.name || `Shade #${vIdx + 1}`} ({variant.sizes?.length || 0})
+                                </span>
+                                <span style={{ fontSize: "11px", fontWeight: 600, color: (variant.sizes?.reduce((acc, s) => acc + (Number(s.stock) || 0), 0) || 0) > 0 ? "#0F7A50" : "#B91C1C", backgroundColor: (variant.sizes?.reduce((acc, s) => acc + (Number(s.stock) || 0), 0) || 0) > 0 ? "#EBF8F2" : "#FEF2F2", padding: "2px 6px", borderRadius: "4px" }}>
+                                  Total: {variant.sizes?.reduce((acc, s) => acc + (Number(s.stock) || 0), 0) || 0} pcs
+                                </span>
+                              </div>
+                              <div style={{ display: "flex", gap: "6px" }}>
+                                {productForm.available_sizes.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const garmentSizes = productForm.available_sizes.map((sz) => ({
+                                        size: sz,
+                                        stock: productForm.size_inventory[sz] !== undefined ? productForm.size_inventory[sz] : 5,
+                                      }));
+                                      setProductForm((prev) => {
+                                        const updated = prev.color_variants.map((v, i) =>
+                                          i === vIdx ? { ...v, sizes: garmentSizes, stock: garmentSizes.reduce((sum, s) => sum + s.stock, 0) } : v
+                                        );
+                                        const totalStock = updated.reduce((sum, v) => sum + (v.sizes?.reduce((sSum, s) => sSum + (Number(s.stock) || 0), 0) || v.stock || 0), 0);
+                                        return { ...prev, color_variants: updated, stock_count: String(totalStock) };
+                                      });
+                                    }}
+                                    style={{
+                                      fontSize: "10.5px",
+                                      padding: "3px 8px",
+                                      borderRadius: "4px",
+                                      border: "1px solid #CFBEAD",
+                                      backgroundColor: "#FFFFFF",
+                                      color: "#866951",
+                                      cursor: "pointer",
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    📋 Copy Garment Sizes
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setProductForm((prev) => {
+                                      const curSizes = variant.sizes || [];
+                                      const nextSizeName = `Size ${curSizes.length + 1}`;
+                                      const updatedSizes = [...curSizes, { size: nextSizeName, stock: 5 }];
+                                      const updatedVariants = prev.color_variants.map((v, i) =>
+                                        i === vIdx ? { ...v, sizes: updatedSizes, stock: updatedSizes.reduce((sum, s) => sum + s.stock, 0) } : v
+                                      );
+                                      const totalStock = updatedVariants.reduce((sum, v) => sum + (v.sizes?.reduce((sSum, s) => sSum + (Number(s.stock) || 0), 0) || v.stock || 0), 0);
+                                      return { ...prev, color_variants: updatedVariants, stock_count: String(totalStock) };
+                                    });
+                                  }}
+                                  style={{
+                                    fontSize: "10.5px",
+                                    padding: "3px 8px",
+                                    borderRadius: "4px",
+                                    backgroundColor: "#866951",
+                                    color: "#FFFFFF",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  + Add Size
+                                </button>
+                              </div>
+                            </div>
+
+                            {(!variant.sizes || variant.sizes.length === 0) ? (
+                              <div style={{ fontSize: "11px", color: "#866951", fontStyle: "italic", padding: "6px 0" }}>
+                                No specific size stock set for this shade. Click &quot;📋 Copy Garment Sizes&quot; or &quot;+ Add Size&quot;.
+                              </div>
+                            ) : (
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                                {variant.sizes.map((szObj, szIdx) => (
+                                  <div
+                                    key={szIdx}
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "6px",
+                                      padding: "4px 8px",
+                                      borderRadius: "6px",
+                                      backgroundColor: "#FFFFFF",
+                                      border: Number(szObj.stock) === 0 ? "1px solid #FCA5A5" : "1px solid #CFBEAD",
+                                      fontSize: "12px",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      value={szObj.size}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setProductForm((prev) => ({
+                                          ...prev,
+                                          color_variants: prev.color_variants.map((v, i) =>
+                                            i === vIdx
+                                              ? {
+                                                  ...v,
+                                                  sizes: v.sizes?.map((s, si) => (si === szIdx ? { ...s, size: val } : s)),
+                                                }
+                                              : v
+                                          ),
+                                        }));
+                                      }}
+                                      style={{
+                                        width: "55px",
+                                        padding: "2px 4px",
+                                        border: "1px solid #E8DED3",
+                                        borderRadius: "3px",
+                                        fontSize: "11px",
+                                        fontWeight: 600,
+                                        color: "#261B13",
+                                      }}
+                                      placeholder="Size"
+                                    />
+                                    <span style={{ fontSize: "10.5px", color: "#866951" }}>Qty:</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={szObj.stock}
+                                      onChange={(e) => {
+                                        const num = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                        setProductForm((prev) => {
+                                          const updatedVariants = prev.color_variants.map((v, i) => {
+                                            if (i !== vIdx) return v;
+                                            const newSizes = v.sizes?.map((s, si) => (si === szIdx ? { ...s, stock: num } : s)) || [];
+                                            return { ...v, sizes: newSizes, stock: newSizes.reduce((sum, s) => sum + s.stock, 0) };
+                                          });
+                                          const totalStock = updatedVariants.reduce((sum, v) => sum + (v.sizes?.reduce((sSum, s) => sSum + (Number(s.stock) || 0), 0) || v.stock || 0), 0);
+                                          return { ...prev, color_variants: updatedVariants, stock_count: String(totalStock) };
+                                        });
+                                      }}
+                                      style={{
+                                        width: "48px",
+                                        padding: "2px 4px",
+                                        border: Number(szObj.stock) === 0 ? "1px solid #EF4444" : "1px solid #E8DED3",
+                                        borderRadius: "3px",
+                                        fontSize: "11px",
+                                        fontWeight: 600,
+                                        color: Number(szObj.stock) === 0 ? "#DC2626" : "#261B13",
+                                        backgroundColor: Number(szObj.stock) === 0 ? "#FEF2F2" : "#FFFFFF",
+                                        textAlign: "center",
+                                      }}
+                                    />
+                                    {Number(szObj.stock) === 0 ? (
+                                      <span style={{ fontSize: "9px", fontWeight: 700, color: "#DC2626", textTransform: "uppercase" }}>OOS</span>
+                                    ) : (
+                                      <span style={{ fontSize: "9px", fontWeight: 600, color: "#0F7A50" }}>✓</span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setProductForm((prev) => {
+                                          const updatedVariants = prev.color_variants.map((v, i) => {
+                                            if (i !== vIdx) return v;
+                                            const newSizes = v.sizes?.filter((_, si) => si !== szIdx) || [];
+                                            return { ...v, sizes: newSizes, stock: newSizes.reduce((sum, s) => sum + s.stock, 0) };
+                                          });
+                                          const totalStock = updatedVariants.reduce((sum, v) => sum + (v.sizes?.reduce((sSum, s) => sSum + (Number(s.stock) || 0), 0) || v.stock || 0), 0);
+                                          return { ...prev, color_variants: updatedVariants, stock_count: String(totalStock) };
+                                        });
+                                      }}
+                                      style={{
+                                        background: "none",
+                                        border: "none",
+                                        color: "#991B1B",
+                                        cursor: "pointer",
+                                        fontSize: "11px",
+                                        padding: "0 2px",
+                                        lineHeight: 1,
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#866951", marginBottom: "6px" }}>
                     Drape Craft & Description
@@ -5353,6 +6158,128 @@ CREATE POLICY "Super admin can delete reviews" ON public.product_reviews FOR DEL
             <p style={{ fontSize: "13px", color: "#543E2E", lineHeight: "1.6" }}>
               {viewingProduct.description || "No specific weave notes provided for this drape."}
             </p>
+
+            {/* Sizes in View Modal */}
+            {viewingProduct.available_sizes && viewingProduct.available_sizes.length > 0 && (
+              <div style={{ marginTop: "14px", marginBottom: "14px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
+                  Available Sizes & Stock ({viewingProduct.available_sizes.length})
+                </span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {viewingProduct.available_sizes.map((sz, idx) => {
+                    const sizeInv = viewingProduct.size_inventory || (viewingProduct.specifications as Record<string, unknown> | undefined)?.size_inventory as Record<string, number> | undefined;
+                    const stock = sizeInv?.[sz];
+                    return (
+                      <span
+                        key={idx}
+                        style={{
+                          padding: "3px 8px",
+                          borderRadius: "4px",
+                          backgroundColor: stock === 0 ? "#FEF2F2" : "#FAF7F2",
+                          border: stock === 0 ? "1px solid #FCA5A5" : "1px solid #CFBEAD",
+                          fontSize: "11.5px",
+                          fontWeight: 600,
+                          color: "#261B13",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        <span>{sz}</span>
+                        {stock !== undefined && (
+                          <span style={{ fontSize: "10px", color: stock === 0 ? "#DC2626" : "#866951", fontWeight: stock === 0 ? 700 : 500 }}>
+                            ({stock === 0 ? "Out of Stock" : `${stock} pcs`})
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Colourways in View Modal */}
+            {viewingProduct.color_variants && viewingProduct.color_variants.length > 0 && (
+              <div style={{ marginTop: "14px", marginBottom: "14px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
+                  Colour Variants & Inventory ({viewingProduct.color_variants.length})
+                </span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {viewingProduct.color_variants.map((v, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: "6px",
+                        backgroundColor: "#FAF7F2",
+                        border: "1px solid #E8DED3",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: v.sizes && v.sizes.length > 0 ? "6px" : "0" }}>
+                        <span
+                          style={{
+                            width: "18px",
+                            height: "18px",
+                            borderRadius: "50%",
+                            backgroundColor: v.hex || "#261B13",
+                            border: "1px solid #CFBEAD",
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#261B13", flex: 1 }}>
+                          {v.name}
+                        </span>
+                        {v.stock !== undefined && (
+                          <span style={{ fontSize: "11px", color: v.stock === 0 ? "#DC2626" : "#0F7A50", fontWeight: 600 }}>
+                            {v.stock === 0 ? "Out of stock" : `${v.stock} in stock`}
+                          </span>
+                        )}
+                        {(v.image_url || v.primary_image) && (
+                          <div
+                            style={{
+                              width: "30px",
+                              height: "40px",
+                              borderRadius: "4px",
+                              overflow: "hidden",
+                              border: "1px solid #CFBEAD",
+                              flexShrink: 0,
+                              position: "relative",
+                            }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={v.image_url || v.primary_image}
+                              alt={v.name}
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      {v.sizes && v.sizes.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginLeft: "28px" }}>
+                          {v.sizes.map((s, sIdx) => (
+                            <span
+                              key={sIdx}
+                              style={{
+                                fontSize: "10.5px",
+                                padding: "2px 6px",
+                                borderRadius: "3px",
+                                backgroundColor: Number(s.stock) === 0 ? "#FEF2F2" : "#FFFFFF",
+                                border: Number(s.stock) === 0 ? "1px solid #FCA5A5" : "1px solid #CFBEAD",
+                                color: Number(s.stock) === 0 ? "#DC2626" : "#261B13",
+                                fontWeight: 500,
+                              }}
+                            >
+                              {s.size}: {Number(s.stock) === 0 ? "OOS" : `${s.stock} pcs`}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "24px" }}>
               <button

@@ -105,6 +105,11 @@ export async function DELETE(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const auth = await authenticateAdminRequest();
+    if (!auth.authorized) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
+
     const supabaseAdmin = getAdminSupabaseClient();
     const body = await request.json().catch(() => null);
 
@@ -114,11 +119,6 @@ export async function POST(request: Request) {
 
     // Action 1: Admin manually sends or resends an acknowledgement email for an existing inquiry
     if (body.action === "acknowledge") {
-      const auth = await authenticateAdminRequest();
-      if (!auth.authorized) {
-        return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
-      }
-
       const inquiryId = body.id;
       if (!inquiryId) {
         return NextResponse.json({ success: false, error: "Inquiry ID is required to send acknowledgement." }, { status: 400 });

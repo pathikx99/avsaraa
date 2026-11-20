@@ -155,6 +155,7 @@ export async function POST(request: Request) {
     // 2. Validate Coupon Code
     let discountAmount = 0;
     let validatedCoupon: string | null = null;
+    let isFreeShippingCoupon = false;
 
     if (coupon_code && coupon_code.trim()) {
       const coupValidation = await validateCouponEngine({
@@ -175,6 +176,9 @@ export async function POST(request: Request) {
 
       discountAmount = coupValidation.discountAmount || 0;
       validatedCoupon = coupValidation.coupon?.code || coupon_code.trim().toUpperCase();
+      if (coupValidation.coupon?.discount_type === "free_shipping") {
+        isFreeShippingCoupon = true;
+      }
     }
 
     // 3. Compute Financial Totals (Inclusive 5% GST & Logistics)
@@ -182,6 +186,7 @@ export async function POST(request: Request) {
       subtotal: rawSubtotal,
       discountAmount,
       paymentMethod: "Online Card / UPI",
+      customShippingFee: isFreeShippingCoupon ? 0 : undefined,
     });
 
     const amountInPaise = Math.round(financials.totalAmount * 100);

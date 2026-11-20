@@ -68,8 +68,14 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const rawCode = (body.code || "").trim().toUpperCase();
-    const discountType = body.discount_type === "fixed" ? "fixed" : "percentage";
-    const discountValue = Number(body.discount_value);
+    const discountType: "percentage" | "fixed" | "free_shipping" =
+      body.discount_type === "free_shipping"
+        ? "free_shipping"
+        : body.discount_type === "fixed"
+        ? "fixed"
+        : "percentage";
+    const isFreeShipping = discountType === "free_shipping";
+    const discountValue = isFreeShipping ? 0 : Number(body.discount_value);
     const minOrderAmount = Number(body.min_order_amount) || 0;
     const maxDiscountAmount = body.max_discount_amount ? Number(body.max_discount_amount) : null;
     const usageLimit = body.usage_limit ? Number(body.usage_limit) : null;
@@ -90,7 +96,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (isNaN(discountValue) || discountValue <= 0) {
+    if (!isFreeShipping && (isNaN(discountValue) || discountValue <= 0)) {
       return NextResponse.json(
         { success: false, error: "Discount value must be a positive number." },
         { status: 400 }
@@ -134,6 +140,25 @@ export async function POST(request: Request) {
       insertError = retry.error;
     }
 
+    // Database check constraint fallback: if DB table enforces CHECK (discount_type IN ('percentage', 'fixed'))
+    if (
+      insertError &&
+      isFreeShipping &&
+      (insertError.code === "23514" ||
+        insertError.message?.toLowerCase().includes("check") ||
+        insertError.message?.toLowerCase().includes("constraint"))
+    ) {
+      insertPayload.discount_type = "fixed";
+      insertPayload.discount_value = 50; // standard delivery amount fallback
+      const fallbackRetry = await supabaseAdmin
+        .from("coupons")
+        .insert(insertPayload)
+        .select()
+        .single();
+      data = fallbackRetry.data;
+      insertError = fallbackRetry.error;
+    }
+
     if (insertError) {
       if (insertError.code === "23505") {
         return NextResponse.json(
@@ -148,8 +173,8 @@ export async function POST(request: Request) {
     }
     newCoupon = data;
 
-    // Persist per_user_limit in metadata fallback
-    saveCouponMetadata(rawCode, perUserLimit);
+    // Persist per_user_limit and is_free_shipping in metadata
+    saveCouponMetadata(rawCode, perUserLimit, isFreeShipping);
     const enriched = enrichCoupon(newCoupon as Coupon);
 
     return NextResponse.json({

@@ -2,7 +2,6 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSuperAdminUser } from "@/lib/adminConstants";
 import { getSupabaseUrl, getSupabasePublishableKey } from "@/lib/env";
-import { verifyAdminToken, ADMIN_COOKIE_NAME } from "@/lib/jwtAdmin";
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -33,35 +32,10 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // 1. Protected Route: /admin requires standalone 'admin-auth' JWT OR Super Admin session
+  // 1. /admin renders its own dedicated Super Admin Security Gate when unauthenticated,
+  // allowing direct master password authentication on /admin without redirecting away to /login.
   if (pathname.startsWith("/admin")) {
-    const adminCookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-    let isAdminJwtValid = false;
-
-    if (adminCookie) {
-      const jwtResult = await verifyAdminToken(adminCookie);
-      if (jwtResult.valid && jwtResult.payload?.role === "admin") {
-        isAdminJwtValid = true;
-      }
-    }
-
-    // If no valid admin JWT, fallback to Supabase user session check
-    if (!isAdminJwtValid) {
-      if (!user) {
-        const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = "/login";
-        redirectUrl.searchParams.set("redirectTo", pathname);
-        return NextResponse.redirect(redirectUrl);
-      }
-
-      const isSuperAdmin = isSuperAdminUser(user);
-      if (!isSuperAdmin) {
-        const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = "/account";
-        redirectUrl.searchParams.set("error", "Access Denied: Super Admin authority required.");
-        return NextResponse.redirect(redirectUrl);
-      }
-    }
+    return supabaseResponse;
   }
 
   // 2. Protected Route: /account requires an active customer session with verified email
@@ -115,14 +89,18 @@ export async function proxy(request: NextRequest) {
         if (!UUID_REGEX.test(rawId)) {
           return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
         }
-        const { data: product } = await supabase
-          .from("products")
-          .select("id")
-          .eq("id", rawId)
-          .maybeSingle();
+        try {
+          const { data: product, error } = await supabase
+            .from("products")
+            .select("id")
+            .eq("id", rawId)
+            .maybeSingle();
 
-        if (!product) {
-          return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
+          if (!error && !product) {
+            return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
+          }
+        } catch {
+          // If query fails due to network/cold-start, let the product route handle it
         }
       }
     }

@@ -16,18 +16,21 @@ export type OccasionType =
 
 export type ProductType = "standalone" | "top" | "bottom" | "set";
 
+export interface ColorVariantSize {
+  size: string;
+  stock: number;
+  sku?: string;
+  price?: number;
+}
+
 export interface ColorVariant {
   name: string;
   hex: string;
   image_url?: string;
   primary_image?: string;
   gallery_images?: string[];
-  sizes?: Array<{
-    size: string;
-    sku?: string;
-    stock?: number;
-    price?: number;
-  }>;
+  stock?: number;
+  sizes?: ColorVariantSize[];
 }
 
 export interface ProductHighlight {
@@ -52,8 +55,10 @@ export interface Product {
   product_type?: ProductType;
   gallery_images?: string[];
   available_sizes?: string[];
-  specifications?: Record<string, string>;
+  size_inventory?: Record<string, number>;
+  specifications?: Record<string, unknown>;
   stock_count?: number;
+  display_order?: number;
   mrp?: number;
   discount_percent?: number;
   fabric?: string;

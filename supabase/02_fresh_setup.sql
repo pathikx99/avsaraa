@@ -50,23 +50,35 @@ CREATE POLICY "Public Storage Read Access"
     TO public
     USING (bucket_id IN ('items', 'avatars'));
 
+DROP POLICY IF EXISTS "Service and User Avatar Upload" ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated and Service Upload" ON storage.objects;
-CREATE POLICY "Authenticated and Service Upload"
+CREATE POLICY "Service and User Avatar Upload"
     ON storage.objects FOR INSERT
     TO authenticated, service_role
-    WITH CHECK (bucket_id IN ('items', 'avatars'));
+    WITH CHECK (
+        (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text)
+        OR (auth.role() = 'service_role')
+    );
 
+DROP POLICY IF EXISTS "Service and User Avatar Update" ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated and Service Update" ON storage.objects;
-CREATE POLICY "Authenticated and Service Update"
+CREATE POLICY "Service and User Avatar Update"
     ON storage.objects FOR UPDATE
     TO authenticated, service_role
-    USING (bucket_id IN ('items', 'avatars'));
+    USING (
+        (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text)
+        OR (auth.role() = 'service_role')
+    );
 
+DROP POLICY IF EXISTS "Service and User Avatar Delete" ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated and Service Delete" ON storage.objects;
-CREATE POLICY "Authenticated and Service Delete"
+CREATE POLICY "Service and User Avatar Delete"
     ON storage.objects FOR DELETE
     TO authenticated, service_role
-    USING (bucket_id IN ('items', 'avatars'));
+    USING (
+        (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text)
+        OR (auth.role() = 'service_role')
+    );
 
 -- ------------------------------------------------------------------------------
 -- 3. SUPER ADMIN USERS (Single Master Authority Model)
@@ -120,23 +132,6 @@ CREATE POLICY "Super admin can insert admin users"
 CREATE POLICY "Super admin can update admin users" 
     ON public.admin_users FOR UPDATE 
     USING (public.is_admin());
-
--- Pre-seed default master administrator authority
-INSERT INTO public.admin_users (
-    full_name,
-    email,
-    role,
-    department,
-    status,
-    permissions
-) VALUES (
-    'Avsaraa Master Authority',
-    'web.avsaraa@gmail.com',
-    'Super Admin',
-    'Executive Leadership',
-    'Active',
-    ARRAY['all:super_admin', 'products:manage', 'customers:manage', 'inquiries:manage', 'system:admin']
-) ON CONFLICT (email) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
 -- 4. USER PROFILES (Patrons, CRM Accounts & Concierge Notes)
@@ -380,92 +375,6 @@ CREATE POLICY "Only super admin can delete products"
     ON public.products FOR DELETE 
     USING (public.is_admin());
 
--- Seed Initial Atelier Handloom & Festive Products
-INSERT INTO public.products (
-    id, name, category, price, mrp, discount_percent, image_url, gallery_images, description, fabric, occasion_tags, stock_count, sales_count, product_type
-) VALUES 
-(
-    'e0000000-0000-0000-0000-000000000001',
-    'Royal Banarasi Katan Silk Saree',
-    'Sarees',
-    24999.00,
-    32500.00,
-    23,
-    '/images/saree_model_hero.jpg',
-    '["/images/saree_model_hero.jpg", "/images/occasion_traditional.jpg", "/images/occasion_wedding.jpg"]'::jsonb,
-    'Pure mulberry Katan silk handwoven on traditional Varanasi handlooms with intricate real zari kadhwa floral jaal and a regal gold brocade pallu.',
-    'Pure Mulberry Katan Silk',
-    ARRAY['Traditional & Ceremonial Wear', 'Wedding Guest', 'Festive Edit'],
-    10,
-    320,
-    'standalone'
-),
-(
-    'e0000000-0000-0000-0000-000000000004',
-    'Festive Chanderi Foil Print Dress',
-    'Dresses',
-    12500.00,
-    16900.00,
-    26,
-    '/images/occasion_festive.jpg',
-    '["/images/occasion_festive.jpg", "/images/occasion_party.jpg", "/images/botanical_flowers.jpg"]'::jsonb,
-    'Contemporary silhouette crafted from lightweight Chanderi weave featuring artisanal metallic foil accents, soft inner lining, and a flowing flared hem.',
-    'Pure Chanderi Silk Blend',
-    ARRAY['Festive Edit', 'Haldi & Mehendi', 'Party & Special Occasions'],
-    15,
-    215,
-    'top'
-),
-(
-    'e0000000-0000-0000-0000-000000000002',
-    'Emerald Organza Embroidered Saree',
-    'Sarees',
-    18450.00,
-    23900.00,
-    23,
-    '/images/occasion_traditional.jpg',
-    '["/images/occasion_traditional.jpg", "/images/occasion_party.jpg", "/images/saree_model_hero.jpg"]'::jsonb,
-    'Whisper-light handloom organza saree in deep emerald adorned with scalloped hand-cut resham embroidery and delicate badla zari accents.',
-    'Pure Sheer Handloom Organza Silk',
-    ARRAY['Traditional & Ceremonial Wear', 'Party & Special Occasions'],
-    8,
-    190,
-    'standalone'
-),
-(
-    'e1000000-0000-0000-0000-000000000003',
-    'Indigo Floral Handblock Printed Suit Set',
-    'Dresses',
-    1299.00,
-    1899.00,
-    32,
-    '/images/occasion_everyday.jpg',
-    '["/images/occasion_everyday.jpg", "/images/occasion_festive.jpg", "/images/botanical_flowers.jpg"]'::jsonb,
-    'Breathable pure cotton slub suit set in deep indigo blue, featuring traditional handblock botanical motifs, comfortable straight-fit trousers, and matching lightweight stole.',
-    '100% Breathable Pure Cotton Slub',
-    ARRAY['Everyday Essentials', 'Festive Edit'],
-    25,
-    210,
-    'set'
-),
-(
-    'e1000000-0000-0000-0000-000000000009',
-    'Sage Minimalist Linen Everyday Kurta',
-    'Dresses',
-    1250.00,
-    1750.00,
-    29,
-    '/images/occasion_everyday.jpg',
-    '["/images/occasion_everyday.jpg", "/images/occasion_party.jpg"]'::jsonb,
-    'Minimalist hand-spun linen kurta in soothing sage green. Tailored with a relaxed silhouette, side slits, and mother-of-pearl button detailing for effortless everyday elegance.',
-    'Pure Handloom Linen & Breathable Cotton Blend',
-    ARRAY['Everyday Essentials'],
-    20,
-    88,
-    'top'
-)
-ON CONFLICT (id) DO NOTHING;
-
 -- ------------------------------------------------------------------------------
 -- 7. CONTACT & CONCIERGE INQUIRIES
 -- ------------------------------------------------------------------------------
@@ -611,8 +520,8 @@ CREATE OR REPLACE TRIGGER protect_review_fields_trigger
 CREATE TABLE public.coupons (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code TEXT UNIQUE NOT NULL,
-    discount_type TEXT NOT NULL CHECK (discount_type IN ('percentage', 'fixed')),
-    discount_value NUMERIC(10, 2) NOT NULL CHECK (discount_value > 0),
+    discount_type TEXT NOT NULL CHECK (discount_type IN ('percentage', 'fixed', 'free_shipping')),
+    discount_value NUMERIC(10, 2) NOT NULL CHECK (discount_value >= 0),
     min_order_amount NUMERIC(10, 2) DEFAULT 0 CHECK (min_order_amount >= 0),
     max_discount_amount NUMERIC(10, 2),
     is_active BOOLEAN DEFAULT true NOT NULL,
@@ -641,22 +550,6 @@ CREATE POLICY "Super admin can update coupons"
 CREATE POLICY "Super admin can delete coupons" 
     ON public.coupons FOR DELETE 
     USING (public.is_admin());
-
-INSERT INTO public.coupons (
-    code,
-    discount_type,
-    discount_value,
-    min_order_amount,
-    max_discount_amount,
-    is_active
-) VALUES (
-    'AVSARAA10',
-    'percentage',
-    10.00,
-    0,
-    10000.00,
-    true
-) ON CONFLICT (code) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
 -- 12. ORDERS, ORDER ITEMS & PAYMENTS

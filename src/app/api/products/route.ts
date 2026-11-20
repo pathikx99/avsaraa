@@ -3,6 +3,7 @@ import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { normalizeProducts } from "@/lib/productUtils";
 import { Product } from "@/types/product";
 import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
+import { sortProductsByShowcase } from "@/lib/showcaseOrderManager";
 
 // In-Memory Server Cache for Ultra-Fast Product Fetching
 interface CacheEntry {
@@ -91,6 +92,9 @@ export async function GET(request: Request) {
       filtered.sort((a, b) => a.price - b.price);
     } else if (sort === "price-desc") {
       filtered.sort((a, b) => b.price - a.price);
+    } else {
+      // Default / Featured: Showcase Ordering curated by Super Admin
+      filtered = sortProductsByShowcase(filtered);
     }
 
     // Apply Limit

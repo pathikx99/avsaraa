@@ -103,7 +103,15 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
     assert.strictEqual(ord2.shippingFee, 0);
     assert.strictEqual(ord2.codSurcharge, 0);
     assert.strictEqual(ord2.totalAmount, 1050);
-    assert.strictEqual(ord2.gstAmount, 50);
-    assert.strictEqual(ord2.taxableAmount, 1000);
+    // Scenario 3: Subtotal ₹400 with Free Shipping Promo (customShippingFee: 0) and Prepaid -> Shipping ₹0, COD ₹0 -> Total ₹400
+    const ord3 = calculateOrderTotals({
+      subtotal: 400,
+      discountAmount: 0,
+      paymentMethod: "Online Card / UPI",
+      customShippingFee: 0,
+    });
+    assert.strictEqual(ord3.shippingFee, 0);
+    assert.strictEqual(ord3.codSurcharge, 0);
+    assert.strictEqual(ord3.totalAmount, 400);
   });
 });

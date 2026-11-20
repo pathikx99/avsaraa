@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import type { User } from "@supabase/supabase-js";
 import { AdminUser } from "@/types/admin";
-import { ADMIN_EMAIL, isSuperAdminUser } from "@/lib/adminConstants";
+import { ADMIN_EMAIL, ADMIN_DEFAULT_PASSWORD, isSuperAdminUser } from "@/lib/adminConstants";
 import { verifyAdminSession, AdminJwtPayload } from "@/lib/jwtAdmin";
 
 export interface AdminAuthResult {
@@ -30,9 +30,20 @@ function safeTimingCompare(a: string, b: string): boolean {
  * Returns server-side admin credentials configured from environment variables.
  */
 export function getAdminServerCredentials() {
+  const isLiveProduction = process.env.VERCEL_ENV === "production";
+  const password = process.env.ADMIN_PASSWORD;
+  if (
+    isLiveProduction &&
+    (!password || password === ADMIN_DEFAULT_PASSWORD)
+  ) {
+    console.error(
+      "Critical Security Warning: Insecure default ADMIN_PASSWORD detected in live production deployment."
+    );
+  }
+
   return {
     email: (process.env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase().trim(),
-    password: process.env.ADMIN_PASSWORD || "",
+    password: password || ADMIN_DEFAULT_PASSWORD,
   };
 }
 

@@ -5,6 +5,21 @@ import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 
 export const FALLBACK_COUPONS: Coupon[] = [
   {
+    id: "default-freedel",
+    code: "FREEDEL",
+    discount_type: "free_shipping",
+    discount_value: 0,
+    min_order_amount: 0,
+    max_discount_amount: null,
+    is_active: true,
+    usage_limit: 1000,
+    used_count: 5,
+    valid_from: new Date(Date.now() - 30 * 86400000).toISOString(),
+    valid_until: null,
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+    per_user_limit: 3,
+  },
+  {
     id: "default-avsaraa10",
     code: "AVSARAA10",
     discount_type: "percentage",
@@ -39,6 +54,7 @@ export const FALLBACK_COUPONS: Coupon[] = [
 interface CouponsMetadata {
   [code: string]: {
     per_user_limit?: number;
+    is_free_shipping?: boolean;
   };
 }
 
@@ -46,7 +62,7 @@ const METADATA_FILE_PATH = path.join(process.cwd(), "src", "data", "couponsMetad
 const memoryCouponMeta: CouponsMetadata = {};
 
 /**
- * Reads local coupon metadata (per_user_limit).
+ * Reads local coupon metadata (per_user_limit, is_free_shipping).
  */
 export function readCouponsMetadata(): CouponsMetadata {
   try {
@@ -62,13 +78,18 @@ export function readCouponsMetadata(): CouponsMetadata {
 }
 
 /**
- * Saves coupon metadata (per_user_limit).
+ * Saves coupon metadata (per_user_limit, is_free_shipping).
  */
-export function saveCouponMetadata(code: string, perUserLimit?: number | null) {
+export function saveCouponMetadata(
+  code: string,
+  perUserLimit?: number | null,
+  isFreeShipping?: boolean
+) {
   const cleanCode = code.trim().toUpperCase();
   memoryCouponMeta[cleanCode] = {
     ...memoryCouponMeta[cleanCode],
-    per_user_limit: perUserLimit && perUserLimit > 0 ? perUserLimit : 1,
+    per_user_limit: perUserLimit && perUserLimit > 0 ? perUserLimit : (memoryCouponMeta[cleanCode]?.per_user_limit || 1),
+    is_free_shipping: isFreeShipping !== undefined ? isFreeShipping : Boolean(memoryCouponMeta[cleanCode]?.is_free_shipping),
   };
 
   try {
@@ -100,7 +121,7 @@ export function removeCouponMetadata(code: string) {
 }
 
 /**
- * Enriches raw coupon with per_user_limit.
+ * Enriches raw coupon with per_user_limit and is_free_shipping.
  */
 export function enrichCoupon(coupon: Coupon): Coupon {
   const meta = readCouponsMetadata();
@@ -112,8 +133,12 @@ export function enrichCoupon(coupon: Coupon): Coupon {
       ? meta[cleanCode].per_user_limit
       : 1;
 
+  const isFreeShipping = coupon.discount_type === "free_shipping" || Boolean(meta[cleanCode]?.is_free_shipping);
+
   return {
     ...coupon,
+    discount_type: isFreeShipping ? "free_shipping" : coupon.discount_type,
+    discount_value: isFreeShipping ? 0 : coupon.discount_value,
     per_user_limit: perUserLimit,
   };
 }
@@ -125,7 +150,7 @@ export interface CouponValidationResult {
   coupon?: {
     code: string;
     discount_amount: number;
-    discount_type: "percentage" | "fixed";
+    discount_type: "percentage" | "fixed" | "free_shipping";
     discount_value: number;
     max_discount_amount?: number | null;
     min_order_amount: number;
@@ -297,6 +322,9 @@ export async function validateCouponEngine({
     if (couponData.max_discount_amount && discountAmount > couponData.max_discount_amount) {
       discountAmount = couponData.max_discount_amount;
     }
+  } else if (couponData.discount_type === "free_shipping") {
+    // Free delivery: discount on garment subtotal is 0 (delivery fee waived to 0 at checkout)
+    discountAmount = 0;
   } else {
     // Fixed Rupee Discount
     discountAmount = Math.min(couponData.discount_value, subtotal);

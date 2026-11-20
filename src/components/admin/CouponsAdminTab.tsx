@@ -31,7 +31,7 @@ export default function CouponsAdminTab({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newCode, setNewCode] = useState("");
-  const [newDiscountType, setNewDiscountType] = useState<"percentage" | "fixed">("percentage");
+  const [newDiscountType, setNewDiscountType] = useState<"percentage" | "fixed" | "free_shipping">("percentage");
   const [newDiscountValue, setNewDiscountValue] = useState("");
   const [newMinOrderAmount, setNewMinOrderAmount] = useState("");
   const [newMaxDiscountAmount, setNewMaxDiscountAmount] = useState("");
@@ -129,8 +129,9 @@ export default function CouponsAdminTab({
       showToast("Please enter a promo code.", "error");
       return;
     }
-    const val = Number(newDiscountValue);
-    if (!val || val <= 0) {
+    const isFreeShipping = newDiscountType === "free_shipping";
+    const val = isFreeShipping ? 0 : Number(newDiscountValue);
+    if (!isFreeShipping && (!val || val <= 0)) {
       showToast("Please enter a valid discount value.", "error");
       return;
     }
@@ -608,12 +609,16 @@ export default function CouponsAdminTab({
                       {/* Benefit */}
                       <td style={{ padding: "16px 16px" }}>
                         <div style={{ fontWeight: 600, color: "#261B13" }}>
-                          {coupon.discount_type === "percentage"
+                          {coupon.discount_type === "free_shipping"
+                            ? "🚚 FREE DELIVERY"
+                            : coupon.discount_type === "percentage"
                             ? `${coupon.discount_value}% OFF`
                             : `${formatINR(coupon.discount_value)} FLAT OFF`}
                         </div>
                         <div style={{ fontSize: "0.75rem", color: "#8E8782" }}>
-                          {coupon.discount_type === "percentage"
+                          {coupon.discount_type === "free_shipping"
+                            ? "100% Waived Delivery Fee"
+                            : coupon.discount_type === "percentage"
                             ? "Percentage discount"
                             : "Direct flat deduction"}
                         </div>
@@ -867,7 +872,7 @@ export default function CouponsAdminTab({
                     <select
                       value={newDiscountType}
                       onChange={(e) =>
-                        setNewDiscountType(e.target.value as "percentage" | "fixed")
+                        setNewDiscountType(e.target.value as "percentage" | "fixed" | "free_shipping")
                       }
                       style={{
                         width: "100%",
@@ -881,40 +886,68 @@ export default function CouponsAdminTab({
                     >
                       <option value="percentage">Percentage (%)</option>
                       <option value="fixed">Fixed Rupee (₹)</option>
+                      <option value="free_shipping">Free Delivery (100% Off Shipping)</option>
                     </select>
                   </div>
 
                   <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: "0.78rem",
-                        fontWeight: 600,
-                        color: "#3B332E",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        marginBottom: 6,
-                      }}
-                    >
-                      {newDiscountType === "percentage" ? "Percentage Off (%) *" : "Flat Off (₹) *"}
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      max={newDiscountType === "percentage" ? 100 : undefined}
-                      placeholder={newDiscountType === "percentage" ? "10" : "500"}
-                      value={newDiscountValue}
-                      onChange={(e) => setNewDiscountValue(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        border: "1px solid #E0D9D0",
-                        fontSize: "0.85rem",
-                        outline: "none",
-                      }}
-                    />
+                    {newDiscountType === "free_shipping" ? (
+                      <div
+                        style={{
+                          height: "100%",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "flex-end",
+                        }}
+                      >
+                        <div
+                          style={{
+                            padding: "9px 12px",
+                            borderRadius: 8,
+                            backgroundColor: "#F4EFFC",
+                            border: "1px solid #D8C7F5",
+                            fontSize: "0.78rem",
+                            color: "#6F42C1",
+                            fontWeight: 600,
+                          }}
+                        >
+                          🚚 Standard delivery fee (₹50) is 100% waived
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: "0.78rem",
+                            fontWeight: 600,
+                            color: "#3B332E",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                            marginBottom: 6,
+                          }}
+                        >
+                          {newDiscountType === "percentage" ? "Percentage Off (%) *" : "Flat Off (₹) *"}
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          min={1}
+                          max={newDiscountType === "percentage" ? 100 : undefined}
+                          placeholder={newDiscountType === "percentage" ? "10" : "500"}
+                          value={newDiscountValue}
+                          onChange={(e) => setNewDiscountValue(e.target.value)}
+                          style={{
+                            width: "100%",
+                            padding: "10px 12px",
+                            borderRadius: 8,
+                            border: "1px solid #E0D9D0",
+                            fontSize: "0.85rem",
+                            outline: "none",
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 

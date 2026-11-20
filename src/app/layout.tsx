@@ -39,6 +39,7 @@ import { WishlistProvider } from "@/context/WishlistContext";
 import CartDrawer from "@/components/CartDrawer";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import RecentlyViewedBar from "@/components/RecentlyViewedBar";
 
 export default function RootLayout({
   children,
@@ -57,6 +58,7 @@ export default function RootLayout({
             {children}
             <CartDrawer />
             <AuthRequiredModal />
+            <RecentlyViewedBar />
             <Suspense fallback={null}>
               <MobileBottomNav />
             </Suspense>

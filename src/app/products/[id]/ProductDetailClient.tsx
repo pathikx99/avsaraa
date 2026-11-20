@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -87,6 +87,89 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     city?: string;
     message?: string;
   }>({ status: "idle" });
+
+  // Real-Time Express Delivery Countdown (5:00 PM IST Cutoff for Surat Dispatch)
+  const [expressCountdown, setExpressCountdown] = useState<{
+    hours: string;
+    minutes: string;
+    seconds: string;
+    isSameDay: boolean;
+    targetDateFormatted: string;
+    deliveryDateFormatted: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const calculateCountdown = () => {
+      const now = new Date();
+      // Calculate IST time (UTC + 5:30)
+      const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
+      const istNow = new Date(utcTime + 5.5 * 3600000);
+
+      const istYear = istNow.getFullYear();
+      const istMonth = istNow.getMonth();
+      const istDate = istNow.getDate();
+
+      // Today 5:00 PM IST (17:00:00)
+      let targetIST = new Date(istYear, istMonth, istDate, 17, 0, 0);
+      let isSameDay = true;
+
+      // If already past 5 PM IST, count down to tomorrow 5 PM IST
+      if (istNow.getTime() >= targetIST.getTime()) {
+        targetIST = new Date(istYear, istMonth, istDate + 1, 17, 0, 0);
+        isSameDay = false;
+      }
+
+      const diffMs = Math.max(0, targetIST.getTime() - istNow.getTime());
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+      // Estimated Delivery: 2 business days from dispatch
+      const deliveryEst = new Date(targetIST);
+      deliveryEst.setDate(deliveryEst.getDate() + (isSameDay ? 2 : 3));
+      const options: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" };
+      const deliveryFormatted = deliveryEst.toLocaleDateString("en-IN", options);
+
+      setExpressCountdown({
+        hours: String(hours).padStart(2, "0"),
+        minutes: String(minutes).padStart(2, "0"),
+        seconds: String(seconds).padStart(2, "0"),
+        isSameDay,
+        targetDateFormatted: isSameDay ? "Today" : "Tomorrow",
+        deliveryDateFormatted: deliveryFormatted,
+      });
+    };
+
+    calculateCountdown();
+    const timer = setInterval(calculateCountdown, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Recently Viewed Drapes persistence for floating bar
+  useEffect(() => {
+    if (!product || !product.id) return;
+    try {
+      const STORAGE_KEY = "avsaraa_recently_viewed";
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      const itemToSave = {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        mrp: product.mrp,
+        image_url: product.image_url,
+        category: product.category,
+        fabric: product.fabric,
+        viewed_at: Date.now(),
+      };
+      const filtered = Array.isArray(list) ? list.filter((x: { id: string }) => x && x.id !== product.id) : [];
+      const updated = [itemToSave, ...filtered].slice(0, 8);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      window.dispatchEvent(new Event("avsaraa:recently-viewed-updated"));
+    } catch {
+      // LocalStorage access failsafe
+    }
+  }, [product]);
 
   // Promotional coupon applied state
   const [isCouponApplied, setIsCouponApplied] = useState(false);
@@ -224,6 +307,60 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     );
   }, [product.color_variants, selectedColor]);
 
+  const allAvailableSizes = useMemo(() => {
+    if (activeColorVariant?.sizes && activeColorVariant.sizes.length > 0) {
+      return Array.from(new Set(activeColorVariant.sizes.map((s) => s.size)));
+    }
+    return Array.isArray(product.available_sizes) && product.available_sizes.length > 0
+      ? Array.from(new Set(product.available_sizes))
+      : ["Free Size"];
+  }, [activeColorVariant, product.available_sizes]);
+
+  const getSizeStock = useCallback(
+    (sz: string): number => {
+      // 1. If active colorway has explicit sizes with stock
+      if (activeColorVariant?.sizes && activeColorVariant.sizes.length > 0) {
+        const match = activeColorVariant.sizes.find(
+          (s) => s.size.toLowerCase().trim() === sz.toLowerCase().trim()
+        );
+        if (match && typeof match.stock === "number") {
+          return Math.max(0, match.stock);
+        }
+      }
+
+      // 2. If product has size_inventory (or specifications.size_inventory)
+      const sizeInv =
+        product.size_inventory ||
+        ((product.specifications as Record<string, unknown> | undefined)?.size_inventory as Record<string, number> | undefined);
+      if (sizeInv) {
+        if (sizeInv[sz] !== undefined) {
+          return Math.max(0, Number(sizeInv[sz]) || 0);
+        }
+        const matchKey = Object.keys(sizeInv).find(
+          (k) => k.toLowerCase().trim() === sz.toLowerCase().trim()
+        );
+        if (matchKey && sizeInv[matchKey] !== undefined) {
+          return Math.max(0, Number(sizeInv[matchKey]) || 0);
+        }
+      }
+
+      // 3. If active colorway has overall stock
+      if (activeColorVariant?.stock !== undefined) {
+        return Math.max(0, Number(activeColorVariant.stock) || 0);
+      }
+
+      // 4. Fallback to product stock_count
+      return product.stock_count !== undefined ? Math.max(0, product.stock_count) : 10;
+    },
+    [activeColorVariant, product.size_inventory, product.specifications, product.stock_count]
+  );
+
+  const currentVariantStock = useMemo(() => {
+    return getSizeStock(selectedSize);
+  }, [getSizeStock, selectedSize]);
+
+  const isCurrentVariantOutOfStock = currentVariantStock === 0;
+
   const activeGalleryImages = useMemo(() => {
     if (activeColorVariant?.gallery_images && activeColorVariant.gallery_images.length > 0) {
       return activeColorVariant.gallery_images;
@@ -241,10 +378,23 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const safeImageIndex = selectedImageIndex < activeGalleryImages.length ? selectedImageIndex : 0;
   const currentGalleryImg = activeGalleryImages[safeImageIndex] || product.image_url;
 
-  // Update image when color changes
+  // Update image when color changes and ensure valid size selection
   const handleColorChange = (variantName: string) => {
     setSelectedColor(variantName);
     setSelectedImageIndex(0);
+
+    const targetVariant = product.color_variants?.find((v) => v.name === variantName);
+    if (targetVariant?.sizes && targetVariant.sizes.length > 0) {
+      const curSizeStillInStock = targetVariant.sizes.some(
+        (s) => s.size.toLowerCase().trim() === selectedSize.toLowerCase().trim() && s.stock > 0
+      );
+      if (!curSizeStillInStock) {
+        const firstInStockSize = targetVariant.sizes.find((s) => s.stock > 0);
+        if (firstInStockSize) {
+          setSelectedSize(firstInStockSize.size);
+        }
+      }
+    }
   };
 
   // Gallery Navigation
@@ -278,6 +428,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   // Add to Cart
   const handleAddToCart = () => {
+    if (isCurrentVariantOutOfStock) return;
     const cartProduct: DetailedProduct = {
       ...product,
       price: product.price,
@@ -294,6 +445,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   // Buy Now
   const handleBuyNow = () => {
+    if (isCurrentVariantOutOfStock) return;
     const cartProduct: DetailedProduct = {
       ...product,
       price: product.price,
@@ -1324,32 +1476,63 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
               {/* Size Buttons */}
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {Array.from(new Set(product.available_sizes)).map((sz, idx) => {
+                {allAvailableSizes.map((sz, idx) => {
                   const isSelected = selectedSize === sz;
+                  const sizeStock = getSizeStock(sz);
+                  const isOutOfStock = sizeStock === 0;
                   return (
                     <button
                       key={`${sz}-${idx}`}
                       type="button"
                       onClick={() => setSelectedSize(sz)}
-                      aria-label={`Select size ${sz}`}
+                      aria-label={`Select size ${sz}${isOutOfStock ? " - Out of stock" : ""}`}
                       style={{
                         minWidth: sz.length > 5 ? "auto" : "44px",
                         height: "44px",
-                        padding: sz.length > 5 ? "0 16px" : "0 12px",
+                        padding: sz.length > 5 ? "0 14px" : "0 12px",
                         borderRadius: "8px",
-                        border: isSelected ? "2px solid #261B13" : "1px solid #D8CABE",
-                        backgroundColor: isSelected ? "#261B13" : "#FFFFFF",
-                        color: isSelected ? "#FAF7F2" : "#261B13",
+                        border: isSelected
+                          ? "2px solid #261B13"
+                          : isOutOfStock
+                          ? "1px dashed #D8CABE"
+                          : "1px solid #D8CABE",
+                        backgroundColor: isSelected
+                          ? "#261B13"
+                          : isOutOfStock
+                          ? "#FAF7F2"
+                          : "#FFFFFF",
+                        color: isSelected
+                          ? "#FAF7F2"
+                          : isOutOfStock
+                          ? "#9C8E82"
+                          : "#261B13",
                         fontSize: "13px",
                         fontWeight: 600,
                         cursor: "pointer",
-                        display: "flex",
+                        display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        gap: "6px",
                         transition: "all 0.18s ease",
+                        textDecoration: isOutOfStock && !isSelected ? "line-through" : "none",
                       }}
                     >
-                      {sz}
+                      <span>{sz}</span>
+                      {isOutOfStock && (
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            padding: "1px 5px",
+                            borderRadius: "3px",
+                            backgroundColor: isSelected ? "#8A181A" : "#EFE8E1",
+                            color: isSelected ? "#FFFFFF" : "#8A181A",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Sold Out
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -1478,21 +1661,20 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                         textAlign: "center",
                         fontSize: "14px",
                         fontWeight: 700,
-                        color: "#261B13",
+                        color: isCurrentVariantOutOfStock ? "#8A181A" : "#261B13",
                       }}
                     >
-                      {quantity}
+                      {isCurrentVariantOutOfStock ? 0 : quantity}
                     </span>
                     <button
                       type="button"
                       onClick={() =>
                         setQuantity((q) => {
-                          const maxStock =
-                            product.stock_count && product.stock_count > 0 ? product.stock_count : 10;
+                          const maxStock = Math.min(currentVariantStock, 10);
                           return Math.min(maxStock, q + 1);
                         })
                       }
-                      disabled={Boolean(product.stock_count && quantity >= product.stock_count)}
+                      disabled={isCurrentVariantOutOfStock || quantity >= currentVariantStock}
                       aria-label="Increase quantity"
                       style={{
                         width: "36px",
@@ -1500,13 +1682,13 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                         border: "none",
                         backgroundColor: "transparent",
                         color:
-                          product.stock_count && quantity >= product.stock_count
+                          isCurrentVariantOutOfStock || quantity >= currentVariantStock
                             ? "#C0B2A4"
                             : "#261B13",
                         fontSize: "18px",
                         fontWeight: 700,
                         cursor:
-                          product.stock_count && quantity >= product.stock_count
+                          isCurrentVariantOutOfStock || quantity >= currentVariantStock
                             ? "not-allowed"
                             : "pointer",
                         display: "flex",
@@ -1528,15 +1710,35 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                         width: "8px",
                         height: "8px",
                         borderRadius: "50%",
-                        backgroundColor: "#1E5E3A",
+                        backgroundColor: isCurrentVariantOutOfStock ? "#8A181A" : currentVariantStock <= 5 ? "#B37A2C" : "#1E5E3A",
                         display: "inline-block",
-                        boxShadow: "0 0 0 2px rgba(30, 94, 58, 0.2)",
+                        boxShadow: isCurrentVariantOutOfStock
+                          ? "0 0 0 2px rgba(138, 24, 26, 0.2)"
+                          : currentVariantStock <= 5
+                          ? "0 0 0 2px rgba(179, 122, 44, 0.2)"
+                          : "0 0 0 2px rgba(30, 94, 58, 0.2)",
                       }}
                     />
-                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#1E5E3A" }}>In Stock</span>
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: isCurrentVariantOutOfStock ? "#8A181A" : currentVariantStock <= 5 ? "#B37A2C" : "#1E5E3A",
+                      }}
+                    >
+                      {isCurrentVariantOutOfStock
+                        ? "Out of Stock"
+                        : currentVariantStock <= 5
+                        ? "Limited Stock"
+                        : "In Stock"}
+                    </span>
                   </div>
-                  <div style={{ fontSize: "10.5px", color: "#8E7D70", marginTop: "2px" }}>
-                    Only {product.stock_count} pieces left in this shade
+                  <div style={{ fontSize: "10.5px", color: isCurrentVariantOutOfStock ? "#8A181A" : "#8E7D70", marginTop: "2px" }}>
+                    {isCurrentVariantOutOfStock
+                      ? `Sold out in ${selectedSize}${selectedColor && selectedColor !== "Default" && selectedColor !== "Royal Edition" ? ` · ${selectedColor}` : ""}`
+                      : currentVariantStock <= 5
+                      ? `Only ${currentVariantStock} piece${currentVariantStock > 1 ? "s" : ""} left in this size & shade!`
+                      : `${currentVariantStock} pieces ready to dispatch`}
                   </div>
                 </div>
               </div>
@@ -1600,19 +1802,20 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               <button
                 type="button"
                 onClick={handleAddToCart}
-                aria-label="Add to Cart"
+                disabled={isCurrentVariantOutOfStock}
+                aria-label={isCurrentVariantOutOfStock ? "Out of Stock" : "Add to Cart"}
                 className="btn-shine"
                 style={{
                   height: "52px",
                   borderRadius: "8px",
-                  backgroundColor: isAddedToCart ? "#1E5E3A" : "#FFFFFF",
-                  color: isAddedToCart ? "#FFFFFF" : "#261B13",
-                  border: isAddedToCart ? "1px solid #1E5E3A" : "1.5px solid #261B13",
+                  backgroundColor: isCurrentVariantOutOfStock ? "#F7F2EE" : isAddedToCart ? "#1E5E3A" : "#FFFFFF",
+                  color: isCurrentVariantOutOfStock ? "#866951" : isAddedToCart ? "#FFFFFF" : "#261B13",
+                  border: isCurrentVariantOutOfStock ? "1px solid #CFBEAD" : isAddedToCart ? "1px solid #1E5E3A" : "1.5px solid #261B13",
                   fontSize: "12.5px",
                   fontWeight: 600,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  cursor: "pointer",
+                  cursor: isCurrentVariantOutOfStock ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -1621,35 +1824,36 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   boxShadow: "0 4px 12px rgba(38,27,19,0.06)",
                 }}
               >
-                <ShoppingBagIcon size={16} color={isAddedToCart ? "#FFFFFF" : "#261B13"} />
-                <span>{isAddedToCart ? "ADDED TO BAG ✓" : "ADD TO CART"}</span>
+                <ShoppingBagIcon size={16} color={isCurrentVariantOutOfStock ? "#866951" : isAddedToCart ? "#FFFFFF" : "#261B13"} />
+                <span>{isCurrentVariantOutOfStock ? "OUT OF STOCK" : isAddedToCart ? "ADDED TO BAG ✓" : "ADD TO CART"}</span>
               </button>
 
               {/* BUY NOW BUTTON */}
               <button
                 type="button"
                 onClick={handleBuyNow}
-                aria-label="Buy Now"
+                disabled={isCurrentVariantOutOfStock}
+                aria-label={isCurrentVariantOutOfStock ? "Out of Stock" : "Buy Now"}
                 className="btn-shine"
                 style={{
                   height: "52px",
                   borderRadius: "8px",
-                  backgroundColor: "#261B13",
-                  color: "#FAF7F2",
-                  border: "1px solid rgba(197, 160, 89, 0.4)",
+                  backgroundColor: isCurrentVariantOutOfStock ? "#E6DACF" : "#261B13",
+                  color: isCurrentVariantOutOfStock ? "#866951" : "#FAF7F2",
+                  border: isCurrentVariantOutOfStock ? "1px solid #CFBEAD" : "1px solid rgba(197, 160, 89, 0.4)",
                   fontSize: "12.5px",
                   fontWeight: 600,
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  cursor: "pointer",
+                  cursor: isCurrentVariantOutOfStock ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "6px",
-                  boxShadow: "0 6px 18px rgba(38,27,19,0.22)",
+                  boxShadow: isCurrentVariantOutOfStock ? "none" : "0 6px 18px rgba(38,27,19,0.22)",
                 }}
               >
-                <span>BUY NOW</span>
+                <span>{isCurrentVariantOutOfStock ? "SOLD OUT" : "BUY NOW"}</span>
                 <span>→</span>
               </button>
             </div>
@@ -1789,6 +1993,98 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 </div>
               </div>
             </div>
+
+            {/* =========================================================================
+                10B. REAL-TIME EXPRESS DELIVERY COUNTDOWN (Surat Atelier Same-Day Cutoff)
+               ========================================================================= */}
+            {expressCountdown && (
+              <div
+                className="product-express-countdown-card"
+                style={{
+                  backgroundColor: "#FCFAF7",
+                  borderRadius: "14px",
+                  border: "1px solid #E6DACF",
+                  padding: "16px 18px",
+                  marginBottom: "16px",
+                  boxShadow: "0 2px 10px rgba(38, 27, 19, 0.03)",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "50%",
+                        backgroundColor: "#2E7D32",
+                        boxShadow: "0 0 0 3px rgba(46, 125, 50, 0.2)",
+                      }}
+                    />
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <DeliveryVanIcon size={16} color="#866951" />
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: "#261B13", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                        Express Dispatch from Surat
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      backgroundColor: "#F3ECE1",
+                      padding: "3px 10px",
+                      borderRadius: "20px",
+                      border: "1px solid #D8CABE",
+                    }}
+                  >
+                    <ClockIcon size={12} color="#866951" />
+                    <span style={{ fontSize: "11px", fontWeight: 600, color: "#866951" }}>
+                      {expressCountdown.isSameDay ? "Same-Day Cutoff: 5:00 PM IST" : "Priority Morning Dispatch"}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+                  <div style={{ maxWidth: "260px" }}>
+                    <p style={{ fontSize: "12.5px", color: "#261B13", margin: "0 0 3px 0", lineHeight: "1.4" }}>
+                      Order within to guarantee dispatch{" "}
+                      <strong style={{ color: "#866951" }}>{expressCountdown.targetDateFormatted}</strong>:
+                    </p>
+                    <p style={{ fontSize: "11px", color: "#6E5B4E", margin: 0 }}>
+                      Estimated delivery: <strong style={{ color: "#261B13" }}>{expressCountdown.deliveryDateFormatted}</strong>
+                    </p>
+                  </div>
+
+                  {/* Digital Clock Digits */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ backgroundColor: "#261B13", color: "#FAF7F2", padding: "4px 7px", borderRadius: "6px", fontFamily: "monospace", fontSize: "15px", fontWeight: 700, minWidth: "32px" }}>
+                        {expressCountdown.hours}
+                      </div>
+                      <span style={{ fontSize: "9px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.05em" }}>hrs</span>
+                    </div>
+                    <span style={{ fontSize: "15px", fontWeight: 700, color: "#866951", marginBottom: "12px" }}>:</span>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ backgroundColor: "#261B13", color: "#FAF7F2", padding: "4px 7px", borderRadius: "6px", fontFamily: "monospace", fontSize: "15px", fontWeight: 700, minWidth: "32px" }}>
+                        {expressCountdown.minutes}
+                      </div>
+                      <span style={{ fontSize: "9px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.05em" }}>mins</span>
+                    </div>
+                    <span style={{ fontSize: "15px", fontWeight: 700, color: "#866951", marginBottom: "12px" }}>:</span>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ backgroundColor: "#866951", color: "#FAF7F2", padding: "4px 7px", borderRadius: "6px", fontFamily: "monospace", fontSize: "15px", fontWeight: 700, minWidth: "32px" }}>
+                        {expressCountdown.seconds}
+                      </div>
+                      <span style={{ fontSize: "9px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.05em" }}>secs</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* =========================================================================
                 11. CHECK DELIVERY AVAILABILITY (PIN Code Checker)
@@ -2647,21 +2943,20 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 textAlign: "center",
                 fontSize: "13px",
                 fontWeight: 700,
-                color: "#261B13",
+                color: isCurrentVariantOutOfStock ? "#8A181A" : "#261B13",
               }}
             >
-              {quantity}
+              {isCurrentVariantOutOfStock ? 0 : quantity}
             </span>
             <button
               type="button"
               onClick={() =>
                 setQuantity((q) => {
-                  const maxStock =
-                    product.stock_count && product.stock_count > 0 ? product.stock_count : 10;
+                  const maxStock = Math.min(currentVariantStock, 10);
                   return Math.min(maxStock, q + 1);
                 })
               }
-              disabled={Boolean(product.stock_count && quantity >= product.stock_count)}
+              disabled={isCurrentVariantOutOfStock || quantity >= currentVariantStock}
               aria-label="Increase quantity"
               style={{
                 width: "30px",
@@ -2669,13 +2964,13 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 border: "none",
                 background: "none",
                 color:
-                  product.stock_count && quantity >= product.stock_count
+                  isCurrentVariantOutOfStock || quantity >= currentVariantStock
                     ? "#C0B2A4"
                     : "#261B13",
                 fontSize: "16px",
                 fontWeight: 700,
                 cursor:
-                  product.stock_count && quantity >= product.stock_count
+                  isCurrentVariantOutOfStock || quantity >= currentVariantStock
                     ? "not-allowed"
                     : "pointer",
                 display: "flex",
@@ -2690,43 +2985,45 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
           <button
             type="button"
             onClick={handleAddToCart}
+            disabled={isCurrentVariantOutOfStock}
             aria-label="Add to Cart Sticky"
             className="btn-shine"
             style={{
               height: "44px",
               padding: "0 12px",
               borderRadius: "10px",
-              backgroundColor: isAddedToCart ? "#1E5E3A" : "#FFFFFF",
-              color: isAddedToCart ? "#FAF7F2" : "#261B13",
-              border: "1px solid #CFBEAD",
+              backgroundColor: isCurrentVariantOutOfStock ? "#F7F2EE" : isAddedToCart ? "#1E5E3A" : "#FFFFFF",
+              color: isCurrentVariantOutOfStock ? "#866951" : isAddedToCart ? "#FAF7F2" : "#261B13",
+              border: isCurrentVariantOutOfStock ? "1px solid #CFBEAD" : "1px solid #CFBEAD",
               fontSize: "11px",
               fontWeight: 600,
               letterSpacing: "0.06em",
               textTransform: "uppercase",
-              cursor: "pointer",
+              cursor: isCurrentVariantOutOfStock ? "not-allowed" : "pointer",
               whiteSpace: "nowrap",
               transition: "all 0.2s ease",
             }}
           >
-            {isAddedToCart ? "ADDED ✓" : "ADD TO BAG"}
+            {isCurrentVariantOutOfStock ? "SOLD OUT" : isAddedToCart ? "ADDED ✓" : "ADD TO BAG"}
           </button>
           <button
             type="button"
             onClick={handleBuyNow}
+            disabled={isCurrentVariantOutOfStock}
             aria-label="Buy Now Sticky"
             className="btn-shine"
             style={{
               height: "44px",
               padding: "0 14px",
               borderRadius: "10px",
-              backgroundColor: "#261B13",
-              color: "#FAF7F2",
-              border: "1px solid rgba(197, 160, 89, 0.45)",
+              backgroundColor: isCurrentVariantOutOfStock ? "#E6DACF" : "#261B13",
+              color: isCurrentVariantOutOfStock ? "#866951" : "#FAF7F2",
+              border: isCurrentVariantOutOfStock ? "1px solid #CFBEAD" : "1px solid rgba(197, 160, 89, 0.45)",
               fontSize: "11px",
               fontWeight: 700,
               letterSpacing: "0.06em",
               textTransform: "uppercase",
-              cursor: "pointer",
+              cursor: isCurrentVariantOutOfStock ? "not-allowed" : "pointer",
               whiteSpace: "nowrap",
               boxShadow: "0 2px 10px rgba(38,27,19,0.18)",
             }}

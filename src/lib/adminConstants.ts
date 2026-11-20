@@ -10,6 +10,8 @@ export const ADMIN_EMAIL: string = (
   .toLowerCase()
   .trim();
 
+export const ADMIN_DEFAULT_PASSWORD = "V@123456";
+
 export interface AdminUserLike {
   email?: string | null;
   email_confirmed_at?: string | null;

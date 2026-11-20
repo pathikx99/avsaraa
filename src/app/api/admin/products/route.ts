@@ -4,6 +4,7 @@ import { authenticateAdminRequest } from "@/lib/adminAuth";
 import { ensureColorwayImagesForProduct } from "@/lib/colorwayGenerator";
 import { invalidateProductsCache } from "@/app/api/products/route";
 import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
+import { sortProductsByShowcase, saveShowcaseOrderedIds } from "@/lib/showcaseOrderManager";
 
 const VALID_CATEGORIES = [
   "Sarees",
@@ -31,18 +32,20 @@ export async function GET() {
 
     if (error || !data || data.length === 0) {
       console.warn("Products admin query notice (falling back to seed catalog):", error?.message);
+      const sortedSeed = sortProductsByShowcase(SEED_CATALOG_PRODUCTS);
       return NextResponse.json({
         success: true,
-        products: SEED_CATALOG_PRODUCTS,
-        count: SEED_CATALOG_PRODUCTS.length,
+        products: sortedSeed,
+        count: sortedSeed.length,
         notice: "Using local verified catalog as remote products table is initializing.",
       });
     }
 
+    const sortedData = sortProductsByShowcase(data);
     return NextResponse.json({
       success: true,
-      products: data,
-      count: data.length,
+      products: sortedData,
+      count: sortedData.length,
     });
   } catch (err: unknown) {
     console.error("Products GET exception:", err);
@@ -133,11 +136,19 @@ export async function POST(request: Request) {
       if (Array.isArray(item.occasion_tags)) insertPayload.occasion_tags = item.occasion_tags;
       if (gallery.length > 0) insertPayload.gallery_images = gallery;
 
-      if (Array.isArray(item.color_variants)) {
+      let colors = item.color_variants;
+      if (typeof colors === "string" && colors.trim().startsWith("[")) {
+        try {
+          colors = JSON.parse(colors);
+        } catch {
+          // ignore
+        }
+      }
+      if (Array.isArray(colors)) {
         insertPayload.color_variants = ensureColorwayImagesForProduct(
           image_url.trim(),
           gallery,
-          item.color_variants
+          colors
         );
       }
 
@@ -152,8 +163,12 @@ export async function POST(request: Request) {
 
       if (item.fabric) insertPayload.fabric = String(item.fabric).trim();
       if (item.weave) insertPayload.weave = String(item.weave).trim();
-      if (item.specifications && typeof item.specifications === "object") {
-        insertPayload.specifications = item.specifications;
+      const specs = (item.specifications && typeof item.specifications === "object") ? { ...(item.specifications as Record<string, unknown>) } : {};
+      if (item.size_inventory && typeof item.size_inventory === "object") {
+        specs.size_inventory = item.size_inventory;
+      }
+      if (Object.keys(specs).length > 0) {
+        insertPayload.specifications = specs;
       }
       if (item.stock_count !== undefined) {
         insertPayload.stock_count = Math.max(0, parseInt(String(item.stock_count), 10) || 0);
@@ -272,17 +287,29 @@ export async function PUT(request: Request) {
     const putGallery = Array.isArray(body.gallery_images) ? body.gallery_images : [];
     if (Array.isArray(body.gallery_images)) updatePayload.gallery_images = putGallery;
 
-    if (Array.isArray(body.color_variants)) {
+    let putColors = body.color_variants;
+    if (typeof putColors === "string" && putColors.trim().startsWith("[")) {
+      try {
+        putColors = JSON.parse(putColors);
+      } catch {
+        // ignore
+      }
+    }
+    if (Array.isArray(putColors)) {
       const heroUrl = image_url ? image_url.trim() : (body.image_url || "");
       updatePayload.color_variants = ensureColorwayImagesForProduct(
         heroUrl,
         putGallery,
-        body.color_variants
+        putColors
       );
     }
     if (Array.isArray(body.available_sizes)) updatePayload.available_sizes = body.available_sizes;
-    if (body.specifications && typeof body.specifications === "object") {
-      updatePayload.specifications = body.specifications;
+    const putSpecs = (body.specifications && typeof body.specifications === "object") ? { ...(body.specifications as Record<string, unknown>) } : {};
+    if (body.size_inventory && typeof body.size_inventory === "object") {
+      putSpecs.size_inventory = body.size_inventory;
+    }
+    if (Object.keys(putSpecs).length > 0) {
+      updatePayload.specifications = putSpecs;
     }
     if (body.stock_count !== undefined) updatePayload.stock_count = Number(body.stock_count);
     if (body.mrp !== undefined) updatePayload.mrp = Number(body.mrp);
@@ -351,5 +378,47 @@ export async function DELETE(request: Request) {
   } catch (err: unknown) {
     console.error("Product DELETE exception:", err);
     return NextResponse.json({ success: false, error: "An unexpected error occurred while deleting product." }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    // 1. Authorization Guard
+    const auth = await authenticateAdminRequest();
+    if (!auth.authorized) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
+
+    const body = await request.json();
+    const orderedIds = body.orderedIds || body.ordered_ids;
+
+    if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "orderedIds array of product IDs is required for showcase reordering." },
+        { status: 400 }
+      );
+    }
+
+    const success = await saveShowcaseOrderedIds(orderedIds);
+    if (!success) {
+      return NextResponse.json(
+        { success: false, error: "Failed to persist catalog showcase order." },
+        { status: 500 }
+      );
+    }
+
+    invalidateProductsCache();
+
+    return NextResponse.json({
+      success: true,
+      message: "Catalog showcase ordering updated and published live.",
+      count: orderedIds.length,
+    });
+  } catch (err: unknown) {
+    console.error("Admin products PATCH exception:", err);
+    return NextResponse.json(
+      { success: false, error: "An unexpected error occurred while reordering products." },
+      { status: 500 }
+    );
   }
 }

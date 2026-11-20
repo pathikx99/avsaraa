@@ -93,6 +93,7 @@ export async function verifyAdminSession(
 ): Promise<{
   authorized: boolean;
   admin?: AdminJwtPayload;
+  token?: string;
   error?: string;
 }> {
   let token: string | undefined;
@@ -137,5 +138,5 @@ export async function verifyAdminSession(
     return { authorized: false, error: result.error || "Admin authentication invalid" };
   }
 
-  return { authorized: true, admin: result.payload };
+  return { authorized: true, admin: result.payload, token };
 }

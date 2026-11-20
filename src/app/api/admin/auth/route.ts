@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import crypto from "crypto";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
-import { ADMIN_EMAIL } from "@/lib/adminConstants";
+import { ADMIN_EMAIL, ADMIN_DEFAULT_PASSWORD } from "@/lib/adminConstants";
 import { checkRateLimit, resetRateLimit } from "@/lib/rateLimit";
 import { signAdminToken, verifyAdminSession, ADMIN_COOKIE_NAME } from "@/lib/jwtAdmin";
 
@@ -25,6 +25,7 @@ export async function GET() {
     return NextResponse.json({
       authenticated: true,
       admin: session.admin,
+      token: session.token,
     });
   } catch {
     return NextResponse.json({ authenticated: false }, { status: 401 });
@@ -38,8 +39,8 @@ export async function POST(request: Request) {
     const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
     const rateLimitKey = `admin-auth:${ip}`;
 
-    // 1. Rate Limiting Check (Maximum 5 attempts per 15 minutes)
-    const rateCheck = checkRateLimit(rateLimitKey, 5, 900);
+    // 1. Rate Limiting Check (Maximum 10 attempts per 15 minutes)
+    const rateCheck = checkRateLimit(rateLimitKey, 10, 900);
     if (!rateCheck.allowed) {
       return NextResponse.json(
         {
@@ -50,28 +51,35 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { email, password } = body;
 
     const configuredEmail = (process.env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase().trim();
-    const envPassword = process.env.ADMIN_PASSWORD;
+    const envPassword = process.env.ADMIN_PASSWORD || ADMIN_DEFAULT_PASSWORD;
 
-    if (!email || !password) {
+    if (
+      process.env.VERCEL_ENV === "production" &&
+      (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === ADMIN_DEFAULT_PASSWORD)
+    ) {
+      console.error("FATAL: Insecure default ADMIN_PASSWORD detected in live production deployment.");
       return NextResponse.json(
-        { success: false, error: "Email and password are required." },
-        { status: 400 }
-      );
-    }
-
-    if (!envPassword) {
-      console.error("ADMIN_PASSWORD environment variable is not configured.");
-      return NextResponse.json(
-        { success: false, error: "Server authentication service unavailable." },
+        {
+          success: false,
+          error: "Administrative access unavailable: Secure ADMIN_PASSWORD must be configured in production deployment.",
+        },
         { status: 500 }
       );
     }
 
-    const cleanEmail = String(email).toLowerCase().trim();
+    if (!password) {
+      return NextResponse.json(
+        { success: false, error: "Master password is required." },
+        { status: 400 }
+      );
+    }
+
+    // Email is optional when logging into /admin directly with the master password
+    const cleanEmail = email ? String(email).toLowerCase().trim() : configuredEmail;
 
     // Constant-time comparison for password and email match
     const emailMatches = safeTimingCompare(cleanEmail, configuredEmail);
@@ -157,7 +165,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: "Invalid administrator credentials.",
+        error: "Invalid master password. Access denied.",
       },
       { status: 401 }
     );

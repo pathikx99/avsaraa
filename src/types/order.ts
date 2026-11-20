@@ -69,7 +69,7 @@ export interface Order {
 export interface Coupon {
   id: string;
   code: string;
-  discount_type: "percentage" | "fixed";
+  discount_type: "percentage" | "fixed" | "free_shipping";
   discount_value: number;
   min_order_amount: number;
   max_discount_amount?: number | null;

@@ -18,7 +18,13 @@ export default function CartDrawer() {
     updateQuantity,
     clearCart,
   } = useCart();
-  const [giftNote, setGiftNote] = useState(false);
+  const [giftOptOut, setGiftOptOut] = useState(false);
+
+  const GIFT_THRESHOLD = 2500;
+  const giftProgress = Math.min(100, (subtotal / GIFT_THRESHOLD) * 100);
+  const amountRemainingForGift = Math.max(0, GIFT_THRESHOLD - subtotal);
+  const isGiftUnlocked = subtotal >= GIFT_THRESHOLD;
+  const giftNote = isGiftUnlocked && !giftOptOut;
 
   if (!isCartOpen) return null;
 
@@ -48,6 +54,7 @@ export default function CartDrawer() {
       {/* Drawer Panel */}
       <div
         className="cart-drawer-panel"
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
           width: "440px",
@@ -105,22 +112,66 @@ export default function CartDrawer() {
           </button>
         </div>
 
-        {/* Free Shipping Indicator */}
+        {/* Free Gift / Free Shipping Tiered Progress Bar */}
         <div
+          className="cart-gift-shipping-bar"
           style={{
-            backgroundColor: "#F0F7EE",
+            backgroundColor: isGiftUnlocked ? "#FDFBF7" : "#FAF6F0",
             borderBottom: "1px solid #E6DACF",
-            padding: "10px 24px",
-            fontSize: "12px",
-            color: "#2E6930",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            fontWeight: 500,
+            padding: "14px 20px",
+            transition: "all 0.3s ease",
           }}
         >
-          <span>✨</span>
-          <span>Complimentary Express Shipping & Free Delivery on All Orders across India</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <span style={{ fontSize: "12px", color: isGiftUnlocked ? "#866951" : "#5A4535", fontWeight: 600 }}>
+              {subtotal === 0 ? (
+                <>✨ Complimentary Express Shipping Unlocked on All Orders</>
+              ) : isGiftUnlocked ? (
+                <>🎉 <strong>Keepsake Gift Box Unlocked!</strong> Handcrafted wrap included.</>
+              ) : (
+                <>
+                  Add <strong style={{ color: "#261B13" }}>₹{amountRemainingForGift.toLocaleString("en-IN")}</strong> more for <strong>Complimentary Keepsake Gift Box</strong> 🎁
+                </>
+              )}
+            </span>
+            <span style={{ fontSize: "11px", fontWeight: 700, color: "#866951" }}>
+              {Math.round(giftProgress)}%
+            </span>
+          </div>
+
+          {/* Progress Bar Track */}
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "7px",
+              backgroundColor: "#EAE0D5",
+              borderRadius: "4px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${subtotal === 0 ? 0 : Math.max(8, giftProgress)}%`,
+                background: isGiftUnlocked
+                  ? "linear-gradient(90deg, #C5A059 0%, #D4AF37 50%, #2E7D32 100%)"
+                  : "linear-gradient(90deg, #C5A059 0%, #D4AF37 100%)",
+                borderRadius: "4px",
+                transition: "width 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+              }}
+            />
+          </div>
+
+          {/* Milestone Badges */}
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "10px", color: "#866951" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "3px", fontWeight: 600, color: "#2E7D32" }}>
+              ✓ Free Shipping (All Orders)
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: "3px", fontWeight: isGiftUnlocked ? 700 : 500, color: isGiftUnlocked ? "#2E7D32" : "#866951" }}>
+              {isGiftUnlocked ? "✓ " : "🎁 "} Keepsake Box (₹2,500)
+            </span>
+          </div>
         </div>
 
         {/* Cart Items List */}
@@ -201,8 +252,8 @@ export default function CartDrawer() {
               </Link>
             </div>
           ) : (
-            cartItems.map((item) => {
-              const itemKey = `${item.product.id}__${item.product.name}`;
+            cartItems.map((item, idx) => {
+              const itemKey = `${item.product.id}__${item.product.name}__${idx}`;
               const maxStock =
                 item.product.stock_count && item.product.stock_count > 0 ? item.product.stock_count : 20;
               const isAtMax = item.quantity >= maxStock;
@@ -468,7 +519,7 @@ export default function CartDrawer() {
                 type="checkbox"
                 id="keepsake-gift-box"
                 checked={giftNote}
-                onChange={(e) => setGiftNote(e.target.checked)}
+                onChange={(e) => setGiftOptOut(!e.target.checked)}
                 style={{ accentColor: "#866951", width: "16px", height: "16px", cursor: "pointer" }}
               />
               <label htmlFor="keepsake-gift-box" style={{ cursor: "pointer", flex: 1, userSelect: "none" }}>
@@ -484,7 +535,10 @@ export default function CartDrawer() {
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <Link
                 href="/checkout"
-                onClick={closeCart}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeCart();
+                }}
                 className="avsaraa-btn-primary btn-shine"
                 style={{
                   height: "48px",

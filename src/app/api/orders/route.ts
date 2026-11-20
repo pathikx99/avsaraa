@@ -178,6 +178,7 @@ export async function POST(request: Request) {
     // 5. Validate Coupon Code
     let discountAmount = 0;
     let validatedCoupon: string | null = null;
+    let isFreeShippingCoupon = false;
 
     if (coupon_code && coupon_code.trim()) {
       const coupValidation = await validateCouponEngine({
@@ -199,6 +200,9 @@ export async function POST(request: Request) {
 
       discountAmount = coupValidation.discountAmount || 0;
       validatedCoupon = coupValidation.coupon?.code || coupon_code.trim().toUpperCase();
+      if (coupValidation.coupon?.discount_type === "free_shipping") {
+        isFreeShippingCoupon = true;
+      }
     }
 
     // 6. Comprehensive Financial Breakdown (Courier fee, COD surcharge, 5% GST inclusive)
@@ -206,6 +210,7 @@ export async function POST(request: Request) {
       subtotal: rawSubtotal,
       discountAmount,
       paymentMethod: payment_method || "Online Card / UPI",
+      customShippingFee: isFreeShippingCoupon ? 0 : undefined,
     });
 
     const isCOD = payment_method === "COD";

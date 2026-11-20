@@ -3,7 +3,7 @@ import assert from "node:assert";
 import crypto from "crypto";
 import { signAdminToken, verifyAdminToken } from "../../src/lib/jwtAdmin.ts";
 import { escapeHtml } from "../../src/lib/emailTemplates.ts";
-import { isSuperAdminUser, isSuperAdminEmail } from "../../src/lib/adminConstants.ts";
+import { isSuperAdminUser, isSuperAdminEmail, ADMIN_DEFAULT_PASSWORD, ADMIN_EMAIL } from "../../src/lib/adminConstants.ts";
 
 describe("Security Architecture & Cryptographic Verification Tests", () => {
   test("Standalone Admin JWT generation and cryptographic verification with jose", async () => {
@@ -134,5 +134,33 @@ describe("Security Architecture & Cryptographic Verification Tests", () => {
     assert.strictEqual(sanitized.user_id, undefined);
     assert.strictEqual(sanitized.created_at, undefined);
     assert.strictEqual(sanitized.role, undefined);
+  });
+
+  test("Master password login credential and cryptographic session verification", async () => {
+    assert.strictEqual(ADMIN_DEFAULT_PASSWORD, "V@123456");
+
+    // Password comparison logic test
+    const configuredPassword = process.env.ADMIN_PASSWORD || ADMIN_DEFAULT_PASSWORD;
+    const testInputPassword = "V@123456";
+    const wrongPassword = "WrongPassword123";
+
+    const bufA = Buffer.from(testInputPassword, "utf-8");
+    const bufConfig = Buffer.from(configuredPassword, "utf-8");
+    const bufWrong = Buffer.from(wrongPassword, "utf-8");
+
+    assert.strictEqual(crypto.timingSafeEqual(bufA, bufConfig), true);
+    assert.strictEqual(bufWrong.length === bufConfig.length ? crypto.timingSafeEqual(bufWrong, bufConfig) : false, false);
+
+    // Verify token generation with configured admin email and master password
+    const token = await signAdminToken({
+      email: ADMIN_EMAIL,
+      role: "admin",
+      full_name: "Super Admin",
+    });
+
+    const session = await verifyAdminToken(token);
+    assert.strictEqual(session.valid, true);
+    assert.strictEqual(session.payload?.role, "admin");
+    assert.strictEqual(session.payload?.email, ADMIN_EMAIL);
   });
 });
