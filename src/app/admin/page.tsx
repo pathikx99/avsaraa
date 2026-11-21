@@ -127,7 +127,7 @@ export default function AdminDashboardPage() {
   // Form states
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Product Form state (with Promotional, Stock, Sizes & Colourways capabilities)
+  // Product Form state (with Promotional, Stock, Sizes, Colourways & Atelier Craftsmanship capabilities)
   const [productForm, setProductForm] = useState<{
     name: string;
     category: ProductCategory;
@@ -152,6 +152,12 @@ export default function AdminDashboardPage() {
       }>;
     }>;
     description: string;
+    fabric: string;
+    weave: string;
+    video_url: string;
+    sku: string;
+    hsn_code: string;
+    cluster_origin: string;
   }>({
     name: "",
     category: "Sarees",
@@ -166,6 +172,12 @@ export default function AdminDashboardPage() {
     size_inventory: { "Free Size": 10 },
     color_variants: [],
     description: "",
+    fabric: "",
+    weave: "",
+    video_url: "",
+    sku: "",
+    hsn_code: "",
+    cluster_origin: "",
   });
 
   const [customSizeInput, setCustomSizeInput] = useState("");
@@ -603,6 +615,12 @@ export default function AdminDashboardPage() {
       size_inventory: { "Free Size": 10 },
       color_variants: [],
       description: "",
+      fabric: "",
+      weave: "",
+      video_url: "",
+      sku: "",
+      hsn_code: "",
+      cluster_origin: "",
     });
     setCustomSizeInput("");
     setProductPhotoUploadNotice(null);
@@ -662,10 +680,28 @@ export default function AdminDashboardPage() {
       size_inventory: sizeInv,
       color_variants: colors,
       description: product.description || "",
+      fabric: product.fabric || (typeof product.specifications?.fabric === "string" ? product.specifications.fabric : ""),
+      weave: product.weave || (typeof product.specifications?.work === "string" ? product.specifications.work : ""),
+      video_url: product.video_url || "",
+      sku: product.sku || (typeof product.specifications?.sku === "string" ? product.specifications.sku : ""),
+      hsn_code: product.hsn_code || (typeof product.specifications?.hsn_code === "string" ? product.specifications.hsn_code : ""),
+      cluster_origin: product.cluster_origin || (typeof product.specifications?.cluster_origin === "string" ? product.specifications.cluster_origin : ""),
     });
     setCustomSizeInput("");
     setProductPhotoUploadNotice(null);
     setGalleryUploadNotice(null);
+  };
+
+  const openCloneProductModal = (product: Product) => {
+    openEditProductModal(product);
+    setEditingProduct(null);
+    setProductForm((prev) => ({
+      ...prev,
+      name: `${prev.name} (Copy)`,
+      sku: prev.sku ? `${prev.sku}-COPY` : "",
+    }));
+    setShowAddProductModal(true);
+    showToast(`Garment "${product.name}" duplicated into creation form.`);
   };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
@@ -720,6 +756,12 @@ export default function AdminDashboardPage() {
         size_inventory: productForm.size_inventory,
         color_variants: cleanColors,
         description: productForm.description,
+        fabric: productForm.fabric?.trim() || undefined,
+        weave: productForm.weave?.trim() || undefined,
+        video_url: productForm.video_url?.trim() || undefined,
+        sku: productForm.sku?.trim() || undefined,
+        hsn_code: productForm.hsn_code?.trim() || undefined,
+        cluster_origin: productForm.cluster_origin?.trim() || undefined,
       };
 
       const res = await fetch("/api/admin/products", {
@@ -804,6 +846,12 @@ export default function AdminDashboardPage() {
         size_inventory: productForm.size_inventory,
         color_variants: cleanColors,
         description: productForm.description,
+        fabric: productForm.fabric?.trim() || undefined,
+        weave: productForm.weave?.trim() || undefined,
+        video_url: productForm.video_url?.trim() || undefined,
+        sku: productForm.sku?.trim() || undefined,
+        hsn_code: productForm.hsn_code?.trim() || undefined,
+        cluster_origin: productForm.cluster_origin?.trim() || undefined,
       };
 
       const res = await fetch("/api/admin/products", {
@@ -3183,6 +3231,19 @@ export default function AdminDashboardPage() {
                               }}
                             >
                               <EditIcon size={14} />
+                            </button>
+                            <button
+                              onClick={() => openCloneProductModal(product)}
+                              title="Duplicate / Clone Product"
+                              style={{
+                                padding: "7px",
+                                borderRadius: "8px",
+                                border: "1px solid #E8DED3",
+                                backgroundColor: "#FFFFFF",
+                                color: "#866951",
+                              }}
+                            >
+                              <span style={{ fontSize: "13px", display: "inline-block", lineHeight: 1 }}>📑</span>
                             </button>
                             <button
                               onClick={() => setDeletingProduct(product)}
@@ -5784,6 +5845,141 @@ export default function AdminDashboardPage() {
                       ))}
                     </div>
                   )}
+                </div>
+
+                <div style={{ padding: "14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px solid #E8DED3" }}>
+                  <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase", marginBottom: "10px", letterSpacing: "0.06em" }}>
+                    ✦ Atelier Craftsmanship, Drape Video & Compliance
+                  </span>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "10px" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                        Fabric Material
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.fabric}
+                        onChange={(e) => setProductForm({ ...productForm, fabric: e.target.value })}
+                        placeholder="e.g. Pure Mulberry Katan Silk / Chanderi Blend"
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #CFBEAD",
+                          backgroundColor: "#FFFFFF",
+                          fontSize: "13px",
+                          color: "#261B13",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                        Weave / Work / Detailing
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.weave}
+                        onChange={(e) => setProductForm({ ...productForm, weave: e.target.value })}
+                        placeholder="e.g. Real Gold Zari Kadhwa Weave & Floral Jaal"
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #CFBEAD",
+                          backgroundColor: "#FFFFFF",
+                          fontSize: "13px",
+                          color: "#261B13",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "10px" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                        Craft Cluster / Origin
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.cluster_origin}
+                        onChange={(e) => setProductForm({ ...productForm, cluster_origin: e.target.value })}
+                        placeholder="e.g. Surat Zari Guild & Varanasi Weaving Cluster"
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #CFBEAD",
+                          backgroundColor: "#FFFFFF",
+                          fontSize: "13px",
+                          color: "#261B13",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                        YouTube Drape Video Link
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.video_url}
+                        onChange={(e) => setProductForm({ ...productForm, video_url: e.target.value })}
+                        placeholder="e.g. https://www.youtube.com/watch?v=..."
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #CFBEAD",
+                          backgroundColor: "#FFFFFF",
+                          fontSize: "13px",
+                          color: "#261B13",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#866951", marginBottom: "4px" }}>
+                        SKU Identifier (Inventory Code)
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.sku}
+                        onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+                        placeholder="e.g. AVS-SAR-KAT-RED"
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #CFBEAD",
+                          backgroundColor: "#FFFFFF",
+                          fontSize: "13px",
+                          color: "#261B13",
+                          fontFamily: "monospace",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#866951", marginBottom: "4px" }}>
+                        GST HSN Code
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.hsn_code}
+                        onChange={(e) => setProductForm({ ...productForm, hsn_code: e.target.value })}
+                        placeholder="e.g. 5007 (Silk) or 5208 (Cotton)"
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #CFBEAD",
+                          backgroundColor: "#FFFFFF",
+                          fontSize: "13px",
+                          color: "#261B13",
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>

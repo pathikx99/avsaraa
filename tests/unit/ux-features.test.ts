@@ -123,4 +123,39 @@ describe("UX Features Unit Tests", () => {
       assert.ok(Array.isArray(sorted));
     });
   });
+
+  describe("5. Product Video URL & YouTube Embed Transformer", () => {
+    const resolveEmbedUrl = (rawUrl?: string): string => {
+      if (!rawUrl) return "https://www.youtube.com/embed/5mGUdDq42iI?autoplay=1&rel=0";
+      if (rawUrl.includes("youtube.com/embed/")) {
+        return `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}autoplay=1&rel=0`;
+      }
+      if (rawUrl.includes("youtu.be/")) {
+        const vidId = rawUrl.split("youtu.be/")[1]?.split(/[?#]/)[0];
+        if (vidId) return `https://www.youtube.com/embed/${vidId}?autoplay=1&rel=0`;
+      }
+      if (rawUrl.includes("watch?v=")) {
+        const vidId = rawUrl.split("watch?v=")[1]?.split("&")[0];
+        if (vidId) return `https://www.youtube.com/embed/${vidId}?autoplay=1&rel=0`;
+      }
+      return rawUrl;
+    };
+
+    it("correctly converts standard YouTube watch links to autoplay embed URLs", () => {
+      const url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+      const embed = resolveEmbedUrl(url);
+      assert.equal(embed, "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0");
+    });
+
+    it("correctly converts youtu.be shortlinks to embed URLs", () => {
+      const url = "https://youtu.be/dQw4w9WgXcQ";
+      const embed = resolveEmbedUrl(url);
+      assert.equal(embed, "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0");
+    });
+
+    it("falls back to default atelier drape video when url is undefined", () => {
+      const embed = resolveEmbedUrl(undefined);
+      assert.equal(embed, "https://www.youtube.com/embed/5mGUdDq42iI?autoplay=1&rel=0");
+    });
+  });
 });

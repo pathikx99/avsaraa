@@ -111,7 +111,7 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState<string | null>(null);
 
   // Payment & Order Options
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Online Card / UPI");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Razorpay");
   const [orderNotes, setOrderNotes] = useState("");
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -631,8 +631,8 @@ export default function CheckoutPage() {
         notes: orderNotes.trim() || undefined,
       };
 
-      // Online Card / UPI Payment via Razorpay Gateway
-      if (paymentMethod === "Online Card / UPI") {
+      // Razorpay Gateway (Cards, UPI, Wallets, NetBanking)
+      if (paymentMethod === "Razorpay") {
         const scriptLoaded = await loadRazorpayScript();
         if (!scriptLoaded || !window.Razorpay) {
           throw new Error(
@@ -1592,19 +1592,19 @@ export default function CheckoutPage() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {/* Option A: Online Payment */}
+                {/* Option A: Razorpay (Cards, UPI, Wallets, NetBanking) */}
                 <div
-                  onClick={() => setPaymentMethod("Online Card / UPI")}
+                  onClick={() => setPaymentMethod("Razorpay")}
                   style={{
                     border:
-                      paymentMethod === "Online Card / UPI"
+                      paymentMethod === "Razorpay"
                         ? "2px solid #261B13"
                         : "1px solid rgba(38, 27, 19, 0.12)",
                     borderRadius: "12px",
                     padding: "16px",
                     cursor: "pointer",
                     backgroundColor:
-                      paymentMethod === "Online Card / UPI" ? "rgba(197, 168, 128, 0.08)" : "#FFFFFF",
+                      paymentMethod === "Razorpay" ? "rgba(197, 168, 128, 0.08)" : "#FFFFFF",
                     transition: "all 0.2s ease",
                   }}
                 >
@@ -1616,7 +1616,7 @@ export default function CheckoutPage() {
                           height: "18px",
                           borderRadius: "50%",
                           border:
-                            paymentMethod === "Online Card / UPI"
+                            paymentMethod === "Razorpay"
                               ? "5px solid #261B13"
                               : "2px solid #C5A880",
                           backgroundColor: "#FFFFFF",
@@ -1624,10 +1624,10 @@ export default function CheckoutPage() {
                       />
                       <div>
                         <span style={{ fontWeight: 600, fontSize: "14px", color: "#261B13" }}>
-                          Online Payment (Instant & Insured)
+                          Razorpay — Secure Online Payment
                         </span>
                         <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#866951" }}>
-                          UPI (Google Pay, PhonePe, Paytm), Credit / Debit Cards, NetBanking
+                          Credit / Debit Cards, UPI, Wallets &amp; NetBanking — Instant &amp; Insured
                         </p>
                       </div>
                     </div>

@@ -3,7 +3,9 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useCart } from "@/context/CartContext";
 import { Order } from "@/types/order";
+import { Product } from "@/types/product";
 import { formatINR, resolveProductImage } from "@/lib/productUtils";
 import {
   ShoppingBagIcon,
@@ -26,6 +28,8 @@ export default function OrdersAccountTab({
   onOrdersUpdate,
   showToast,
 }: OrdersAccountTabProps) {
+  const { addToCart } = useCart();
+
   // Exchange Portal State
   const [selectedExchangeOrder, setSelectedExchangeOrder] = useState<Order | null>(null);
   const [exchangeReason, setExchangeReason] = useState("Size mismatch (Need larger size)");
@@ -33,6 +37,9 @@ export default function OrdersAccountTab({
   const [exchangeDetails, setExchangeDetails] = useState("");
   const [submittingExchange, setSubmittingExchange] = useState(false);
   const [now] = useState(() => Date.now());
+
+  // Reorder state
+  const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null);
 
   const handleSubmitExchange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +79,48 @@ export default function OrdersAccountTab({
       showToast(msg);
     } finally {
       setSubmittingExchange(false);
+    }
+  };
+
+  const handleReorder = async (order: Order) => {
+    setReorderingOrderId(order.id);
+    try {
+      const items = (order.order_items || []).map((item) => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        image_url: item.image_url,
+        size: item.size || "Standard Size",
+        color: item.color || "Default",
+        tailored_blouse: item.tailored_blouse,
+        unit_price: item.unit_price,
+        quantity: item.quantity,
+      }));
+
+      const success = items.every((item) => {
+        return addToCart(
+          {
+            id: item.product_id || "",
+            name: item.product_name,
+            price: item.unit_price,
+            image_url: item.image_url,
+            category: "Occasion Wear",
+            description: "",
+            color_variants: [],
+            available_sizes: [item.size || "Standard Size"],
+            stock_count: 10,
+          } as Product,
+          item.quantity
+        );
+      });
+
+      if (success) {
+        showToast(`Added ${items.length} item(s) from order ${order.order_number} to your bag.`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to reorder.";
+      showToast(msg);
+    } finally {
+      setReorderingOrderId(null);
     }
   };
 
@@ -431,6 +480,36 @@ export default function OrdersAccountTab({
                     >
                       View Invoice
                     </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => handleReorder(order)}
+                      disabled={reorderingOrderId === order.id}
+                      style={{
+                        height: "36px",
+                        padding: "0 14px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        width: "auto",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        backgroundColor: "#FAF7F2",
+                        border: "1px solid #E8DED3",
+                        borderRadius: "18px",
+                        color: "#261B13",
+                        cursor: reorderingOrderId === order.id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {reorderingOrderId === order.id ? (
+                        <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <SpinnerIcon size={12} color="#261B13" />
+                          <span>Reordering...</span>
+                        </span>
+                      ) : (
+                        <span>Reorder</span>
+                      )}
+                    </button>
 
                     {canRequestExchange && (
                       <button

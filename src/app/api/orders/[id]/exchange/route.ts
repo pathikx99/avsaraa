@@ -1,30 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import { createClient } from "@supabase/supabase-js";
-import { getSupabaseUrl, getSupabasePublishableKey } from "@/lib/env";
+import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { isSuperAdminUser } from "@/lib/adminConstants";
 import { verifyAdminSession } from "@/lib/jwtAdmin";
 import { checkRateLimit } from "@/lib/rateLimit";
-
-function getServiceSupabaseClient() {
-  const supabaseUrl = getSupabaseUrl();
-  if (!supabaseUrl) return null;
-
-  const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const isSecretValid = Boolean(
-    secretKey &&
-    !secretKey.includes("•") &&
-    !secretKey.includes("...") &&
-    secretKey.trim().length >= 20
-  );
-
-  const key = isSecretValid ? (secretKey as string) : getSupabasePublishableKey();
-  if (!key) return null;
-
-  return createClient(supabaseUrl, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
 
 export async function POST(
   request: Request,
@@ -72,13 +51,7 @@ export async function POST(
       );
     }
 
-    const supabase = getServiceSupabaseClient();
-    if (!supabase) {
-      return NextResponse.json(
-        { success: false, message: "Database service unavailable." },
-        { status: 503 }
-      );
-    }
+    const supabase = getAdminSupabaseClient();
 
     // Fetch order to verify ownership & status (support both UUID and order_number)
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);

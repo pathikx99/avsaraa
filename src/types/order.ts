@@ -11,7 +11,7 @@ export type OrderStatus =
 
 export type PaymentStatus = "Pending" | "Paid" | "Failed" | "Refunded";
 
-export type PaymentMethod = "Online Card / UPI" | "Razorpay" | "Cashfree" | "COD";
+export type PaymentMethod = "Razorpay" | "COD";
 
 export interface AddressSnapshot {
   recipient_name: string;
@@ -64,6 +64,14 @@ export interface Order {
   created_at: string;
   updated_at: string;
   order_items?: OrderItem[];
+  // Feature extensions
+  gift_wrap?: boolean;
+  gift_wrap_fee_cents?: number;
+  gift_message?: string | null;
+  shipping_zone?: "gujarat" | "india" | "international";
+  currency?: string;
+  exchange_source_order_id?: string | null;
+  exchange_replacement_order_id?: string | null;
 }
 
 export interface Coupon {

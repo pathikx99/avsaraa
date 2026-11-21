@@ -57,18 +57,16 @@ export async function POST(request: Request) {
       product_id,
       product_name = "Luxury Handloom Saree",
       customer_name,
-      customer_email = null,
       customer_city = null,
       rating,
       title = null,
       comment,
       photos = [],
-      user_id = null,
     } = body;
 
-    // 1. Detect Authenticated User Session
-    let authUserId: string | null = user_id || null;
-    let authUserEmail: string | null = customer_email || null;
+    // 1. Detect Authenticated User Session (never trust a client-supplied user_id)
+    let authUserId: string | null = null;
+    let authUserEmail: string | null = null;
     try {
       const serverClient = await createSupabaseServerClient();
       let user = (await serverClient.auth.getUser()).data.user;

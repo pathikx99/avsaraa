@@ -7,8 +7,10 @@ import {
   isValidGujaratPincode,
   calculateOrderTotals,
 } from "@/lib/financials";
-import { validateCouponEngine } from "@/lib/couponManager";
+import { validateCouponEngine, incrementCouponUsage } from "@/lib/couponManager";
 import { dispatchOrderSuccessEmails } from "@/lib/emailService";
+import { deductInventory } from "@/lib/inventory";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 function generateOrderNumber(): string {
   const now = new Date();
@@ -21,6 +23,15 @@ function generateOrderNumber(): string {
 
 export async function POST(request: Request) {
   try {
+    // CSRF protection for state-changing order creation
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     // 1. Authenticate Requester (or enable Guest Checkout)
     const serverClient = await createSupabaseServerClient();
     const {
@@ -209,7 +220,7 @@ export async function POST(request: Request) {
     const financials = calculateOrderTotals({
       subtotal: rawSubtotal,
       discountAmount,
-      paymentMethod: payment_method || "Online Card / UPI",
+      paymentMethod: payment_method || "Razorpay",
       customShippingFee: isFreeShippingCoupon ? 0 : undefined,
     });
 
@@ -238,7 +249,7 @@ export async function POST(request: Request) {
       coupon_code: validatedCoupon,
       order_status: orderStatus,
       payment_status: paymentStatus,
-      payment_method: payment_method || "Online Card / UPI",
+      payment_method: payment_method || "Razorpay",
       notes: notes || null,
       courier_partner: postalCode.startsWith("395")
         ? "Avsaraa Dedicated Surat Courier"
@@ -250,91 +261,69 @@ export async function POST(request: Request) {
     let createdOrder: Order | null = null;
     let createdItems: OrderItem[] = [];
 
-    try {
-      const { data: dbOrder, error: orderErr } = await adminClient
-        .from("orders")
-        .insert(orderPayload)
-        .select()
-        .single();
+    const { data: dbOrder, error: orderErr } = await adminClient
+      .from("orders")
+      .insert(orderPayload)
+      .select()
+      .single();
 
-      if (!orderErr && dbOrder) {
-        createdOrder = dbOrder as Order;
-
-        // Insert order items
-        const itemsToInsert = sanitizedItems.map((item) => ({
-          order_id: dbOrder.id,
-          ...item,
-        }));
-
-        const { data: dbItems, error: itemsErr } = await adminClient
-          .from("order_items")
-          .insert(itemsToInsert)
-          .select();
-
-        if (!itemsErr && dbItems) {
-          createdItems = dbItems as OrderItem[];
-        }
-
-        // Insert payment record
-        await adminClient.from("payments").insert({
-          order_id: dbOrder.id,
-          gateway: isCOD ? "Cash on Delivery" : payment_method,
-          transaction_id: isCOD
-            ? `COD-${orderNumber}`
-            : `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-          amount: financials.totalAmount,
-          currency: "INR",
-          status: paymentStatus,
-          raw_payload: {
-            method: payment_method,
-            paid_at: new Date().toISOString(),
-            cod_surcharge: financials.codSurcharge,
-            gst_amount: financials.gstAmount,
-            taxable_amount: financials.taxableAmount,
-            notes,
-          },
-        });
-
-        // Increment coupon used_count on successful placement
-        if (validatedCoupon) {
-          try {
-            const { data: coupRow } = await adminClient
-              .from("coupons")
-              .select("id, used_count")
-              .ilike("code", validatedCoupon)
-              .maybeSingle();
-
-            if (coupRow) {
-              await adminClient
-                .from("coupons")
-                .update({ used_count: (coupRow.used_count || 0) + 1 })
-                .eq("id", coupRow.id);
-            }
-          } catch (cErr) {
-            console.warn("Notice: coupon used_count increment error:", cErr);
-          }
-        }
-      }
-    } catch (dbEx) {
-      console.warn("Notice: Database orders insert warning (fallback simulated):", dbEx);
+    if (orderErr || !dbOrder) {
+      throw new Error(
+        `Failed to create order in database: ${orderErr?.message || "Insert returned no order record."}`
+      );
     }
 
-    // Fallback if table not initialized
-    if (!createdOrder) {
-      const generatedId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      createdOrder = {
-        id: generatedId,
-        ...orderPayload,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as Order;
+    createdOrder = dbOrder as Order;
 
-      createdItems = sanitizedItems.map((item, idx) => ({
-        id: `item-${generatedId}-${idx + 1}`,
-        order_id: generatedId,
-        ...item,
-        created_at: new Date().toISOString(),
-      }));
+    // Insert order items
+    const itemsToInsert = sanitizedItems.map((item) => ({
+      order_id: dbOrder.id,
+      ...item,
+    }));
+
+    const { data: dbItems, error: itemsErr } = await adminClient
+      .from("order_items")
+      .insert(itemsToInsert)
+      .select();
+
+    if (itemsErr || !dbItems) {
+      throw new Error(
+        `Failed to create order items in database: ${itemsErr?.message || "Insert returned no order items."}`
+      );
+    }
+
+    createdItems = dbItems as OrderItem[];
+
+    // Insert payment record
+    await adminClient.from("payments").insert({
+      order_id: dbOrder.id,
+      gateway: isCOD ? "Cash on Delivery" : payment_method,
+      transaction_id: isCOD
+        ? `COD-${orderNumber}`
+        : `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+      amount: financials.totalAmount,
+      currency: "INR",
+      status: paymentStatus,
+      raw_payload: {
+        method: payment_method,
+        paid_at: new Date().toISOString(),
+        cod_surcharge: financials.codSurcharge,
+        gst_amount: financials.gstAmount,
+        taxable_amount: financials.taxableAmount,
+        notes,
+      },
+    });
+
+    // Deduct inventory stock (AVS-004 / AVS-005)
+    try {
+      await deductInventory(adminClient, sanitizedItems);
+    } catch (invErr) {
+      console.warn("Notice: Inventory stock deduction error:", invErr);
+    }
+
+    // Increment coupon used_count on successful placement, guarded by usage limits (AVS-006)
+    if (validatedCoupon) {
+      await incrementCouponUsage(adminClient, validatedCoupon);
     }
 
     const finalOrderWithItems = {

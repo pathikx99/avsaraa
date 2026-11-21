@@ -167,6 +167,9 @@ export async function POST(request: Request) {
       if (item.size_inventory && typeof item.size_inventory === "object") {
         specs.size_inventory = item.size_inventory;
       }
+      if (item.sku) specs.sku = String(item.sku).trim();
+      if (item.hsn_code) specs.hsn_code = String(item.hsn_code).trim();
+      if (item.cluster_origin) specs.cluster_origin = String(item.cluster_origin).trim();
       if (Object.keys(specs).length > 0) {
         insertPayload.specifications = specs;
       }
@@ -308,12 +311,17 @@ export async function PUT(request: Request) {
     if (body.size_inventory && typeof body.size_inventory === "object") {
       putSpecs.size_inventory = body.size_inventory;
     }
+    if (body.sku) putSpecs.sku = String(body.sku).trim();
+    if (body.hsn_code) putSpecs.hsn_code = String(body.hsn_code).trim();
+    if (body.cluster_origin) putSpecs.cluster_origin = String(body.cluster_origin).trim();
     if (Object.keys(putSpecs).length > 0) {
       updatePayload.specifications = putSpecs;
     }
     if (body.stock_count !== undefined) updatePayload.stock_count = Number(body.stock_count);
     if (body.mrp !== undefined) updatePayload.mrp = Number(body.mrp);
     if (body.discount_percent !== undefined) updatePayload.discount_percent = Number(body.discount_percent);
+    if (body.fabric !== undefined) updatePayload.fabric = body.fabric ? String(body.fabric).trim() : null;
+    if (body.weave !== undefined) updatePayload.weave = body.weave ? String(body.weave).trim() : null;
     if (body.video_url !== undefined) updatePayload.video_url = body.video_url ? String(body.video_url).trim() : null;
     if (Array.isArray(body.highlights)) updatePayload.highlights = body.highlights;
 

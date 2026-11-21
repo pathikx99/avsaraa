@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { normalizePhoneNumber, maskEmail } from "@/lib/phoneUtils";
-import { checkRateLimit } from "@/lib/rateLimit";
+import { checkDbRateLimit } from "@/lib/dbRateLimit";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -12,8 +12,8 @@ export async function POST(request: Request) {
     const forwardedFor = headerList.get("x-forwarded-for");
     const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
 
-    // Rate Limiting Protection (10 pre-registration checks per minute per IP)
-    const rateCheck = checkRateLimit(`register-check:${ip}`, 10, 60);
+    // Rate Limiting Protection (10 pre-registration checks per minute per IP) - database-backed
+    const rateCheck = await checkDbRateLimit(`register-check:${ip}`, 10, 60);
     if (!rateCheck.allowed) {
       return NextResponse.json(
         {

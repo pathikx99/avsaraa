@@ -3,13 +3,14 @@ import crypto from "crypto";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { processedWebhooksMemory } from "@/lib/webhooks";
 import { dispatchOrderSuccessEmails } from "@/lib/emailService";
-import type { Order } from "@/types/order";
+import { deductInventory } from "@/lib/inventory";
+import { incrementCouponUsage } from "@/lib/couponManager";
+import type { Order, OrderItem } from "@/types/order";
 
 function timingSafeMatch(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "utf-8");
   const bufB = Buffer.from(b, "utf-8");
   if (bufA.length !== bufB.length) {
-    crypto.timingSafeEqual(bufA, bufA);
     return false;
   }
   return crypto.timingSafeEqual(bufA, bufB);
@@ -38,15 +39,12 @@ export async function POST(request: Request) {
           { status: 500 }
         );
       }
-      console.warn("WARNING: Using development fallback secret for Razorpay webhook verification.");
+      throw new Error("RAZORPAY_WEBHOOK_SECRET or RAZORPAY_KEY_SECRET must be configured for Razorpay webhook verification.");
     }
 
-    const activeSecret =
-      webhookSecret || "avsaraa_test_razorpay_webhook_secret_2026";
-
-    // 1. Verify HMAC SHA256 Signature
+    // 1. Verify HMAC SHA256 Signature using configured secret only
     const expectedSignature = crypto
-      .createHmac("sha256", activeSecret)
+      .createHmac("sha256", webhookSecret)
       .update(rawBody)
       .digest("hex");
 
@@ -174,23 +172,17 @@ export async function POST(request: Request) {
             raw_payload: event,
           });
 
-          if (updatedOrder.coupon_code) {
-            try {
-              const { data: coupRow } = await adminClient
-                .from("coupons")
-                .select("id, used_count")
-                .ilike("code", updatedOrder.coupon_code)
-                .maybeSingle();
+          // Deduct inventory stock upon verified payment (AVS-004)
+          try {
+            const itemsToDeduct = (updatedOrder.order_items || []) as OrderItem[];
+            await deductInventory(adminClient, itemsToDeduct);
+          } catch (invErr) {
+            console.warn("Notice: Razorpay webhook inventory deduction notice:", invErr);
+          }
 
-              if (coupRow) {
-                await adminClient
-                  .from("coupons")
-                  .update({ used_count: (coupRow.used_count || 0) + 1 })
-                  .eq("id", coupRow.id);
-              }
-            } catch (cErr) {
-              console.warn("Coupon increment notice:", cErr);
-            }
+          // Concurrency-guarded coupon usage increment (AVS-006)
+          if (updatedOrder.coupon_code) {
+            await incrementCouponUsage(adminClient, updatedOrder.coupon_code);
           }
 
           // Asynchronous email dispatch (Customer GST Tax Invoice + Admin Alert)

@@ -5,12 +5,15 @@
 
 export const ADMIN_EMAIL: string = (
   (typeof process !== "undefined" && process.env?.ADMIN_EMAIL) ||
-  "web.avsaraa@gmail.com"
+  ""
 )
   .toLowerCase()
   .trim();
 
-export const ADMIN_DEFAULT_PASSWORD = "V@123456";
+export const ADMIN_DEFAULT_PASSWORD: string | undefined =
+  typeof process !== "undefined" && process.env?.ADMIN_PASSWORD
+    ? process.env.ADMIN_PASSWORD
+    : undefined;
 
 export interface AdminUserLike {
   email?: string | null;

@@ -69,7 +69,7 @@ const mockSampleOrder: Order = {
   coupon_code: "AVSARAA10",
   order_status: "Confirmed",
   payment_status: "Paid",
-  payment_method: "Online Card / UPI",
+  payment_method: "Razorpay",
   notes: "Urgent wedding order. Gift packing requested.",
   courier_partner: "Avsaraa Dedicated Surat Courier",
   tracking_number: "BLUEDART-882910291",
@@ -151,10 +151,9 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
       assert.match(html, /John &amp; Doe/);
     });
 
-    it("Generates urgent Admin Order Alert HTML with direct WhatsApp link", () => {
+    it("Generates urgent Admin Order Alert HTML", () => {
       const adminHtml = generateAdminOrderAlertEmailHtml(mockSampleOrder);
       assert.match(adminHtml, /🚨 New Order Received: #AVS-20261115-TEST/);
-      assert.match(adminHtml, /https:\/\/wa\.me\/919876543210/);
       assert.match(adminHtml, /Packing Slip Items/);
       assert.match(adminHtml, /Surat Local Atelier Hand-Delivery/);
     });

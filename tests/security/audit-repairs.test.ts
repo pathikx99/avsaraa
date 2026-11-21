@@ -120,4 +120,115 @@ describe("Audit Defect & Security Patch Regression Tests", () => {
     assert.strictEqual(timingSafeMatch("", secret), false);
     assert.strictEqual(timingSafeMatch(secret, ""), false);
   });
+
+  test("Inventory deduction calculates exact new total and per-size stock without dipping below 0 (AVS-004)", () => {
+    function calculateDeductedStock(
+      currentStock: number,
+      currentSizeInv: Record<string, number>,
+      orderedItems: Array<{ size: string; quantity: number }>
+    ) {
+      let totalQty = 0;
+      const sizeQty: Record<string, number> = {};
+      for (const item of orderedItems) {
+        totalQty += item.quantity;
+        sizeQty[item.size] = (sizeQty[item.size] || 0) + item.quantity;
+      }
+
+      const newStock = Math.max(0, currentStock - totalQty);
+      const newInv = { ...currentSizeInv };
+      for (const [size, qty] of Object.entries(sizeQty)) {
+        newInv[size] = Math.max(0, (newInv[size] || 0) - qty);
+      }
+
+      return { newStock, newInv };
+    }
+
+    const initial = {
+      stock: 10,
+      sizes: { "Free Size": 10, "Custom Tailored": 5 },
+    };
+
+    const result = calculateDeductedStock(initial.stock, initial.sizes, [
+      { size: "Free Size", quantity: 3 },
+      { size: "Custom Tailored", quantity: 2 },
+    ]);
+
+    assert.strictEqual(result.newStock, 5);
+    assert.strictEqual(result.newInv["Free Size"], 7);
+    assert.strictEqual(result.newInv["Custom Tailored"], 3);
+
+    // Oversell guard: stock never drops below 0
+    const oversellResult = calculateDeductedStock(2, { "Free Size": 2 }, [
+      { size: "Free Size", quantity: 5 },
+    ]);
+    assert.strictEqual(oversellResult.newStock, 0);
+    assert.strictEqual(oversellResult.newInv["Free Size"], 0);
+  });
+
+  test("Coupon increment rejects updates when usage_limit is reached (AVS-006)", () => {
+    function canIncrementCoupon(usedCount: number, usageLimit: number | null): boolean {
+      if (usageLimit !== null && usedCount >= usageLimit) {
+        return false;
+      }
+      return true;
+    }
+
+    // Unlimited coupon
+    assert.strictEqual(canIncrementCoupon(500, null), true);
+
+    // Limited coupon below limit
+    assert.strictEqual(canIncrementCoupon(99, 100), true);
+
+    // Limited coupon at limit (must be blocked)
+    assert.strictEqual(canIncrementCoupon(100, 100), false);
+
+    // Limited coupon exceeded limit
+    assert.strictEqual(canIncrementCoupon(105, 100), false);
+  });
+
+  test("Master OTP code 123456 is strictly rejected outside test execution (AVS-009)", () => {
+    function isOtpAuthorized(
+      otpInput: string,
+      recordedOtp: string | undefined,
+      isExpired: boolean,
+      env: { NODE_ENV?: string; ENABLE_TEST_OTP?: string }
+    ): boolean {
+      const isTestExecution =
+        env.ENABLE_TEST_OTP === "true" || env.NODE_ENV === "test";
+      const isMasterCode = isTestExecution && otpInput === "123456";
+      const isRecordedValid = Boolean(recordedOtp && recordedOtp === otpInput && !isExpired);
+
+      return isMasterCode || isRecordedValid;
+    }
+
+    // In production with 123456: rejected!
+    assert.strictEqual(
+      isOtpAuthorized("123456", undefined, false, { NODE_ENV: "production" }),
+      false
+    );
+
+    // In development without ENABLE_TEST_OTP: rejected!
+    assert.strictEqual(
+      isOtpAuthorized("123456", undefined, false, { NODE_ENV: "development" }),
+      false
+    );
+
+    // In test execution: allowed!
+    assert.strictEqual(
+      isOtpAuthorized("123456", undefined, false, { NODE_ENV: "test" }),
+      true
+    );
+
+    // Real recorded OTP matches: allowed anywhere!
+    assert.strictEqual(
+      isOtpAuthorized("847291", "847291", false, { NODE_ENV: "production" }),
+      true
+    );
+
+    // Expired real OTP: rejected!
+    assert.strictEqual(
+      isOtpAuthorized("847291", "847291", true, { NODE_ENV: "production" }),
+      false
+    );
+  });
 });

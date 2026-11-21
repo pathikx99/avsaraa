@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import crypto from "crypto";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { dispatchOrderSuccessEmails } from "@/lib/emailService";
-import type { Order } from "@/types/order";
+import { verifyAdminSession } from "@/lib/jwtAdmin";
+import { deductInventory } from "@/lib/inventory";
+import { incrementCouponUsage } from "@/lib/couponManager";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import type { Order, OrderItem } from "@/types/order";
 
 function timingSafeMatch(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "utf-8");
   const bufB = Buffer.from(b, "utf-8");
   if (bufA.length !== bufB.length) {
-    crypto.timingSafeEqual(bufA, bufA);
     return false;
   }
   return crypto.timingSafeEqual(bufA, bufB);
@@ -16,8 +20,18 @@ function timingSafeMatch(a: string, b: string): boolean {
 
 export async function POST(request: Request) {
   try {
+    // CSRF protection for state-changing payment verification
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, order_id } = body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
+    const order_id = body.order_id || body.orderId;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return NextResponse.json(
@@ -48,13 +62,12 @@ export async function POST(request: Request) {
           { status: 500 }
         );
       }
-      console.warn("WARNING: Using development fallback secret for Razorpay verification.");
+      throw new Error("RAZORPAY_KEY_SECRET environment variable must be configured for Razorpay payment verification.");
     }
-    const activeSecret = keySecret || "avsaraa_test_razorpay_secret_key_2026";
 
-    // 1. Compute expected HMAC SHA256 signature
+    // 1. Compute expected HMAC SHA256 signature using configured secret only
     const expectedSignature = crypto
-      .createHmac("sha256", activeSecret)
+      .createHmac("sha256", keySecret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 
@@ -68,11 +81,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Update database payment status atomically with concurrency guard
+    // 3. Resolve internal order and enforce ownership
     const adminClient = getAdminSupabaseClient();
     let fullOrder: Order | null = null;
 
     if (order_id) {
+      const serverClient = await createSupabaseServerClient();
+      const {
+        data: { user },
+      } = await serverClient.auth.getUser();
+
+      const GUEST_SYSTEM_USER_ID = "7a3b2e24-820f-4706-8cc3-4218b42b0da3";
+      const isAdmin = (await verifyAdminSession(request)).authorized;
+
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(order_id);
       let actualOrderId = order_id;
 
@@ -88,6 +109,58 @@ export async function POST(request: Request) {
         }
       }
 
+      const { data: order, error: fetchErr } = await adminClient
+        .from("orders")
+        .select("id, user_id, order_number, payment_status, order_status, total_amount, coupon_code")
+        .eq("id", actualOrderId)
+        .maybeSingle();
+
+      if (fetchErr || !order) {
+        return NextResponse.json(
+          { success: false, error: "Order not found." },
+          { status: 404 }
+        );
+      }
+
+      const isGuestOrder = !order.user_id || order.user_id === GUEST_SYSTEM_USER_ID;
+
+      // Enforce ownership: Registered customer orders require owner session or admin authority
+      if (!isGuestOrder && (!user || user.id !== order.user_id) && !isAdmin) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: user
+              ? "Not authorized to verify payment for this order."
+              : "Authentication required to verify payment for this order.",
+          },
+          { status: user ? 403 : 401 }
+        );
+      }
+
+      // Idempotency: never double-record the same Razorpay transaction.
+      const { data: existingPayment } = await adminClient
+        .from("payments")
+        .select("id")
+        .eq("transaction_id", razorpay_payment_id)
+        .maybeSingle();
+
+      if (existingPayment) {
+        const { data: existingOrder } = await adminClient
+          .from("orders")
+          .select(`
+            *,
+            order_items (*)
+          `)
+          .eq("id", order.id)
+          .maybeSingle();
+        return NextResponse.json({
+          success: true,
+          message: "Payment already verified for this transaction.",
+          payment_id: razorpay_payment_id,
+          order: existingOrder,
+        });
+      }
+
       // Concurrency lock: Only update if payment_status is NOT already 'Paid'
       const { data: updatedOrder, error: updateErr } = await adminClient
         .from("orders")
@@ -96,7 +169,7 @@ export async function POST(request: Request) {
           order_status: "Confirmed",
           updated_at: new Date().toISOString(),
         })
-        .eq("id", actualOrderId)
+        .eq("id", order.id)
         .neq("payment_status", "Paid")
         .select(`
           *,
@@ -109,7 +182,7 @@ export async function POST(request: Request) {
         fullOrder = updatedOrder as Order;
 
         await adminClient.from("payments").insert({
-          order_id: actualOrderId,
+          order_id: order.id,
           gateway: "Razorpay",
           transaction_id: razorpay_payment_id,
           amount: fullOrder.total_amount || body.amount || 0,
@@ -122,24 +195,17 @@ export async function POST(request: Request) {
           },
         });
 
-        // Increment coupon used_count
-        if (fullOrder.coupon_code) {
-          try {
-            const { data: coupRow } = await adminClient
-              .from("coupons")
-              .select("id, used_count")
-              .ilike("code", fullOrder.coupon_code)
-              .maybeSingle();
+        // Deduct inventory stock upon verified payment (AVS-004)
+        try {
+          const itemsToDeduct = (updatedOrder.order_items || []) as OrderItem[];
+          await deductInventory(adminClient, itemsToDeduct);
+        } catch (invErr) {
+          console.warn("Notice: Payment verify inventory deduction notice:", invErr);
+        }
 
-            if (coupRow) {
-              await adminClient
-                .from("coupons")
-                .update({ used_count: (coupRow.used_count || 0) + 1 })
-                .eq("id", coupRow.id);
-            }
-          } catch (cErr) {
-            console.warn("Coupon increment notice:", cErr);
-          }
+        // Concurrency-guarded coupon usage increment (AVS-006)
+        if (fullOrder.coupon_code) {
+          await incrementCouponUsage(adminClient, fullOrder.coupon_code);
         }
 
         // Fire-and-forget email notifications (Customer GST Tax Invoice + Admin Alert)
@@ -154,7 +220,7 @@ export async function POST(request: Request) {
             *,
             order_items (*)
           `)
-          .eq("id", actualOrderId)
+          .eq("id", order.id)
           .maybeSingle();
 
         if (existingOrder) {

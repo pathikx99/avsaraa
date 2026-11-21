@@ -310,9 +310,6 @@ export function generateAdminOrderAlertEmailHtml(order: Order): string {
   const safeNotes = escapeHtml(order.notes || "None");
   const isGuest = Boolean(order.shipping_address_snapshot.is_guest);
 
-  const cleanPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
-  const whatsappUrl = `https://wa.me/${cleanPhone}?text=Hello%20${encodeURIComponent(order.shipping_address_snapshot.recipient_name)},%20this%20is%20Avsaraa%20Customer%20Support%20regarding%20your%20order%20%23${safeOrderNumber}.`;
-
   const courierAdvice = safePin.startsWith("395")
     ? "Surat Local Atelier Hand-Delivery"
     : "Blue Dart Express Gujarat";
@@ -357,11 +354,6 @@ export function generateAdminOrderAlertEmailHtml(order: Order): string {
               <strong>Payment Gateway:</strong> ${safeMethod}<br />
               <strong>Payment Status:</strong> <span style="color: ${safeStatus === "Paid" ? "#2E7D32" : "#B26A00"}; font-weight: 700;">● ${safeStatus}</span><br />
               <strong>Customer Tier:</strong> ${isGuest ? "Guest Checkout" : "Registered Member"}
-            </td>
-            <td style="text-align: right;">
-              <a href="${whatsappUrl}" target="_blank" style="display: inline-block; background-color: #25D366; color: #FFFFFF; text-decoration: none; padding: 10px 16px; border-radius: 6px; font-size: 12px; font-weight: 700;">
-                💬 Open WhatsApp
-              </a>
             </td>
           </tr>
         </table>

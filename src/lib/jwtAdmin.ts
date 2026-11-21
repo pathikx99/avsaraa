@@ -5,19 +5,16 @@ export const ADMIN_COOKIE_NAME = "admin-auth";
 export const ADMIN_TOKEN_EXPIRY = "12h";
 
 function getJwtSecret(): Uint8Array {
-  const rawSecret =
-    process.env.ADMIN_JWT_SECRET ||
-    process.env.ADMIN_PASSWORD ||
-    process.env.SUPABASE_SECRET_KEY;
+  const rawSecret = process.env.ADMIN_JWT_SECRET;
 
-  if (!rawSecret && process.env.NODE_ENV === "production") {
+  if (!rawSecret || rawSecret.trim().length < 32) {
+    // Fail closed: never generate or sign tokens with an insecure fallback secret.
     throw new Error(
-      "Critical Security Configuration: ADMIN_JWT_SECRET or ADMIN_PASSWORD must be configured in production environments."
+      "Critical Security Configuration: ADMIN_JWT_SECRET must be configured (minimum 32 characters) before issuing or verifying admin sessions."
     );
   }
 
-  const secretToUse = rawSecret || "avsaraa_super_secret_admin_jwt_signature_key_2026";
-  return new TextEncoder().encode(secretToUse.padEnd(32, "#"));
+  return new TextEncoder().encode(rawSecret.padEnd(32, "#"));
 }
 
 export interface AdminJwtPayload {

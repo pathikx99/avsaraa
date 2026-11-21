@@ -46,7 +46,7 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
   test("Cash on Delivery (COD) surcharge strictly applies ₹20", () => {
     assert.strictEqual(computeCodSurcharge("COD"), COD_SURCHARGE);
     assert.strictEqual(computeCodSurcharge("COD"), 20);
-    assert.strictEqual(computeCodSurcharge("Online Card / UPI"), 0);
+    assert.strictEqual(computeCodSurcharge("Razorpay"), 0);
     assert.strictEqual(computeCodSurcharge("Razorpay"), 0);
   });
 
@@ -98,7 +98,7 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
     const ord2 = calculateOrderTotals({
       subtotal: 1050,
       discountAmount: 0,
-      paymentMethod: "Online Card / UPI",
+      paymentMethod: "Razorpay",
     });
     assert.strictEqual(ord2.shippingFee, 0);
     assert.strictEqual(ord2.codSurcharge, 0);
@@ -107,7 +107,7 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
     const ord3 = calculateOrderTotals({
       subtotal: 400,
       discountAmount: 0,
-      paymentMethod: "Online Card / UPI",
+      paymentMethod: "Razorpay",
       customShippingFee: 0,
     });
     assert.strictEqual(ord3.shippingFee, 0);

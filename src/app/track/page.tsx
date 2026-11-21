@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -639,10 +640,8 @@ function OrderTrackingContent() {
                 </span>
               </div>
             </div>
-            <a
-              href={`https://wa.me/919920029999?text=${encodeURIComponent(`Hello Avsaraa Atelier, I am inquiring about tracking order #${trackedOrder.order_number}`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/contact"
               style={{
                 fontSize: "12px",
                 fontWeight: 600,
@@ -651,7 +650,7 @@ function OrderTrackingContent() {
               }}
             >
               Contact Atelier Concierge →
-            </a>
+            </Link>
           </div>
         </div>
       )}

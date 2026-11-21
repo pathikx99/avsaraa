@@ -65,6 +65,26 @@ export interface Product {
   weave?: string;
   video_url?: string;
   highlights?: Array<string | ProductHighlight>;
+  sku?: string;
+  hsn_code?: string;
+  weight_grams?: number;
+  cluster_origin?: string;
+  status?: "published" | "draft" | "archived";
+  slug?: string;
+  // Feature extensions
+  back_in_stock_notify?: boolean;
+  pre_order?: boolean;
+  pre_order_available_at?: string;
+  pre_order_deposit_percent?: number;
+  size_guide_url?: string;
+  fit_notes?: string;
+  publish_status?: "draft" | "scheduled" | "published" | "archived";
+  scheduled_publish_at?: string;
+  low_stock_threshold?: number;
+  shipping_weight_grams?: number;
+  international_shippable?: boolean;
+  country_of_origin?: string;
+  stock_status?: "in_stock" | "low_stock" | "out_of_stock";
 }
 
 export interface OccasionCategory {

@@ -9,6 +9,7 @@ import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { formatINR } from "@/lib/productUtils";
 import { isValidGujaratPincode } from "@/lib/financials";
+import BackInStockNotifier from "@/components/BackInStockNotifier";
 import { ProductReview } from "@/types/review";
 import Footer from "@/components/Footer";
 import NavigationDrawer from "@/components/NavigationDrawer";
@@ -62,6 +63,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const [quantity, setQuantity] = useState(1);
   const [isAddedToCart, setIsAddedToCart] = useState(false);
   const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false);
+  const [preOrderMode, setPreOrderMode] = useState(false);
 
   // Modals & Overlays
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
@@ -451,6 +453,35 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       name: `${product.name} · ${selectedSize}${selectedColor && selectedColor !== "Default" && selectedColor !== "Royal Edition" ? ` · ${selectedColor}` : ""}`,
     };
 
+    const success = addToCart(cartProduct, quantity);
+    if (success) {
+      router.push("/checkout");
+    }
+  };
+
+  // Pre-order handlers
+  const handlePreOrderAddToCart = () => {
+    const cartProduct: DetailedProduct = {
+      ...product,
+      price: product.price,
+      image_url: currentGalleryImg,
+      name: `${product.name} · Pre-Order · ${selectedSize}${selectedColor && selectedColor !== "Default" ? ` · ${selectedColor}` : ""}`,
+    };
+    const success = addToCart(cartProduct, quantity);
+    if (success) {
+      setIsAddedToCart(true);
+      setPreOrderMode(false);
+      setTimeout(() => setIsAddedToCart(false), 2400);
+    }
+  };
+
+  const handlePreOrderBuyNow = () => {
+    const cartProduct: DetailedProduct = {
+      ...product,
+      price: product.price,
+      image_url: currentGalleryImg,
+      name: `${product.name} · Pre-Order · ${selectedSize}${selectedColor && selectedColor !== "Default" ? ` · ${selectedColor}` : ""}`,
+    };
     const success = addToCart(cartProduct, quantity);
     if (success) {
       router.push("/checkout");
@@ -1756,6 +1787,17 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               </div>
             </div>
 
+            {/* Back-in-Stock Notifier (Out of Stock) */}
+            {isCurrentVariantOutOfStock && (
+              <BackInStockNotifier
+                productId={product.id}
+                productName={product.name}
+                stockCount={currentVariantStock}
+                selectedSize={selectedSize}
+                selectedColor={selectedColor}
+              />
+            )}
+
             {/* Saree Finishing & Blouse Fabric Information (Category Specific) */}
             {product.fall_pico_included && (
               <div
@@ -1794,74 +1836,165 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 marginBottom: "14px",
               }}
             >
-              {/* ADD TO CART BUTTON */}
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                disabled={isCurrentVariantOutOfStock}
-                aria-label={isCurrentVariantOutOfStock ? "Out of Stock" : "Add to Cart"}
-                className="btn-shine"
-                style={{
-                  height: "52px",
-                  borderRadius: "8px",
-                  backgroundColor: isCurrentVariantOutOfStock ? "#F7F2EE" : isAddedToCart ? "#1E5E3A" : "#FFFFFF",
-                  color: isCurrentVariantOutOfStock ? "#866951" : isAddedToCart ? "#FFFFFF" : "#261B13",
-                  border: isCurrentVariantOutOfStock ? "1px solid #CFBEAD" : isAddedToCart ? "1px solid #1E5E3A" : "1.5px solid #261B13",
-                  fontSize: "12.5px",
-                  fontWeight: 600,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  cursor: isCurrentVariantOutOfStock ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  transition: "all 0.25s ease",
-                  boxShadow: "0 4px 12px rgba(38,27,19,0.06)",
-                }}
-              >
-                <ShoppingBagIcon size={16} color={isCurrentVariantOutOfStock ? "#866951" : isAddedToCart ? "#FFFFFF" : "#261B13"} />
-                <span>{isCurrentVariantOutOfStock ? "OUT OF STOCK" : isAddedToCart ? "ADDED TO BAG ✓" : "ADD TO CART"}</span>
-              </button>
+              {/* Pre-order mode toggle shown when out of stock but pre-order enabled */}
+              {isCurrentVariantOutOfStock && product.pre_order && !preOrderMode && (
+                <div style={{ gridColumn: "1 / -1", marginBottom: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setPreOrderMode(true)}
+                    style={{
+                      width: "100%",
+                      height: "44px",
+                      borderRadius: "8px",
+                      backgroundColor: "#F3ECE1",
+                      border: "1.5px dashed #8A181A",
+                      color: "#8A181A",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <span style={{ fontSize: "16px" }}>⏳</span>
+                    <span>This is a Pre-Order item · Pay deposit to reserve</span>
+                  </button>
+                </div>
+              )}
 
-              {/* BUY NOW BUTTON */}
-              <button
-                type="button"
-                onClick={handleBuyNow}
-                disabled={isCurrentVariantOutOfStock}
-                aria-label={isCurrentVariantOutOfStock ? "Out of Stock" : "Buy Now"}
-                className="btn-shine"
-                style={{
-                  height: "52px",
-                  borderRadius: "8px",
-                  backgroundColor: isCurrentVariantOutOfStock ? "#E6DACF" : "#261B13",
-                  color: isCurrentVariantOutOfStock ? "#866951" : "#FAF7F2",
-                  border: isCurrentVariantOutOfStock ? "1px solid #CFBEAD" : "1px solid rgba(197, 160, 89, 0.4)",
-                  fontSize: "12.5px",
-                  fontWeight: 600,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  cursor: isCurrentVariantOutOfStock ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                  boxShadow: isCurrentVariantOutOfStock ? "none" : "0 6px 18px rgba(38,27,19,0.22)",
-                }}
-              >
-                <span>{isCurrentVariantOutOfStock ? "SOLD OUT" : "BUY NOW"}</span>
-                <span>→</span>
-              </button>
+              {!preOrderMode ? (
+                <>
+                  {/* ADD TO CART BUTTON */}
+                  <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    disabled={isCurrentVariantOutOfStock}
+                    aria-label={isCurrentVariantOutOfStock ? "Out of Stock" : "Add to Cart"}
+                    className="btn-shine"
+                    style={{
+                      height: "52px",
+                      borderRadius: "8px",
+                      backgroundColor: isCurrentVariantOutOfStock ? "#F7F2EE" : isAddedToCart ? "#1E5E3A" : "#FFFFFF",
+                      color: isCurrentVariantOutOfStock ? "#866951" : isAddedToCart ? "#FFFFFF" : "#261B13",
+                      border: isCurrentVariantOutOfStock ? "1px solid #CFBEAD" : isAddedToCart ? "1px solid #1E5E3A" : "1.5px solid #261B13",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      cursor: isCurrentVariantOutOfStock ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      transition: "all 0.25s ease",
+                      boxShadow: "0 4px 12px rgba(38,27,19,0.06)",
+                    }}
+                  >
+                    <ShoppingBagIcon size={16} color={isCurrentVariantOutOfStock ? "#866951" : isAddedToCart ? "#FFFFFF" : "#261B13"} />
+                    <span>{isCurrentVariantOutOfStock ? "OUT OF STOCK" : isAddedToCart ? "ADDED TO BAG ✓" : "ADD TO CART"}</span>
+                  </button>
+
+                  {/* BUY NOW BUTTON */}
+                  <button
+                    type="button"
+                    onClick={handleBuyNow}
+                    disabled={isCurrentVariantOutOfStock}
+                    aria-label={isCurrentVariantOutOfStock ? "Out of Stock" : "Buy Now"}
+                    className="btn-shine"
+                    style={{
+                      height: "52px",
+                      borderRadius: "8px",
+                      backgroundColor: isCurrentVariantOutOfStock ? "#E6DACF" : "#261B13",
+                      color: isCurrentVariantOutOfStock ? "#866951" : "#FAF7F2",
+                      border: isCurrentVariantOutOfStock ? "1px solid #CFBEAD" : "1px solid rgba(197, 160, 89, 0.4)",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      cursor: isCurrentVariantOutOfStock ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      boxShadow: isCurrentVariantOutOfStock ? "none" : "0 6px 18px rgba(38,27,19,0.22)",
+                    }}
+                  >
+                    <span>{isCurrentVariantOutOfStock ? "SOLD OUT" : "BUY NOW"}</span>
+                    <span>→</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* PRE-ORDER ADD TO CART */}
+                  <button
+                    type="button"
+                    onClick={handlePreOrderAddToCart}
+                    disabled={isAddedToCart}
+                    aria-label="Pre-Order Add to Cart"
+                    className="btn-shine"
+                    style={{
+                      height: "52px",
+                      borderRadius: "8px",
+                      backgroundColor: isAddedToCart ? "#1E5E3A" : "#8A181A",
+                      color: "#FAF7F2",
+                      border: isAddedToCart ? "1px solid #1E5E3A" : "1.5px solid #8A181A",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      cursor: isAddedToCart ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      transition: "all 0.25s ease",
+                      boxShadow: "0 4px 12px rgba(38,27,19,0.06)",
+                    }}
+                  >
+                    <ShoppingBagIcon size={16} color="#FAF7F2" />
+                    <span>{isAddedToCart ? "RESERVED ✓" : "PRE-ORDER CART"}</span>
+                  </button>
+
+                  {/* PRE-ORDER BUY NOW */}
+                  <button
+                    type="button"
+                    onClick={handlePreOrderBuyNow}
+                    aria-label="Pre-Order Buy Now"
+                    className="btn-shine"
+                    style={{
+                      height: "52px",
+                      borderRadius: "8px",
+                      backgroundColor: "#261B13",
+                      color: "#FAF7F2",
+                      border: "1px solid rgba(197, 160, 89, 0.4)",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      boxShadow: "0 6px 18px rgba(38,27,19,0.22)",
+                    }}
+                  >
+                    <span>PRE-ORDER NOW</span>
+                    <span>→</span>
+                  </button>
+                </>
+              )}
             </div>
 
-            {/* WhatsApp Atelier Stylist Concierge */}
-            <a
-              href={`https://wa.me/919876543210?text=${encodeURIComponent(
-                `Namaste AVSARAA! I am exploring "${product.name}" (Ref: ${product.id}). Could you share real-time drape video and styling advice?`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Chat with Surat Stylist on WhatsApp"
+            {/* Atelier Stylist Concierge */}
+            <Link
+              href="/contact"
+              aria-label="Contact Surat Stylist"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -1881,13 +2014,13 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 transition: "all 0.2s ease",
               }}
             >
-              <span style={{ fontSize: "16px" }}>{product.price >= 15000 ? "📹" : "💬"}</span>
+              <span style={{ fontSize: "16px" }}>{product.price >= 15000 ? "📹" : "📧"}</span>
               <span>
                 {product.price >= 15000
-                  ? "Book Private Video Drape Consultation • WhatsApp Stylist"
-                  : "Chat with Surat Stylist on WhatsApp"}
+                  ? "Book Private Video Drape Consultation • Contact Stylist"
+                  : "Contact Surat Stylist"}
               </span>
-            </a>
+            </Link>
 
             {/* =========================================================================
                 10. FREE SHIPPING & DELIVERY BENEFITS
@@ -3489,7 +3622,22 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               ✕
             </button>
             <iframe
-              src="https://www.youtube.com/embed/5mGUdDq42iI?autoplay=1&rel=0"
+              src={(() => {
+                const raw = product.video_url;
+                if (!raw) return "https://www.youtube.com/embed/5mGUdDq42iI?autoplay=1&rel=0";
+                if (raw.includes("youtube.com/embed/")) {
+                  return `${raw}${raw.includes("?") ? "&" : "?"}autoplay=1&rel=0`;
+                }
+                if (raw.includes("youtu.be/")) {
+                  const vidId = raw.split("youtu.be/")[1]?.split(/[?#]/)[0];
+                  if (vidId) return `https://www.youtube.com/embed/${vidId}?autoplay=1&rel=0`;
+                }
+                if (raw.includes("watch?v=")) {
+                  const vidId = raw.split("watch?v=")[1]?.split("&")[0];
+                  if (vidId) return `https://www.youtube.com/embed/${vidId}?autoplay=1&rel=0`;
+                }
+                return raw;
+              })()}
               title={`${product.name} - Drape & Movement Video`}
               style={{ width: "100%", height: "100%", border: "none" }}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

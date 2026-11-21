@@ -3131,6 +3131,14 @@ body {
   }
 }
 
+/* Float Recently Viewed Bar above mobile sticky action bar */
+@media (max-width: 899px) {
+  .recently-viewed-floating-bar {
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+
 
 
 

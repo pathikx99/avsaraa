@@ -20,7 +20,9 @@ function safeTimingCompare(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "utf-8");
   const bufB = Buffer.from(b, "utf-8");
   if (bufA.length !== bufB.length) {
-    crypto.timingSafeEqual(bufA, bufA);
+    // Length mismatch: still run a constant-time operation to avoid leaking
+    // length information via timing side channels.
+    crypto.timingSafeEqual(Buffer.alloc(32, 0), Buffer.alloc(32, 0));
     return false;
   }
   return crypto.timingSafeEqual(bufA, bufB);

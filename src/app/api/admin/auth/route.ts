@@ -2,18 +2,15 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import crypto from "crypto";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
-import { ADMIN_EMAIL, ADMIN_DEFAULT_PASSWORD } from "@/lib/adminConstants";
-import { checkRateLimit, resetRateLimit } from "@/lib/rateLimit";
+import { ADMIN_EMAIL } from "@/lib/adminConstants";
+import { checkDbRateLimit, resetDbRateLimit } from "@/lib/dbRateLimit";
 import { signAdminToken, verifyAdminSession, ADMIN_COOKIE_NAME } from "@/lib/jwtAdmin";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 function safeTimingCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a, "utf-8");
-  const bufB = Buffer.from(b, "utf-8");
-  if (bufA.length !== bufB.length) {
-    crypto.timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return crypto.timingSafeEqual(bufA, bufB);
+  const hashA = crypto.createHash("sha256").update(a, "utf-8").digest();
+  const hashB = crypto.createHash("sha256").update(b, "utf-8").digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }
 
 export async function GET() {
@@ -34,13 +31,22 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    // CSRF protection for admin login
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const headerList = await headers();
     const forwardedFor = headerList.get("x-forwarded-for");
     const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
     const rateLimitKey = `admin-auth:${ip}`;
 
-    // 1. Rate Limiting Check (Maximum 10 attempts per 15 minutes)
-    const rateCheck = checkRateLimit(rateLimitKey, 10, 900);
+    // 1. Rate Limiting Check (Maximum 10 attempts per 15 minutes) - database-backed
+    const rateCheck = await checkDbRateLimit(rateLimitKey, 10, 900);
     if (!rateCheck.allowed) {
       return NextResponse.json(
         {
@@ -55,11 +61,25 @@ export async function POST(request: Request) {
     const { email, password } = body;
 
     const configuredEmail = (process.env.ADMIN_EMAIL || ADMIN_EMAIL).toLowerCase().trim();
-    const envPassword = process.env.ADMIN_PASSWORD || ADMIN_DEFAULT_PASSWORD;
+    const envPassword = process.env.ADMIN_PASSWORD;
+
+    if (!envPassword) {
+      if (process.env.NODE_ENV === "production") {
+        console.error("FATAL: ADMIN_PASSWORD environment variable is not configured in production.");
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Administrative access unavailable: ADMIN_PASSWORD must be configured in production deployment.",
+          },
+          { status: 500 }
+        );
+      }
+      throw new Error("ADMIN_PASSWORD environment variable must be configured for admin authentication.");
+    }
 
     if (
       process.env.VERCEL_ENV === "production" &&
-      (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === ADMIN_DEFAULT_PASSWORD)
+      envPassword === "V@123456"
     ) {
       console.error("FATAL: Insecure default ADMIN_PASSWORD detected in live production deployment.");
       return NextResponse.json(
@@ -87,7 +107,7 @@ export async function POST(request: Request) {
 
     if (emailMatches && passwordMatches) {
       // Successful authentication: Reset rate limit for this IP
-      resetRateLimit(rateLimitKey);
+      await resetDbRateLimit(rateLimitKey);
 
       // Sign Cryptographic Admin JWT with strict role: "admin"
       const jwtToken = await signAdminToken({

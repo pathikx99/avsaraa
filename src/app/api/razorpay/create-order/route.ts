@@ -185,7 +185,7 @@ export async function POST(request: Request) {
     const financials = calculateOrderTotals({
       subtotal: rawSubtotal,
       discountAmount,
-      paymentMethod: "Online Card / UPI",
+      paymentMethod: "Razorpay",
       customShippingFee: isFreeShippingCoupon ? 0 : undefined,
     });
 
@@ -215,7 +215,7 @@ export async function POST(request: Request) {
       coupon_code: validatedCoupon,
       order_status: orderStatus,
       payment_status: paymentStatus,
-      payment_method: "Online Card / UPI",
+      payment_method: "Razorpay",
       notes: notes || null,
       courier_partner: postalCode.startsWith("395")
         ? "Avsaraa Dedicated Surat Courier"
@@ -256,69 +256,70 @@ export async function POST(request: Request) {
     }
 
     if (!createdOrder) {
-      const fallbackId = `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      createdOrder = {
-        id: fallbackId,
-        ...orderPayload,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as Order;
-
-      createdItems = sanitizedItems.map((item, idx) => ({
-        id: `item-${fallbackId}-${idx + 1}`,
-        order_id: fallbackId,
-        ...item,
-        created_at: new Date().toISOString(),
-      }));
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Failed to create order record in database before initiating payment.",
+        },
+        { status: 500 }
+      );
     }
 
     // 4. Create Order with Razorpay REST API
     const keyId =
       process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
-      process.env.RAZORPAY_KEY_ID ||
-      "rzp_test_avsaraa_demo";
-    const keySecret =
-      process.env.RAZORPAY_KEY_SECRET || "avsaraa_test_razorpay_secret_key_2026";
+      process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!keyId || !keySecret) {
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.json(
+          { success: false, message: "Payment gateway configuration is missing in production." },
+          { status: 500 }
+        );
+      }
+      throw new Error(
+        "Razorpay credentials (NEXT_PUBLIC_RAZORPAY_KEY_ID / RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET) must be configured."
+      );
+    }
 
     let razorpayOrderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
     try {
-      // Call Razorpay API if live/test credentials are ready
-      if (keyId && keySecret && !keyId.includes("your_key_here")) {
-        const authHeader = `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`;
-        const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
-          method: "POST",
-          headers: {
-            Authorization: authHeader,
-            "Content-Type": "application/json",
+      // Call Razorpay API with live/test credentials
+      const authHeader = `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`;
+      const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
+        method: "POST",
+        headers: {
+          Authorization: authHeader,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: amountInPaise,
+          currency: "INR",
+          receipt: orderNumber,
+          notes: {
+            order_id: createdOrder.id,
+            order_number: orderNumber,
+            customer_name: shipping_address_snapshot.recipient_name,
+            customer_phone: shipping_address_snapshot.phone_number,
+            customer_email: shipping_address_snapshot.email || "",
           },
-          body: JSON.stringify({
-            amount: amountInPaise,
-            currency: "INR",
-            receipt: orderNumber,
-            notes: {
-              order_id: createdOrder.id,
-              order_number: orderNumber,
-              customer_name: shipping_address_snapshot.recipient_name,
-              customer_phone: shipping_address_snapshot.phone_number,
-              customer_email: shipping_address_snapshot.email || "",
-            },
-          }),
-          signal: AbortSignal.timeout(6000),
-        });
+        }),
+        signal: AbortSignal.timeout(6000),
+      });
 
-        if (rzpRes.ok) {
-          const rzpData = await rzpRes.json();
-          if (rzpData?.id) {
-            razorpayOrderId = rzpData.id;
-          }
-        } else {
-          const errData = await rzpRes.json().catch(() => null);
-          console.warn(
-            "Notice: Razorpay API returned non-200 (using simulated order for development):",
-            errData
-          );
+      if (rzpRes.ok) {
+        const rzpData = await rzpRes.json();
+        if (rzpData?.id) {
+          razorpayOrderId = rzpData.id;
         }
+      } else {
+        const errData = await rzpRes.json().catch(() => null);
+        console.warn(
+          "Notice: Razorpay API returned non-200 (falling back to simulated order):",
+          errData
+        );
       }
     } catch (rzpErr) {
       console.warn("Notice: Razorpay order API notice (fallback active):", rzpErr);
@@ -333,10 +334,9 @@ export async function POST(request: Request) {
 
     // Sandbox test credentials only generated in local non-production environments with mock demo keys
     if (isMockDemoMode) {
-      const activeSecret = keySecret || "avsaraa_test_razorpay_secret_key_2026";
       testPaymentId = `pay_test_${Date.now()}`;
       testSignature = crypto
-        .createHmac("sha256", activeSecret)
+        .createHmac("sha256", keySecret)
         .update(`${razorpayOrderId}|${testPaymentId}`)
         .digest("hex");
     }

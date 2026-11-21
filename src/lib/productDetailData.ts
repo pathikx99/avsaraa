@@ -292,10 +292,14 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
   const isCoord = product.category === "Co-ords" || product.name.toLowerCase().includes("co-ord") || product.name.toLowerCase().includes("suit set");
   const isUnder1299 = product.price <= 1299;
 
-  // Calculate MRP & Discount
-  const markup = isUnder1299 ? 1.35 : isSaree ? 1.25 : 1.3;
-  const mrp = Math.round(product.price * markup);
-  const discount_percent = Math.round(((mrp - product.price) / mrp) * 100);
+  // Calculate MRP & Discount (honors explicit database values, falls back to standard markup)
+  const fallbackMarkup = isUnder1299 ? 1.35 : isSaree ? 1.25 : 1.3;
+  const calculatedMrp = Math.round(product.price * fallbackMarkup);
+  const mrp = product.mrp && product.mrp > product.price ? product.mrp : calculatedMrp;
+  const discount_percent =
+    product.discount_percent !== undefined && product.discount_percent > 0
+      ? product.discount_percent
+      : Math.max(0, Math.round(((mrp - product.price) / mrp) * 100));
 
   // Gallery images with resolveProductImage
   const primaryImg = resolveProductImage(product.image_url);
@@ -307,8 +311,8 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
   // Deduplicate gallery
   const uniqueGallery = Array.from(new Set(gallery_images));
 
-  // Highlights adapted to category
-  const highlights = isSaree
+  // Default highlights adapted to category
+  const defaultHighlights = isSaree
     ? [
         { icon: "loom", title: "Pure Handloom Weave", description: "100% Certified Pure Silk" },
         { icon: "needle", title: "Artisanal Zari Work", description: "Intricate Antique Gold Weft" },
@@ -338,6 +342,20 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
         { icon: "dress", title: "Flattering Silhouette", description: "4.5m Flared Kalidar Ghera" },
       ];
 
+  const highlights =
+    Array.isArray(product.highlights) && product.highlights.length > 0
+      ? product.highlights.map((h) => {
+          if (typeof h === "string") {
+            return { icon: "loom", title: h, description: "" };
+          }
+          return {
+            icon: h.icon || "loom",
+            title: h.title,
+            description: h.description || "",
+          };
+        })
+      : defaultHighlights;
+
   const available_sizes =
     product.available_sizes && product.available_sizes.length > 0
       ? product.available_sizes
@@ -347,8 +365,8 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
       ? ["38 (S)", "40 (M)", "42 (L)", "44 (XL)", "46 (XXL)"]
       : ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
-  // Specifications adapted to category
-  const specifications = isSaree
+  // Default specifications adapted to category
+  const defaultSpecifications = isSaree
     ? {
         fabric: "Pure Handloom Silk & Chanderi Zari Blend",
         work: "Intricate Antique Gold Zari Kadhwa Weave & Handcrafted Border",
@@ -406,6 +424,17 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
         ghera_flare: "4.5 Meters Full Kalidar Ghera Circumference",
       };
 
+  // Merge custom specifications and root attributes (fabric, weave) so admin data is never lost
+  const rawCustomSpecs = (product.specifications && typeof product.specifications === "object")
+    ? (product.specifications as Record<string, string>)
+    : {};
+  const specifications = {
+    ...defaultSpecifications,
+    ...rawCustomSpecs,
+    ...(product.fabric ? { fabric: product.fabric } : {}),
+    ...(product.weave ? { work: product.weave } : {}),
+  };
+
   const wash_care_bullets = isSaree
     ? [
         "Dry clean strictly recommended to preserve genuine zari thread shine.",
@@ -420,13 +449,18 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
         "Warm iron on reverse side to maintain fabric texture.",
       ];
 
-  const cluster_origin = isSaree
+  const defaultClusterOrigin = isSaree
     ? "Surat Zari Guild & Varanasi Weaving Cluster"
     : isMen
     ? "Surat Raw Silk Studio, Gujarat"
     : isCoord
     ? "Bagru & Sanganer Handblock Cluster"
     : "Surat Handloom Collective";
+
+  const cluster_origin =
+    product.cluster_origin ||
+    (typeof product.specifications?.cluster_origin === "string" ? product.specifications.cluster_origin : undefined) ||
+    defaultClusterOrigin;
 
   const artisan_hours = isSaree ? 128 : isCoord ? 48 : isMen ? 56 : 64;
 
@@ -437,13 +471,15 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
           { name: "Original Edition", hex: "#261B13", image_url: primaryImg },
         ];
 
+  const video_url = product.video_url || "https://www.youtube.com/embed/5mGUdDq42iI";
+
   return {
     ...product,
     image_url: primaryImg,
     mrp,
     discount_percent,
     gallery_images: uniqueGallery,
-    video_url: "https://www.youtube.com/embed/5mGUdDq42iI",
+    video_url,
     cluster_origin,
     artisan_hours,
     fall_pico_included: isSaree,
@@ -457,17 +493,26 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
     specifications,
     wash_care_bullets,
     color_variants,
+    sku: product.sku || (typeof product.specifications?.sku === "string" ? product.specifications.sku : undefined),
+    hsn_code: product.hsn_code || (typeof product.specifications?.hsn_code === "string" ? product.specifications.hsn_code : undefined),
   };
 }
 
 /**
- * Fetches a product by ID from cache / Supabase, or falls back to seed catalog.
+ * Fetches a product by ID or human-friendly URL slug from cache / Supabase, or falls back to seed catalog.
  */
 export async function fetchProductById(id: string): Promise<DetailedProduct | null> {
+  const normalizedKey = (id || "").trim().toLowerCase();
+  if (!normalizedKey) return null;
+
   // 1. Check in-memory catalog cache first (instant 0ms response!)
   try {
     const catalog = await fetchCatalog();
-    const cachedMatch = catalog.find((p) => p.id === id);
+    const cachedMatch = catalog.find((p) =>
+      p.id === id ||
+      p.slug === id ||
+      p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") === normalizedKey
+    );
     if (cachedMatch) {
       return enrichProductToDetailed(cachedMatch);
     }
@@ -477,25 +522,47 @@ export async function fetchProductById(id: string): Promise<DetailedProduct | nu
 
   // 2. Query Supabase (primary source of truth if not in memory)
   try {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUuid) {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
 
-    if (data && !error) {
-      return enrichProductToDetailed(data as Product);
+      if (data && !error) {
+        return enrichProductToDetailed(data as Product);
+      }
+    } else {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .ilike("name", `%${id.replace(/-/g, " ")}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (data && !error) {
+        return enrichProductToDetailed(data as Product);
+      }
     }
   } catch (err) {
     console.warn("fetchProductById Supabase lookup notice:", err);
   }
 
   // 3. Check exact match in SEED_CATALOG_PRODUCTS fallback
-  const seedMatch = SEED_CATALOG_PRODUCTS.find((p) => p.id === id);
+  const seedMatch = SEED_CATALOG_PRODUCTS.find((p) =>
+    p.id === id ||
+    p.slug === id ||
+    p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") === normalizedKey
+  );
   if (seedMatch) return seedMatch;
 
-  // 4. Fallback: match by partial ID
-  const partialMatch = SEED_CATALOG_PRODUCTS.find((p) => p.id.includes(id) || id.includes(p.id));
+  // 4. Fallback: match by partial ID or name keyword
+  const partialMatch = SEED_CATALOG_PRODUCTS.find((p) =>
+    p.id.includes(id) ||
+    id.includes(p.id) ||
+    p.name.toLowerCase().includes(normalizedKey.replace(/-/g, " "))
+  );
   if (partialMatch) return partialMatch;
 
   return null;

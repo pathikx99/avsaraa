@@ -55,7 +55,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://va.vercel-scripts.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://*.vercel-insights.com; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.r2.dev https://imagedelivery.net https://*.cloudflare.com https://*.cloudflarestorage.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; frame-src https://api.razorpay.com https://checkout.razorpay.com; object-src 'none'; base-uri 'self';",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://va.vercel-scripts.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.razorpay.com https://*.vercel-insights.com; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.r2.dev https://imagedelivery.net https://*.cloudflare.com https://*.cloudflarestorage.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; base-uri 'self';",
           },
           {
             key: "X-Frame-Options",

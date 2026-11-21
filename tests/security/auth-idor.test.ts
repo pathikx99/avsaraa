@@ -7,29 +7,41 @@ import { isSuperAdminUser, isSuperAdminEmail, ADMIN_DEFAULT_PASSWORD, ADMIN_EMAI
 
 describe("Security Architecture & Cryptographic Verification Tests", () => {
   test("Standalone Admin JWT generation and cryptographic verification with jose", async () => {
-    // 1. Sign valid admin token
-    const token = await signAdminToken({
-      email: "admin@avsaraa.com",
-      role: "admin",
-      full_name: "Super Admin Authority",
-    });
+    // Configure JWT secret for test (no hardcoded default in production code)
+    const originalSecret = process.env.ADMIN_JWT_SECRET;
+    process.env.ADMIN_JWT_SECRET = "test_jwt_secret_minimum_32_characters_2026";
 
-    assert.ok(typeof token === "string" && token.length > 50);
+    try {
+      // 1. Sign valid admin token
+      const token = await signAdminToken({
+        email: "admin@avsaraa.com",
+        role: "admin",
+        full_name: "Super Admin Authority",
+      });
 
-    // 2. Verify valid admin token
-    const verification = await verifyAdminToken(token);
-    assert.strictEqual(verification.valid, true);
-    assert.strictEqual(verification.payload?.email, "admin@avsaraa.com");
-    assert.strictEqual(verification.payload?.role, "admin");
+      assert.ok(typeof token === "string" && token.length > 50);
 
-    // 3. Reject tampered token
-    const tampered = token.slice(0, -6) + "XXXXXX";
-    const tamperedVerification = await verifyAdminToken(tampered);
-    assert.strictEqual(tamperedVerification.valid, false);
+      // 2. Verify valid admin token
+      const verification = await verifyAdminToken(token);
+      assert.strictEqual(verification.valid, true);
+      assert.strictEqual(verification.payload?.email, "admin@avsaraa.com");
+      assert.strictEqual(verification.payload?.role, "admin");
 
-    // 4. Reject empty or invalid token
-    const emptyVerification = await verifyAdminToken("");
-    assert.strictEqual(emptyVerification.valid, false);
+      // 3. Reject tampered token
+      const tampered = token.slice(0, -6) + "XXXXXX";
+      const tamperedVerification = await verifyAdminToken(tampered);
+      assert.strictEqual(tamperedVerification.valid, false);
+
+      // 4. Reject empty or invalid token
+      const emptyVerification = await verifyAdminToken("");
+      assert.strictEqual(emptyVerification.valid, false);
+    } finally {
+      if (originalSecret === undefined) {
+        delete process.env.ADMIN_JWT_SECRET;
+      } else {
+        process.env.ADMIN_JWT_SECRET = originalSecret;
+      }
+    }
   });
 
   test("HTML sanitization (escapeHtml) strictly neutralizes XSS and email injection attacks", () => {
@@ -136,31 +148,104 @@ describe("Security Architecture & Cryptographic Verification Tests", () => {
     assert.strictEqual(sanitized.role, undefined);
   });
 
+  test("Admin JWT signs and verifies only with configured ADMIN_JWT_SECRET (secret isolation)", async () => {
+    const originalSecret = process.env.ADMIN_JWT_SECRET;
+    const originalNodeEnv = process.env.NODE_ENV;
+
+    process.env.ADMIN_JWT_SECRET = "configured_jwt_secret_for_testing_2026";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "test";
+
+    const token = await signAdminToken({ email: "admin@avsaraa.com", role: "admin" });
+    assert.ok(typeof token === "string" && token.length > 50);
+
+    const verification = await verifyAdminToken(token);
+    assert.strictEqual(verification.valid, true);
+    assert.strictEqual(verification.payload?.email, "admin@avsaraa.com");
+
+    // Rotate to a different secret: previously issued token must now be rejected (fail closed).
+    process.env.ADMIN_JWT_SECRET = "rotated_jwt_secret_minimum_32_chars_2026";
+    const staleVerification = await verifyAdminToken(token);
+    assert.strictEqual(staleVerification.valid, false);
+
+    // A token signed under the new secret verifies under the new secret.
+    const rotatedToken = await signAdminToken({ email: "admin@avsaraa.com", role: "admin" });
+    const rotatedVerification = await verifyAdminToken(rotatedToken);
+    assert.strictEqual(rotatedVerification.valid, true);
+
+    // Restore environment.
+    if (originalSecret === undefined) delete process.env.ADMIN_JWT_SECRET;
+    else process.env.ADMIN_JWT_SECRET = originalSecret;
+    (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv ?? undefined;
+  });
+
+  test("Admin JWT refuses to sign without ADMIN_JWT_SECRET in production (fail closed)", async () => {
+    const originalSecret = process.env.ADMIN_JWT_SECRET;
+    const originalNodeEnv = process.env.NODE_ENV;
+
+    delete process.env.ADMIN_JWT_SECRET;
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+
+    let threw = false;
+    try {
+      await signAdminToken({ email: "admin@avsaraa.com", role: "admin" });
+    } catch {
+      threw = true;
+    }
+    assert.strictEqual(threw, true, "Expected getJwtSecret to throw when ADMIN_JWT_SECRET is missing in production");
+
+    if (originalSecret === undefined) delete process.env.ADMIN_JWT_SECRET;
+    else process.env.ADMIN_JWT_SECRET = originalSecret;
+    (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv ?? undefined;
+  });
+
   test("Master password login credential and cryptographic session verification", async () => {
-    assert.strictEqual(ADMIN_DEFAULT_PASSWORD, "V@123456");
+    // Configure test admin secrets via env var (no hardcoded defaults in production code)
+    const originalAdminPassword = process.env.ADMIN_PASSWORD;
+    const originalAdminJwtSecret = process.env.ADMIN_JWT_SECRET;
+    const originalNodeEnv = process.env.NODE_ENV;
 
-    // Password comparison logic test
-    const configuredPassword = process.env.ADMIN_PASSWORD || ADMIN_DEFAULT_PASSWORD;
-    const testInputPassword = "V@123456";
-    const wrongPassword = "WrongPassword123";
+    process.env.ADMIN_PASSWORD = "V@123456";
+    process.env.ADMIN_JWT_SECRET = "test_jwt_secret_minimum_32_characters_2026";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "test";
 
-    const bufA = Buffer.from(testInputPassword, "utf-8");
-    const bufConfig = Buffer.from(configuredPassword, "utf-8");
-    const bufWrong = Buffer.from(wrongPassword, "utf-8");
+    try {
+      assert.strictEqual(process.env.ADMIN_PASSWORD, "V@123456");
 
-    assert.strictEqual(crypto.timingSafeEqual(bufA, bufConfig), true);
-    assert.strictEqual(bufWrong.length === bufConfig.length ? crypto.timingSafeEqual(bufWrong, bufConfig) : false, false);
+      // Password comparison logic test
+      const configuredPassword = process.env.ADMIN_PASSWORD || ADMIN_DEFAULT_PASSWORD;
+      const testInputPassword = "V@123456";
+      const wrongPassword = "WrongPassword123";
 
-    // Verify token generation with configured admin email and master password
-    const token = await signAdminToken({
-      email: ADMIN_EMAIL,
-      role: "admin",
-      full_name: "Super Admin",
-    });
+      const bufA = Buffer.from(testInputPassword, "utf-8");
+      const bufConfig = Buffer.from(configuredPassword, "utf-8");
+      const bufWrong = Buffer.from(wrongPassword, "utf-8");
 
-    const session = await verifyAdminToken(token);
-    assert.strictEqual(session.valid, true);
-    assert.strictEqual(session.payload?.role, "admin");
-    assert.strictEqual(session.payload?.email, ADMIN_EMAIL);
+      assert.strictEqual(crypto.timingSafeEqual(bufA, bufConfig), true);
+      assert.strictEqual(bufWrong.length === bufConfig.length ? crypto.timingSafeEqual(bufWrong, bufConfig) : false, false);
+
+      // Verify token generation with configured admin email and master password
+      const token = await signAdminToken({
+        email: ADMIN_EMAIL,
+        role: "admin",
+        full_name: "Super Admin",
+      });
+
+      const session = await verifyAdminToken(token);
+      assert.strictEqual(session.valid, true);
+      assert.strictEqual(session.payload?.role, "admin");
+      assert.strictEqual(session.payload?.email, ADMIN_EMAIL);
+    } finally {
+      if (originalAdminPassword === undefined) {
+        delete process.env.ADMIN_PASSWORD;
+      } else {
+        process.env.ADMIN_PASSWORD = originalAdminPassword;
+      }
+      if (originalAdminJwtSecret === undefined) {
+        delete process.env.ADMIN_JWT_SECRET;
+      } else {
+        process.env.ADMIN_JWT_SECRET = originalAdminJwtSecret;
+      }
+      (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv ?? undefined;
+    }
   });
 });

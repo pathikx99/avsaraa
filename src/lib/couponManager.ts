@@ -346,3 +346,47 @@ export async function validateCouponEngine({
     },
   };
 }
+
+/**
+ * Concurrency-safe atomic increment for coupon used_count.
+ * Strictly verifies and enforces usage_limit condition to prevent over-redemption races (AVS-006).
+ */
+export async function incrementCouponUsage(
+  adminClient: ReturnType<typeof getAdminSupabaseClient>,
+  couponCode: string
+): Promise<boolean> {
+  if (!couponCode || !couponCode.trim()) return false;
+  try {
+    const cleanCode = couponCode.trim();
+    const { data: coupRow } = await adminClient
+      .from("coupons")
+      .select("id, used_count, usage_limit")
+      .ilike("code", cleanCode)
+      .maybeSingle();
+
+    if (!coupRow) return false;
+
+    const used = Number(coupRow.used_count || 0);
+    const limit = coupRow.usage_limit == null ? null : Number(coupRow.usage_limit);
+
+    if (limit != null && used >= limit) {
+      return false;
+    }
+
+    const updateQuery = adminClient
+      .from("coupons")
+      .update({ used_count: used + 1 })
+      .eq("id", coupRow.id);
+
+    if (limit != null) {
+      updateQuery.lt("used_count", limit);
+    }
+
+    const { error } = await updateQuery;
+    return !error;
+  } catch (err) {
+    console.warn("Notice: coupon used_count increment notice:", err);
+    return false;
+  }
+}
+

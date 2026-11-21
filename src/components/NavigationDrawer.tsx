@@ -431,10 +431,10 @@ export default function NavigationDrawer({
 
         {/* 5. ATELIER CONCIERGE CALLOUT */}
         <div style={{ marginTop: "auto", paddingTop: "24px", position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
-          <a
-            href="https://wa.me/919876543210?text=Hello%20Avsaraa,%20I%20would%20like%20styling%20assistance."
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/contact"
+            onClick={onClose}
+            className="btn-shine"
             style={{
               display: "flex",
               alignItems: "center",
@@ -453,9 +453,9 @@ export default function NavigationDrawer({
               transition: "transform 0.15s ease",
             }}
           >
-            <span>💬</span>
-            <span>Chat with Surat Stylist (WhatsApp)</span>
-          </a>
+            <span>📧</span>
+            <span>Contact Atelier Concierge</span>
+          </Link>
 
           <Link
             href="/contact"
