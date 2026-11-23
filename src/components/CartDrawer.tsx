@@ -363,7 +363,7 @@ export default function CartDrawer() {
                     >
                       <button
                         type="button"
-                        onClick={() => updateQuantity(itemKey, item.quantity - 1)}
+                        onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
                         aria-label="Decrease quantity"
                         style={{
                           width: "32px",
@@ -396,7 +396,7 @@ export default function CartDrawer() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => updateQuantity(itemKey, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
                         disabled={isAtMax}
                         aria-label="Increase quantity"
                         style={{
@@ -420,7 +420,7 @@ export default function CartDrawer() {
 
                     <button
                       type="button"
-                      onClick={() => removeFromCart(itemKey)}
+                      onClick={() => removeFromCart(item.product.id)}
                       style={{
                         fontSize: "12px",
                         color: "#A83E2D",

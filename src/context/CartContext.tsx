@@ -4,11 +4,10 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { Product } from "@/types/product";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
+import { getCartItemKey, isCartItemMatch, type CartItem } from "@/lib/cartUtils";
 
-export interface CartItem {
-  product: Product;
-  quantity: number;
-}
+export type { CartItem };
+export { getCartItemKey, isCartItemMatch };
 
 interface CartContextType {
   cartItems: CartItem[];
@@ -36,8 +35,6 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const GUEST_CART_KEY = "avsaraa_guest_cart";
 const DEBOUNCE_DELAY_MS = 400;
-
-export const getCartItemKey = (p: Product) => `${p.id}__${p.name}`;
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -284,7 +281,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     (itemIdentifier: string) => {
       setCartItems((prev) => {
         const updated = prev.filter(
-          (item) => getCartItemKey(item.product) !== itemIdentifier && item.product.id !== itemIdentifier
+          (item) => !isCartItemMatch(item, itemIdentifier)
         );
         persistCartLocally(updated, user);
         return updated;
@@ -303,8 +300,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       setCartItems((prev) => {
         const updated = prev.map((item) => {
-          const isMatch =
-            getCartItemKey(item.product) === itemIdentifier || item.product.id === itemIdentifier;
+          const isMatch = isCartItemMatch(item, itemIdentifier);
           if (!isMatch) return item;
 
           const maxStock =
