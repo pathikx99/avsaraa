@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
+import { getCartItemKey } from "@/lib/cartUtils";
 import { ShoppingBagIcon } from "./Icons";
 import { resolveProductImage } from "@/lib/productUtils";
 
@@ -254,6 +255,7 @@ export default function CartDrawer() {
           ) : (
             cartItems.map((item, idx) => {
               const itemKey = `${item.product.id}__${item.product.name}__${idx}`;
+              const itemCanonicalKey = getCartItemKey(item.product);
               const maxStock =
                 item.product.stock_count && item.product.stock_count > 0 ? item.product.stock_count : 20;
               const isAtMax = item.quantity >= maxStock;
@@ -363,7 +365,7 @@ export default function CartDrawer() {
                     >
                       <button
                         type="button"
-                        onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                        onClick={() => updateQuantity(itemCanonicalKey, item.quantity - 1, idx)}
                         aria-label="Decrease quantity"
                         style={{
                           width: "32px",
@@ -396,7 +398,7 @@ export default function CartDrawer() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        onClick={() => updateQuantity(itemCanonicalKey, item.quantity + 1, idx)}
                         disabled={isAtMax}
                         aria-label="Increase quantity"
                         style={{
@@ -420,7 +422,7 @@ export default function CartDrawer() {
 
                     <button
                       type="button"
-                      onClick={() => removeFromCart(item.product.id)}
+                      onClick={() => removeFromCart(itemCanonicalKey, idx)}
                       style={{
                         fontSize: "12px",
                         color: "#A83E2D",

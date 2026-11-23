@@ -20,8 +20,8 @@ interface CartContextType {
   toastMessage: string | null;
   user: User | null;
   addToCart: (product: Product, quantity?: number) => boolean;
-  removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  removeFromCart: (productId: string, itemIndex?: number) => void;
+  updateQuantity: (productId: string, quantity: number, itemIndex?: number) => void;
   clearCart: () => void;
   setIsCartOpen: (open: boolean) => void;
   openCart: () => void;
@@ -278,11 +278,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const removeFromCart = useCallback(
-    (itemIdentifier: string) => {
+    (itemIdentifier: string, itemIndex?: number) => {
       setCartItems((prev) => {
-        const updated = prev.filter(
-          (item) => !isCartItemMatch(item, itemIdentifier)
-        );
+        let updated: CartItem[];
+        if (typeof itemIndex === "number" && itemIndex >= 0 && itemIndex < prev.length) {
+          updated = prev.filter((_, idx) => idx !== itemIndex);
+        } else {
+          updated = prev.filter(
+            (item, idx) => !isCartItemMatch(item, itemIdentifier, idx, itemIndex)
+          );
+        }
         persistCartLocally(updated, user);
         return updated;
       });
@@ -292,15 +297,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateQuantity = useCallback(
-    (itemIdentifier: string, quantity: number) => {
+    (itemIdentifier: string, quantity: number, itemIndex?: number) => {
       if (quantity <= 0) {
-        removeFromCart(itemIdentifier);
+        removeFromCart(itemIdentifier, itemIndex);
         return;
       }
 
       setCartItems((prev) => {
-        const updated = prev.map((item) => {
-          const isMatch = isCartItemMatch(item, itemIdentifier);
+        const updated = prev.map((item, idx) => {
+          const isMatch =
+            (typeof itemIndex === "number" && idx === itemIndex) ||
+            isCartItemMatch(item, itemIdentifier, idx, itemIndex);
           if (!isMatch) return item;
 
           const maxStock =
