@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { normalizePhoneNumber } from "@/lib/phoneUtils";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function GET() {
   try {
@@ -43,6 +44,14 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const supabase = await createSupabaseServerClient();
     const {
       data: { user },

@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { sendEmail } from "@/lib/emailService";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
   try {
@@ -15,18 +16,37 @@ export async function POST(request: Request) {
       );
     }
 
-    const serverClient = await createSupabaseServerClient();
-    const { data: { user } } = await serverClient.auth.getUser();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { success: false, message: "Invalid request payload." },
+        { status: 400 }
+      );
+    }
 
-    const body = await request.json();
     const { productId, email, phoneNumber, variantName, size } = body;
 
-    if (!productId || !email || !email.includes("@")) {
+    if (!productId || !email || !String(email).includes("@")) {
       return NextResponse.json(
         { success: false, message: "Product ID and valid email are required." },
         { status: 400 }
       );
     }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const rateCheck = checkRateLimit(`back-in-stock:${cleanEmail}`, 5, 300);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Too many alert requests. Please wait ${rateCheck.resetSeconds}s.`,
+        },
+        { status: 429 }
+      );
+    }
+
+    const serverClient = await createSupabaseServerClient();
+    const { data: { user } } = await serverClient.auth.getUser();
 
     const adminClient = getAdminSupabaseClient();
 

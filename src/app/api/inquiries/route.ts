@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { sendInquiryAcknowledgementEmail } from "@/lib/emailService";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -31,7 +32,16 @@ export async function POST(request: Request) {
     const phone = String(body.phone_number || body.phone || "").trim() || null;
     const subject = String(body.subject || "Customer Inquiry").trim();
     const message = String(body.message || "").trim();
-    const userId = body.user_id && typeof body.user_id === "string" ? body.user_id : null;
+
+    // Derive user_id from verified server session rather than trusting client-supplied parameter
+    let verifiedUserId: string | null = null;
+    try {
+      const serverClient = await createSupabaseServerClient();
+      const { data: { user } } = await serverClient.auth.getUser();
+      verifiedUserId = user?.id || null;
+    } catch {
+      // Unauthenticated visitor
+    }
 
     if (!fullName || !email || !message) {
       return NextResponse.json(
@@ -57,7 +67,7 @@ export async function POST(request: Request) {
           phone_number: phone,
           subject,
           message,
-          user_id: userId,
+          user_id: verifiedUserId,
           status: "Unread",
         },
       ])

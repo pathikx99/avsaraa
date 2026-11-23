@@ -4,12 +4,22 @@ import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { isSuperAdminUser } from "@/lib/adminConstants";
 import { verifyAdminSession } from "@/lib/jwtAdmin";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function POST(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
   try {
+    // CSRF protection for state-changing exchange requests
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const { id } = await props.params;
 
     if (!id) {

@@ -10,7 +10,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, products: [] });
     }
 
-    const ids = idsParam.split(",").filter(Boolean);
+    const ids = idsParam.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 10);
     if (ids.length === 0) {
       return NextResponse.json({ success: true, products: [] });
     }

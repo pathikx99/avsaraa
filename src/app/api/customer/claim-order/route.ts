@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function POST(request: Request) {
   try {
+    // CSRF protection for state-changing order claim
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
     const supabase = await createSupabaseServerClient();
     const {
       data: { user },
