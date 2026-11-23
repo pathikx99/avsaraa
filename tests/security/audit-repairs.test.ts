@@ -231,4 +231,49 @@ describe("Audit Defect & Security Patch Regression Tests", () => {
       false
     );
   });
+
+  test("Exchange workflow strictly requires Delivered status and valid 7-day window", () => {
+    function canRequestExchange(
+      orderStatus: string,
+      updatedAtOrCreatedAt: string
+    ): { eligible: boolean; reason?: string } {
+      if (orderStatus !== "Delivered") {
+        return { eligible: false, reason: `Exchange requests can only be initiated for delivered orders (current status: ${orderStatus}).` };
+      }
+      const deliveryTimestamp = new Date(updatedAtOrCreatedAt).getTime();
+      const daysSinceDelivery = (Date.now() - deliveryTimestamp) / (1000 * 60 * 60 * 24);
+      if (daysSinceDelivery > 7) {
+        return { eligible: false, reason: "The 7-Day Heritage Exchange window for this order has expired." };
+      }
+      return { eligible: true };
+    }
+
+    // Pending or confirmed orders cannot be exchanged
+    assert.strictEqual(canRequestExchange("Pending", new Date().toISOString()).eligible, false);
+    assert.strictEqual(canRequestExchange("Confirmed", new Date().toISOString()).eligible, false);
+    assert.strictEqual(canRequestExchange("Dispatched", new Date().toISOString()).eligible, false);
+    assert.strictEqual(canRequestExchange("Cancelled", new Date().toISOString()).eligible, false);
+
+    // Delivered 2 days ago: eligible
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    assert.strictEqual(canRequestExchange("Delivered", twoDaysAgo).eligible, true);
+
+    // Delivered 10 days ago: expired
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    assert.strictEqual(canRequestExchange("Delivered", tenDaysAgo).eligible, false);
+  });
+
+  test("Order edit address validation strictly enforces Gujarat pincode boundary", () => {
+    function validateEditAddress(snap: { postal_code?: string; recipient_name?: string }): boolean {
+      if (!snap || !snap.postal_code) return false;
+      const code = parseInt(snap.postal_code, 10);
+      const isGujarat = !isNaN(code) && code >= 360000 && code <= 399999;
+      return isGujarat && Boolean(snap.recipient_name);
+    }
+
+    assert.strictEqual(validateEditAddress({ postal_code: "395006", recipient_name: "Meera" }), true);
+    assert.strictEqual(validateEditAddress({ postal_code: "380001", recipient_name: "Pooja" }), true);
+    assert.strictEqual(validateEditAddress({ postal_code: "110001", recipient_name: "Attacker" }), false);
+    assert.strictEqual(validateEditAddress({ postal_code: "400001", recipient_name: "Attacker" }), false);
+  });
 });

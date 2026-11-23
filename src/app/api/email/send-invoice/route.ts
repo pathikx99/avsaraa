@@ -6,9 +6,29 @@ import { sendCustomerOrderInvoice } from "@/lib/emailService";
 import { Order } from "@/types/order";
 import { isSuperAdminUser } from "@/lib/adminConstants";
 import { verifyAdminSession } from "@/lib/jwtAdmin";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
   try {
+    // CSRF protection for email dispatch
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
+    const forwarded = request.headers.get("x-forwarded-for");
+    const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+    const rateCheck = checkRateLimit(`send-invoice:${ip}`, 5, 300);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `Too many invoice requests. Please retry in ${rateCheck.resetSeconds}s.` },
+        { status: 429 }
+      );
+    }
     const serverClient = await createSupabaseServerClient();
     const {
       data: { user },

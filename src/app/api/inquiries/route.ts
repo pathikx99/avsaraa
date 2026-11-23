@@ -3,9 +3,18 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { sendInquiryAcknowledgementEmail } from "@/lib/emailService";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function POST(request: Request) {
   try {
+    // CSRF protection for inquiry submission
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
     const forwarded = request.headers.get("x-forwarded-for");
     const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
     const rateCheck = checkRateLimit(`inquiry-submit:${ip}`, 5, 300);

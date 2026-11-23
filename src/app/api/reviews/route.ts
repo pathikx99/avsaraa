@@ -3,6 +3,7 @@ import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { ProductReview } from "@/types/review";
 import { rateLimitReviews } from "@/lib/rateLimit";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function GET(request: Request) {
   try {
@@ -52,6 +53,15 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // CSRF protection for review submissions
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const {
       product_id,

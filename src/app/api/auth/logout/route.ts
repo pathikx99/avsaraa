@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { ADMIN_COOKIE_NAME } from "@/lib/jwtAdmin";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    // CSRF protection for logout
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
     const supabase = await createSupabaseServerClient();
     await supabase.auth.signOut();
 

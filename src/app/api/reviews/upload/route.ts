@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import crypto from "crypto";
 import sharp from "sharp";
 
 export async function POST(request: Request) {
   try {
+    // CSRF protection for photo uploads
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
     const forwarded = request.headers.get("x-forwarded-for");
     const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
     const rateCheck = checkRateLimit(`review-upload:${ip}`, 10, 300);

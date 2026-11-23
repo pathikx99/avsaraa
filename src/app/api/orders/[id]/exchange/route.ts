@@ -93,17 +93,19 @@ export async function POST(
       );
     }
 
-    // Check exchange window: within 7 days of delivery / creation
-    if (order.order_status === "Cancelled") {
+    // Check exchange window: within 7 days of delivery
+    if (order.order_status !== "Delivered") {
       return NextResponse.json(
-        { success: false, message: "Cannot exchange a cancelled order." },
+        { success: false, message: `Exchange requests can only be initiated for delivered orders (current status: ${order.order_status}).` },
         { status: 400 }
       );
     }
 
-    if (order.order_status === "Exchange Requested" || order.order_status === "Exchanged") {
+    const deliveryTimestamp = new Date(order.updated_at || order.created_at).getTime();
+    const daysSinceDelivery = (Date.now() - deliveryTimestamp) / (1000 * 60 * 60 * 24);
+    if (daysSinceDelivery > 7) {
       return NextResponse.json(
-        { success: false, message: "An exchange has already been initiated for this order." },
+        { success: false, message: "The 7-Day Heritage Exchange window for this order has expired." },
         { status: 400 }
       );
     }

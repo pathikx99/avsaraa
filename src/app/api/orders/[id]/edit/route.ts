@@ -5,6 +5,7 @@ import { verifyAdminSession } from "@/lib/jwtAdmin";
 import { isSuperAdminUser } from "@/lib/adminConstants";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { isValidGujaratPincode } from "@/lib/financials";
 
 export async function PATCH(
   request: Request,
@@ -69,7 +70,30 @@ export async function PATCH(
 
     const nowIso = new Date().toISOString();
     const updateFields: Record<string, unknown> = { updated_at: nowIso };
-    if (shipping_address_snapshot) updateFields.shipping_address_snapshot = shipping_address_snapshot;
+    if (shipping_address_snapshot) {
+      const postalCode = shipping_address_snapshot.postal_code;
+      if (!postalCode || !isValidGujaratPincode(postalCode)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Delivery restriction: Pin code ${postalCode || "empty"} is outside our Gujarat service territory. Avsaraa currently delivers exclusively within Gujarat (pincodes 360000–399999).`,
+          },
+          { status: 400 }
+        );
+      }
+      if (
+        !shipping_address_snapshot.recipient_name ||
+        !shipping_address_snapshot.phone_number ||
+        !shipping_address_snapshot.address_line1 ||
+        !shipping_address_snapshot.city
+      ) {
+        return NextResponse.json(
+          { success: false, message: "A complete delivery address is required." },
+          { status: 400 }
+        );
+      }
+      updateFields.shipping_address_snapshot = shipping_address_snapshot;
+    }
     if (notes !== undefined) updateFields.notes = notes;
 
     const { data: updatedOrder, error: updateErr } = await adminClient

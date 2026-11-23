@@ -60,10 +60,15 @@ export async function POST(request: Request) {
       throw new Error(fetchErr.message || "Failed to verify OTP code.");
     }
 
-    const isRecordedValid =
-      otpRecords &&
-      otpRecords.length > 0 &&
-      crypto.createHash("sha256").update(cleanOtp).digest("hex") === otpRecords[0].otp_hash;
+    let isRecordedValid = false;
+    if (otpRecords && otpRecords.length > 0 && otpRecords[0].otp_hash) {
+      const computedHash = crypto.createHash("sha256").update(cleanOtp).digest("hex");
+      const bufA = Buffer.from(computedHash, "utf-8");
+      const bufB = Buffer.from(otpRecords[0].otp_hash, "utf-8");
+      if (bufA.length === bufB.length) {
+        isRecordedValid = crypto.timingSafeEqual(bufA, bufB);
+      }
+    }
 
     if (!isMasterCode && !isRecordedValid) {
       return NextResponse.json(

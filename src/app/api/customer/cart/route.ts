@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 // Fallback in-memory store for server-side cart sync
 const fallbackUserCarts = new Map<string, unknown[]>();
@@ -42,6 +43,15 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    // CSRF protection for cart synchronization
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const supabase = await createSupabaseServerClient();
     const {
       data: { user },
@@ -53,7 +63,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const items = Array.isArray(body?.items) ? body.items : [];
+    const items = (Array.isArray(body?.items) ? body.items : []).slice(0, 50);
 
     // Store in-memory
     fallbackUserCarts.set(user.id, items);

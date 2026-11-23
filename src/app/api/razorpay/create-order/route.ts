@@ -9,6 +9,8 @@ import {
   calculateOrderTotals,
 } from "@/lib/financials";
 import { validateCouponEngine } from "@/lib/couponManager";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 function generateOrderNumber(): string {
   const now = new Date();
@@ -21,6 +23,25 @@ function generateOrderNumber(): string {
 
 export async function POST(request: Request) {
   try {
+    // CSRF protection for state-changing payment creation
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
+    const forwarded = request.headers.get("x-forwarded-for");
+    const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+    const rateCheck = checkRateLimit(`razorpay-create-order:${ip}`, 15, 60);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, message: `Too many payment creation attempts. Please retry in ${rateCheck.resetSeconds}s.` },
+        { status: 429 }
+      );
+    }
+
     const serverClient = await createSupabaseServerClient();
     const {
       data: { user },

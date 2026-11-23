@@ -92,6 +92,33 @@ export async function PATCH(request: Request) {
       if (order_status === "Delivered") {
         updatePayload.payment_status = "Paid";
       }
+
+      // If status changed to Cancelled, restore inventory stock
+      if (order_status === "Cancelled") {
+        try {
+          const { data: existingOrder } = await supabaseAdmin
+            .from("orders")
+            .select("order_status")
+            .eq("id", id)
+            .maybeSingle();
+
+          if (existingOrder && existingOrder.order_status !== "Cancelled") {
+            const { data: items } = await supabaseAdmin
+              .from("order_items")
+              .select("product_id, quantity")
+              .eq("order_id", id);
+            if (items) {
+              for (const item of items) {
+                if (item.product_id) {
+                  await supabaseAdmin.rpc("increment_stock", { p_id: item.product_id, p_qty: item.quantity });
+                }
+              }
+            }
+          }
+        } catch (invErr) {
+          console.warn("Notice: Admin cancellation inventory increment warning:", invErr);
+        }
+      }
     }
 
     if (courier_partner !== undefined) {
