@@ -5,6 +5,7 @@ import { ensureColorwayImagesForProduct } from "@/lib/colorwayGenerator";
 import { invalidateProductsCache } from "@/app/api/products/route";
 import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import { sortProductsByShowcase, saveShowcaseOrderedIds } from "@/lib/showcaseOrderManager";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 const VALID_CATEGORIES = [
   "Sarees",
@@ -55,6 +56,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     // 1. Authorization Guard
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {
@@ -221,6 +230,14 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     // 1. Authorization Guard
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {
@@ -351,6 +368,14 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     // 1. Authorization Guard
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {

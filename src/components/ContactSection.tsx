@@ -43,6 +43,7 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: fullName.trim(),
+          name: fullName.trim(),
           email: email.trim().toLowerCase(),
           phone_number: phone.trim() || null,
           subject: "Customer Inquiry",
@@ -55,12 +56,13 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
         // Fallback to client-side insert if API endpoint is unreachable
         const { error } = await supabase.from("contact_inquiries").insert([
           {
-            full_name: fullName.trim(),
+            name: fullName.trim(),
             email: email.trim().toLowerCase(),
             phone_number: phone.trim() || null,
             subject: "Customer Inquiry",
             message: message.trim(),
             user_id: user?.id || null,
+            status: "New",
           },
         ]);
         if (error) {

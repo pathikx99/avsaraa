@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
 import { ProductReview } from "@/types/review";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function GET(request: Request) {
   try {
@@ -53,6 +54,14 @@ export async function GET(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {
       return NextResponse.json(
@@ -104,6 +113,14 @@ export async function DELETE(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {
       return NextResponse.json(

@@ -67,21 +67,43 @@ export async function POST(request: Request) {
     }
 
     const supabaseAdmin = getAdminSupabaseClient();
-    const { data, error } = await supabaseAdmin
+
+    // Support both schema naming variants: 'name' (live DB schema) vs 'full_name' (clean SQL migration)
+    const primaryPayload: Record<string, unknown> = {
+      name: fullName,
+      email,
+      phone_number: phone,
+      subject,
+      message,
+      user_id: verifiedUserId,
+      status: "New",
+    };
+
+    let { data, error } = await supabaseAdmin
       .from("contact_inquiries")
-      .insert([
-        {
-          full_name: fullName,
-          email,
-          phone_number: phone,
-          subject,
-          message,
-          user_id: verifiedUserId,
-          status: "Unread",
-        },
-      ])
+      .insert([primaryPayload])
       .select()
       .single();
+
+    // Fallback if schema has 'full_name' column or 'Unread' status instead
+    if (error && (error.message?.includes("name") || error.code === "PGRST204" || error.code === "23514")) {
+      const fallbackPayload: Record<string, unknown> = {
+        full_name: fullName,
+        email,
+        phone_number: phone,
+        subject,
+        message,
+        user_id: verifiedUserId,
+        status: "Unread",
+      };
+      const retry = await supabaseAdmin
+        .from("contact_inquiries")
+        .insert([fallbackPayload])
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error("[InquiriesAPI:InsertError]", error);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_STATUSES = ["Active", "Inactive", "Suspended"];
@@ -299,6 +300,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     // 1. Authorization Guard
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {
@@ -394,6 +403,14 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     // 1. Authorization Guard
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {
@@ -567,6 +584,14 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     // 1. Authorization Guard
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {

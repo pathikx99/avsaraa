@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
 import { OrderStatus } from "@/types/order";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 const VALID_STATUSES: OrderStatus[] = [
   "Pending",
@@ -62,6 +63,14 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });

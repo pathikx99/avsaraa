@@ -3,9 +3,18 @@ import { authenticateAdminRequest } from "@/lib/adminAuth";
 import { optimizeProductImage } from "@/lib/imageOptimizer";
 import { uploadMedia, getActiveStorageProvider } from "@/lib/storageClient";
 import { buildOrganizedStoragePath } from "@/lib/imageOrganizer";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function POST(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     // 1. Authenticate Admin Request
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {

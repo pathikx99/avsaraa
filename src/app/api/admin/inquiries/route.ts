@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
 import { sendInquiryAcknowledgementEmail } from "@/lib/emailService";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function GET() {
   try {
@@ -35,6 +36,14 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
@@ -48,17 +57,41 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, error: "Missing inquiry ID or status." }, { status: 400 });
     }
 
-    const validStatuses = ["Unread", "In Progress", "Resolved", "Archived"];
+    const validStatuses = [
+      "New", "Under Review", "Contacted", "Resolved", "Archived",
+      "Unread", "In Progress"
+    ];
     if (!validStatuses.includes(status)) {
       return NextResponse.json({ success: false, error: "Invalid status value." }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from("contact_inquiries")
       .update({ status })
       .eq("id", id)
       .select()
       .single();
+
+    if (error && error.code === "23514") {
+      const alternateMap: Record<string, string> = {
+        Unread: "New",
+        "In Progress": "Under Review",
+        New: "Unread",
+        "Under Review": "In Progress",
+        Contacted: "In Progress",
+      };
+      const altStatus = alternateMap[status];
+      if (altStatus) {
+        const retry = await supabaseAdmin
+          .from("contact_inquiries")
+          .update({ status: altStatus })
+          .eq("id", id)
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      }
+    }
 
     if (error) {
       console.error("Inquiry status update database error:", error);
@@ -74,6 +107,14 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
