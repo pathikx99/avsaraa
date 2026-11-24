@@ -118,6 +118,10 @@ export interface CreateOrderPayload {
   coupon_code?: string;
   payment_method: PaymentMethod;
   notes?: string;
+  verification_tokens?: {
+    phone_token?: string;
+    email_token?: string;
+  };
 }
 
 export interface RazorpaySuccessResponse {

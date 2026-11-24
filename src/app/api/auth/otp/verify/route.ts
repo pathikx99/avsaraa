@@ -3,6 +3,8 @@ import { checkDbRateLimit } from "@/lib/dbRateLimit";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import crypto from "crypto";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { normalizePhoneNumber } from "@/lib/phoneUtils";
+import { issueContactProofToken, ContactPurpose } from "@/lib/contactVerification";
 
 export async function POST(request: Request) {
   try {
@@ -16,9 +18,9 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { contact, otp } = body;
+    const { contact, otp, purpose } = body;
 
-    const cleanContact = String(contact || "").trim().toLowerCase();
+    let cleanContact = String(contact || "").trim();
     const cleanOtp = String(otp || "").trim();
 
     if (!cleanContact || !cleanOtp) {
@@ -26,6 +28,16 @@ export async function POST(request: Request) {
         { success: false, error: "Contact and OTP code are required." },
         { status: 400 }
       );
+    }
+
+    const isEmail = cleanContact.includes("@");
+    if (!isEmail) {
+      const phoneNorm = normalizePhoneNumber(cleanContact);
+      if (phoneNorm.isValid) {
+        cleanContact = phoneNorm.normalized;
+      }
+    } else {
+      cleanContact = cleanContact.toLowerCase();
     }
 
     // Rate limit verification attempts (5 attempts per 5 minutes) - database-backed
@@ -41,7 +53,8 @@ export async function POST(request: Request) {
     }
 
     const isTestExecution =
-      process.env.ENABLE_TEST_OTP === "true" || process.env.NODE_ENV === "test";
+      process.env.NODE_ENV !== "production" &&
+      (process.env.ENABLE_TEST_OTP === "true" || process.env.NODE_ENV === "test");
     const isMasterCode = isTestExecution && cleanOtp === "123456";
 
     const adminClient = getAdminSupabaseClient();
@@ -86,30 +99,21 @@ export async function POST(request: Request) {
         .eq("consumed", false);
     }
 
-    // Generate verifiable proof token (<encodedContact>.<timestamp>.<hmacSignature>)
-    const timestamp = Date.now();
-    const rawSecret =
-      process.env.OTP_PROOF_SECRET ||
-      process.env.SUPABASE_SECRET_KEY ||
-      process.env.ADMIN_JWT_SECRET;
-    if (!rawSecret && process.env.NODE_ENV === "production") {
-      throw new Error("Critical Security Configuration: OTP_PROOF_SECRET must be configured in production.");
-    }
-    if (!rawSecret) {
-      throw new Error("OTP_PROOF_SECRET must be configured for OTP proof token generation.");
-    }
-    const proofSecret = rawSecret;
-    const signature = crypto
-      .createHmac("sha256", proofSecret)
-      .update(`${cleanContact}:${timestamp}`)
-      .digest("hex");
-    const proofToken = `${Buffer.from(cleanContact).toString("base64url")}.${timestamp}.${signature}`;
+    // Resolve purpose and issue tamper-proof proof token
+    const resolvedPurpose: ContactPurpose =
+      (purpose as ContactPurpose) ||
+      (isEmail ? "order_email" : "order_phone");
+
+    const proofToken = issueContactProofToken(cleanContact, resolvedPurpose);
 
     return NextResponse.json({
       success: true,
       message: "Contact verified successfully.",
       verified: true,
+      contact: cleanContact,
+      purpose: resolvedPurpose,
       verificationToken: proofToken,
+      token: proofToken,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";

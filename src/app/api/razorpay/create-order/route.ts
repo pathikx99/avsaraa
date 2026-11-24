@@ -11,6 +11,10 @@ import {
 import { validateCouponEngine } from "@/lib/couponManager";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { checkRateLimit } from "@/lib/rateLimit";
+import {
+  validateOrderContacts,
+  isContactProofTokenConsumed,
+} from "@/lib/contactVerification";
 
 function generateOrderNumber(): string {
   const now = new Date();
@@ -78,6 +82,82 @@ export async function POST(request: Request) {
         },
         { status: 400 }
       );
+    }
+
+    // Contact Verification: Ensure both WhatsApp Phone and Email are verified
+    let userProfile: { phone_number?: string | null; phone_verified?: boolean | null; email?: string | null } | null = null;
+    if (user?.id) {
+      try {
+        const { data: prof, error: profErr } = await getAdminSupabaseClient()
+          .from("profiles")
+          .select("phone_number, phone_verified, email")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profErr) {
+          const fallback = await getAdminSupabaseClient()
+            .from("profiles")
+            .select("phone_number, email")
+            .eq("id", user.id)
+            .maybeSingle();
+          userProfile = fallback.data;
+        } else {
+          userProfile = prof;
+        }
+      } catch {
+        // Non-blocking fallback
+      }
+    }
+
+    const contactCheck = validateOrderContacts({
+      phone: shipping_address_snapshot.phone_number,
+      email: shipping_address_snapshot.email,
+      verificationTokens: body.verification_tokens,
+      user,
+      userProfile,
+    });
+
+    if (!contactCheck.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "CONTACT_VERIFICATION_REQUIRED",
+          message: contactCheck.error || "Contact verification required.",
+          phoneVerified: contactCheck.phoneVerified,
+          emailVerified: contactCheck.emailVerified,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check single-use proof token replay prevention
+    if (body.verification_tokens?.phone_token) {
+      const isConsumed = await isContactProofTokenConsumed(body.verification_tokens.phone_token);
+      if (isConsumed) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: "TOKEN_ALREADY_USED",
+            message:
+              "This WhatsApp verification code has already been used for an order. Please verify again.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+    if (body.verification_tokens?.email_token) {
+      const isConsumed = await isContactProofTokenConsumed(body.verification_tokens.email_token);
+      if (isConsumed) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: "TOKEN_ALREADY_USED",
+            message:
+              "This Email verification code has already been used for an order. Please verify again.",
+          },
+          { status: 400 }
+        );
+      }
     }
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -227,7 +307,10 @@ export async function POST(request: Request) {
     const orderPayload = {
       user_id: currentUserId,
       shipping_address_id: sanitizedAddressId,
-      shipping_address_snapshot,
+      shipping_address_snapshot: {
+        ...shipping_address_snapshot,
+        verification_tokens: body.verification_tokens || null,
+      },
       order_number: orderNumber,
       subtotal: financials.subtotal,
       discount_amount: financials.discountAmount,

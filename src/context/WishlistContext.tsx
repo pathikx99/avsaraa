@@ -5,6 +5,7 @@ import { Product } from "@/types/product";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 import { useCart } from "@/context/CartContext";
+import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 
 interface WishlistContextType {
   wishlist: Product[];
@@ -77,15 +78,35 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         try {
           const { data: dbWishlist, error: dbErr } = await supabase
             .from("wishlists")
-            .select("product_id, product_data")
+            .select("product_id, products(*)")
             .eq("user_id", currentUser.id);
 
           if (!dbErr && dbWishlist && isMounted) {
             // Merge database items
             const dbProducts: Product[] = [];
             for (const row of dbWishlist) {
-              if (row.product_data) {
-                dbProducts.push(row.product_data as Product);
+              const rowData = row as unknown as {
+                product_id: string;
+                product_data?: Product | null;
+                products?: Product | Product[] | null;
+              };
+
+              const joined = rowData.products;
+              const productObj: Product | null = Array.isArray(joined)
+                ? (joined[0] ?? null)
+                : (joined ?? null);
+
+              if (rowData.product_data) {
+                dbProducts.push(rowData.product_data as Product);
+              } else if (productObj && productObj.id) {
+                dbProducts.push(productObj);
+              } else {
+                const cached =
+                  existingWishlist.find((p) => p.id === row.product_id) ||
+                  SEED_CATALOG_PRODUCTS.find((p) => p.id === row.product_id);
+                if (cached) {
+                  dbProducts.push(cached);
+                }
               }
             }
 
@@ -100,7 +121,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
                   {
                     user_id: currentUser.id,
                     product_id: p.id,
-                    product_data: p,
                   },
                   { onConflict: "user_id,product_id" }
                 );
@@ -163,38 +183,43 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      let isRemoving = false;
+      let nextWishlist: Product[] = [];
+
       setWishlist((prev) => {
         const exists = prev.some((item) => item.id === product.id);
-        let updated: Product[];
-        if (exists) {
-          updated = prev.filter((item) => item.id !== product.id);
-          showToast(`Removed "${product.name}" from your wishlist`);
-          // Delete from Supabase wishlists table
-          void supabase
-            .from("wishlists")
-            .delete()
-            .eq("user_id", user.id)
-            .eq("product_id", product.id);
-        } else {
-          updated = [product, ...prev];
-          showToast(`Saved "${product.name}" to your wishlist!`);
-          // Upsert into Supabase wishlists table
-          void supabase.from("wishlists").upsert(
-            {
-              user_id: user.id,
-              product_id: product.id,
-              product_data: product,
-            },
-            { onConflict: "user_id,product_id" }
-          );
-        }
-        try {
-          localStorage.setItem(`avsaraa_wishlist_${user.id}`, JSON.stringify(updated));
-        } catch (e) {
-          console.warn("Could not save wishlist to storage", e);
-        }
-        return updated;
+        isRemoving = exists;
+        nextWishlist = exists
+          ? prev.filter((item) => item.id !== product.id)
+          : [product, ...prev];
+        return nextWishlist;
       });
+
+      // Side effects & toasts executed cleanly outside of React's pure state reducer
+      if (isRemoving) {
+        showToast(`Removed "${product.name}" from your wishlist`);
+        void supabase
+          .from("wishlists")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("product_id", product.id);
+      } else {
+        showToast(`Saved "${product.name}" to your wishlist!`);
+        void supabase.from("wishlists").upsert(
+          {
+            user_id: user.id,
+            product_id: product.id,
+          },
+          { onConflict: "user_id,product_id" }
+        );
+      }
+
+      try {
+        localStorage.setItem(`avsaraa_wishlist_${user.id}`, JSON.stringify(nextWishlist));
+      } catch (e) {
+        console.warn("Could not save wishlist to storage", e);
+      }
+
       return true;
     },
     [user, openAuthModal, showToast]
@@ -203,15 +228,18 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const removeFromWishlist = useCallback(
     (productId: string) => {
       if (!user) return;
+      let nextWishlist: Product[] = [];
       setWishlist((prev) => {
-        const updated = prev.filter((item) => item.id !== productId);
-        try {
-          localStorage.setItem(`avsaraa_wishlist_${user.id}`, JSON.stringify(updated));
-        } catch (e) {
-          console.warn("Could not save wishlist to storage", e);
-        }
-        return updated;
+        nextWishlist = prev.filter((item) => item.id !== productId);
+        return nextWishlist;
       });
+
+      try {
+        localStorage.setItem(`avsaraa_wishlist_${user.id}`, JSON.stringify(nextWishlist));
+      } catch (e) {
+        console.warn("Could not save wishlist to storage", e);
+      }
+
       // Delete from Supabase wishlists table
       void supabase
         .from("wishlists")

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -10,6 +10,7 @@ import { isSuperAdminUser } from "@/lib/adminConstants";
 import {
   BackArrowIcon,
   MailIcon,
+  WhatsAppIcon,
   GoogleIcon,
   SpinnerIcon,
   FlourishDivider,
@@ -35,13 +36,120 @@ export default function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [authMode, setAuthMode] = useState<"otp" | "password">("otp");
+  const [authMode, setAuthMode] = useState<"whatsapp" | "otp" | "password">("whatsapp");
   const [otpCode, setOtpCode] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isOtpLoading, setIsOtpLoading] = useState(false);
+
+  // WhatsApp OTP Login States
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [waOtpCode, setWaOtpCode] = useState("");
+  const [isWaOtpSent, setIsWaOtpSent] = useState(false);
+  const [isWaOtpLoading, setIsWaOtpLoading] = useState(false);
+  const [waCountdown, setWaCountdown] = useState(0);
+
   const [toastMessage, setToastMessage] = useState<string | null>(
     urlError ? decodeURIComponent(urlError) : null
   );
+
+  // WhatsApp resend countdown timer
+  useEffect(() => {
+    if (waCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setWaCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [waCountdown]);
+
+  const handleSendWhatsAppOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanPhone = phoneNumber.trim().replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length < 10) {
+      showToast("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+
+    setIsWaOtpLoading(true);
+    try {
+      const e164 = cleanPhone.startsWith("91") && cleanPhone.length === 12
+        ? `+${cleanPhone}`
+        : `+91${cleanPhone.slice(-10)}`;
+
+      const res = await fetch("/api/auth/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contact: e164,
+          channel: "whatsapp",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || "Failed to dispatch WhatsApp verification code.");
+        return;
+      }
+
+      setIsWaOtpSent(true);
+      setWaCountdown(60);
+      showToast(`Verification code sent to your WhatsApp (+91 ${cleanPhone.slice(-10)})`);
+      if (data.debugOtp) {
+        setWaOtpCode(data.debugOtp);
+      }
+    } catch {
+      showToast("Could not connect to WhatsApp verification service. Please retry.");
+    } finally {
+      setIsWaOtpLoading(false);
+    }
+  };
+
+  const handleVerifyWhatsAppOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!waOtpCode || waOtpCode.trim().length !== 6) {
+      showToast("Please enter the 6-digit WhatsApp verification code.");
+      return;
+    }
+
+    const cleanPhone = phoneNumber.trim().replace(/\D/g, "");
+    const formattedPhone = cleanPhone.startsWith("91") && cleanPhone.length === 12
+      ? `+${cleanPhone}`
+      : `+91${cleanPhone.slice(-10)}`;
+
+    setIsWaOtpLoading(true);
+    try {
+      const res = await fetch("/api/auth/whatsapp/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phoneNumber: formattedPhone,
+          otp: waOtpCode.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || "Invalid WhatsApp verification code.");
+        setIsWaOtpLoading(false);
+        return;
+      }
+
+      showToast(`Welcome! ${data.message || "Logged in successfully."}`);
+
+      // Refresh Supabase client session in browser
+      await supabase.auth.getSession();
+
+      const isSuperAdmin = data.user?.email && isSuperAdminUser(data.user);
+      const targetDestination = isSuperAdmin ? "/admin" : redirectTo;
+
+      setTimeout(() => {
+        router.push(targetDestination);
+        router.refresh();
+      }, 500);
+    } catch {
+      showToast("Authentication failed. Please try again.");
+      setIsWaOtpLoading(false);
+    }
+  };
 
   const handleSendEmailOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -503,12 +611,12 @@ export default function LoginForm({
                 letterSpacing: "0.08em",
               }}
             >
-              OR WITH EMAIL
+              OR SIGN IN WITH
             </span>
             <div style={{ flex: 1, height: "1px", backgroundColor: "#E6DBD0" }} />
           </div>
 
-          {/* Auth Method Selector (Email Code OTP vs Password) */}
+          {/* Auth Method Selector (WhatsApp OTP vs Email Code vs Password) */}
           <div
             style={{
               display: "flex",
@@ -516,8 +624,36 @@ export default function LoginForm({
               borderRadius: "10px",
               padding: "3px",
               marginBottom: "16px",
+              gap: "2px",
             }}
           >
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("whatsapp");
+                setIsWaOtpSent(false);
+              }}
+              style={{
+                flex: 1,
+                padding: "8px 6px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                fontWeight: 600,
+                border: "none",
+                cursor: "pointer",
+                backgroundColor: authMode === "whatsapp" ? "#FFFFFF" : "transparent",
+                color: authMode === "whatsapp" ? "#1B5E20" : "#7E6E62",
+                boxShadow: authMode === "whatsapp" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "5px",
+              }}
+            >
+              <WhatsAppIcon size={14} color={authMode === "whatsapp" ? "#25D366" : "#7E6E62"} />
+              <span>WhatsApp</span>
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -526,9 +662,9 @@ export default function LoginForm({
               }}
               style={{
                 flex: 1,
-                padding: "8px 12px",
+                padding: "8px 6px",
                 borderRadius: "8px",
-                fontSize: "12.5px",
+                fontSize: "12px",
                 fontWeight: 600,
                 border: "none",
                 cursor: "pointer",
@@ -538,7 +674,7 @@ export default function LoginForm({
                 transition: "all 0.2s ease",
               }}
             >
-              ✉️ Email Code (Verify)
+              ✉️ Email
             </button>
             <button
               type="button"
@@ -548,9 +684,9 @@ export default function LoginForm({
               }}
               style={{
                 flex: 1,
-                padding: "8px 12px",
+                padding: "8px 6px",
                 borderRadius: "8px",
-                fontSize: "12.5px",
+                fontSize: "12px",
                 fontWeight: 600,
                 border: "none",
                 cursor: "pointer",
@@ -563,6 +699,200 @@ export default function LoginForm({
               🔑 Password
             </button>
           </div>
+
+          {/* MODE 0: WhatsApp OTP Form */}
+          {authMode === "whatsapp" && (
+            <div className="fade-in">
+              {!isWaOtpSent ? (
+                <form onSubmit={handleSendWhatsAppOtp}>
+                  {/* Phone Field */}
+                  <div style={{ marginBottom: "14px" }}>
+                    <div
+                      className="avsaraa-input-group"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        height: "52px",
+                        padding: "0 14px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          paddingRight: "8px",
+                          borderRight: "1px solid #D9CFC4",
+                          color: "#786556",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        <WhatsAppIcon size={16} color="#25D366" />
+                        <span>+91</span>
+                      </div>
+                      <input
+                        type="tel"
+                        autoComplete="tel-national"
+                        placeholder="Enter 10-digit mobile number"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
+                        style={{ flex: 1, fontSize: "14px", color: "#261B13" }}
+                        required
+                        disabled={isWaOtpLoading}
+                        autoFocus
+                      />
+                    </div>
+                    <span style={{ display: "block", fontSize: "11.5px", color: "#8E7D70", marginTop: "6px", paddingLeft: "4px" }}>
+                      We will send a 6-digit verification code to your WhatsApp.
+                    </span>
+                  </div>
+
+                  {/* Send Code Button */}
+                  <button
+                    type="submit"
+                    disabled={isWaOtpLoading || phoneNumber.replace(/\D/g, "").length < 10}
+                    className="avsaraa-btn-primary"
+                    style={{
+                      height: "52px",
+                      width: "100%",
+                      backgroundColor: phoneNumber.replace(/\D/g, "").length >= 10 ? "#25D366" : undefined,
+                      borderColor: phoneNumber.replace(/\D/g, "").length >= 10 ? "#20BA5A" : undefined,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    {isWaOtpLoading ? (
+                      <SpinnerIcon size={18} color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <WhatsAppIcon size={18} color="#FFFFFF" />
+                        <span>Send WhatsApp Code →</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyWhatsAppOtp}>
+                  {/* Notice & Edit Phone */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      backgroundColor: "#E8F5E9",
+                      borderRadius: "8px",
+                      marginBottom: "14px",
+                      fontSize: "12.5px",
+                      border: "1px solid rgba(37, 211, 102, 0.25)",
+                    }}
+                  >
+                    <span style={{ color: "#1B5E20", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <WhatsAppIcon size={14} color="#25D366" />
+                      <span>Code sent to <strong>+91 {phoneNumber.slice(-10)}</strong></span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsWaOtpSent(false)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#2E7D32",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        fontSize: "12px",
+                      }}
+                    >
+                      Change
+                    </button>
+                  </div>
+
+                  {/* 6-Digit OTP Input */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <div
+                      className="avsaraa-input-group"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        height: "54px",
+                        padding: "0 14px",
+                        backgroundColor: "#FFFFFF",
+                        border: "1.5px solid #25D366",
+                      }}
+                    >
+                      <input
+                        type="text"
+                        maxLength={6}
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        placeholder="• • • • • •"
+                        value={waOtpCode}
+                        onChange={(e) => setWaOtpCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                        style={{
+                          flex: 1,
+                          fontSize: "22px",
+                          fontWeight: 700,
+                          letterSpacing: "8px",
+                          textAlign: "center",
+                          color: "#261B13",
+                        }}
+                        required
+                        autoFocus
+                        disabled={isWaOtpLoading}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Verify & Sign In Button */}
+                  <button
+                    type="submit"
+                    disabled={isWaOtpLoading || waOtpCode.trim().length !== 6}
+                    className="avsaraa-btn-primary"
+                    style={{
+                      height: "52px",
+                      width: "100%",
+                      opacity: waOtpCode.trim().length !== 6 ? 0.7 : 1,
+                      backgroundColor: "#25D366",
+                      borderColor: "#20BA5A",
+                    }}
+                  >
+                    {isWaOtpLoading ? (
+                      <SpinnerIcon size={18} color="#FFFFFF" />
+                    ) : (
+                      "Verify WhatsApp Code & Sign In →"
+                    )}
+                  </button>
+
+                  {/* Resend Link */}
+                  <div style={{ textAlign: "center", marginTop: "14px" }}>
+                    <button
+                      type="button"
+                      onClick={handleSendWhatsAppOtp}
+                      disabled={isWaOtpLoading || waCountdown > 0}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: waCountdown > 0 ? "#A3978C" : "#2E7D32",
+                        fontSize: "12.5px",
+                        cursor: waCountdown > 0 ? "default" : "pointer",
+                        textDecoration: waCountdown > 0 ? "none" : "underline",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {waCountdown > 0
+                        ? `Resend WhatsApp code in ${waCountdown}s`
+                        : "Didn't receive code? Resend via WhatsApp"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
 
           {/* MODE 1: Email Code (OTP) Form */}
           {authMode === "otp" && (

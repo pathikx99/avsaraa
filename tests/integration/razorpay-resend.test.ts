@@ -21,7 +21,31 @@ import {
   getSupportSender,
   getVerificationSender,
 } from "../../src/lib/emailService.ts";
+import { issueContactProofToken } from "../../src/lib/contactVerification.ts";
 import type { Order } from "../../src/types/order.ts";
+import fs from "fs";
+
+// Load test environment secrets if available
+try {
+  for (const envPath of [".env.local", ".env"]) {
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, "utf-8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("OTP_PROOF_SECRET=") || trimmed.startsWith("RAZORPAY_KEY_SECRET=")) {
+          const [k, ...vParts] = trimmed.split("=");
+          const key = k.trim();
+          const val = vParts.join("=").trim().replace(/^["']|["']$/g, "");
+          if (!process.env[key]) {
+            process.env[key] = val;
+          }
+        }
+      }
+    }
+  }
+} catch {
+  // ignore
+}
 
 async function resolveAvsaraaBaseUrl(): Promise<{ baseUrl: string; isOnline: boolean }> {
   const candidates = process.env.TEST_BASE_URL
@@ -291,18 +315,27 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
     });
 
     it("POST /api/razorpay/create-order creates order with valid Gujarat pincode", async () => {
+      const phone = "+919876543210";
+      const email = "rohan@example.com";
+      const phoneToken = issueContactProofToken(phone, "order_phone");
+      const emailToken = issueContactProofToken(email, "order_email");
+
       const res = await fetch(`${BASE_URL}/api/razorpay/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           shipping_address_snapshot: {
             recipient_name: "Rohan Patel",
-            phone_number: "9876543210",
-            email: "rohan@example.com",
+            phone_number: phone,
+            email: email,
             address_line1: "101 Ashwamegh Complex",
             city: "Ahmedabad",
             state: "Gujarat",
             postal_code: "380015",
+          },
+          verification_tokens: {
+            phone_token: phoneToken,
+            email_token: emailToken,
           },
           items: [
             {

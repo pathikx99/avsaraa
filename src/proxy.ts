@@ -48,14 +48,18 @@ export async function proxy(request: NextRequest) {
     }
 
     const isGoogleOAuth = user.app_metadata?.provider === "google";
+    const isPhoneVerified = Boolean(
+      user.phone_confirmed_at ||
+      user.user_metadata?.auth_provider === "whatsapp_otp"
+    );
     const isEmailVerified = Boolean(user.email_confirmed_at || isGoogleOAuth);
 
-    if (!isEmailVerified) {
+    if (!isEmailVerified && !isPhoneVerified) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/login";
       redirectUrl.searchParams.set(
         "error",
-        "Please verify your email address to access your account. Check your inbox for the verification link."
+        "Please verify your email address or mobile number to access your account."
       );
       return NextResponse.redirect(redirectUrl);
     }

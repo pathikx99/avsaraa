@@ -5,6 +5,7 @@ import { processedWebhooksMemory } from "@/lib/webhooks";
 import { dispatchOrderSuccessEmails } from "@/lib/emailService";
 import { deductInventory } from "@/lib/inventory";
 import { incrementCouponUsage } from "@/lib/couponManager";
+import { consumeContactProofTokens } from "@/lib/contactVerification";
 import type { Order, OrderItem } from "@/types/order";
 
 function timingSafeMatch(a: string, b: string): boolean {
@@ -183,6 +184,13 @@ export async function POST(request: Request) {
           // Concurrency-guarded coupon usage increment (AVS-006)
           if (updatedOrder.coupon_code) {
             await incrementCouponUsage(adminClient, updatedOrder.coupon_code);
+          }
+
+          // Single-use proof token deduplication: consume tokens now that payment is confirmed
+          const snapshot = updatedOrder.shipping_address_snapshot as Record<string, unknown> | null;
+          if (snapshot && typeof snapshot === "object" && "verification_tokens" in snapshot) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await consumeContactProofTokens((snapshot as any).verification_tokens, adminClient);
           }
 
           // Asynchronous email dispatch (Customer GST Tax Invoice + Admin Alert)

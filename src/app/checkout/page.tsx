@@ -16,10 +16,13 @@ import {
   SpinnerIcon,
   PlusIcon,
   BackArrowIcon,
+  WhatsAppIcon,
+  MailIcon,
 } from "@/components/Icons";
 import { AddressSnapshot, PaymentMethod, Order, RazorpayFailureResponse } from "@/types/order";
 import type { User } from "@supabase/supabase-js";
 import { isValidGujaratPincode, calculateOrderTotals } from "@/lib/financials";
+import { normalizePhoneNumber } from "@/lib/phoneUtils";
 
 interface AddressItem {
   id: string;
@@ -27,6 +30,7 @@ interface AddressItem {
   address_type: string;
   recipient_name: string;
   phone_number: string;
+  email?: string | null;
   address_line1: string;
   address_line2?: string | null;
   landmark?: string | null;
@@ -117,13 +121,31 @@ export default function CheckoutPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Dual-Contact Verification State (WhatsApp OTP / Email verification)
-  const [isContactVerified, setIsContactVerified] = useState(false);
+  const [phoneProofToken, setPhoneProofToken] = useState<string | null>(null);
+  const [emailProofToken, setEmailProofToken] = useState<string | null>(null);
+  const [verifiedProfilePhone, setVerifiedProfilePhone] = useState<string | null>(null);
+  const [verifiedAuthEmail, setVerifiedAuthEmail] = useState<string | null>(null);
+  const [verifiedTokenPhone, setVerifiedTokenPhone] = useState<string | null>(null);
+  const [verifiedTokenEmail, setVerifiedTokenEmail] = useState<string | null>(null);
+
+  // Modal Stepper State: "whatsapp" -> "email"
+  const [verificationStep, setVerificationStep] = useState<"whatsapp" | "email">("whatsapp");
   const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
   const [otpInput, setOtpInput] = useState("");
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [otpSuccessMessage, setOtpSuccessMessage] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
 
   // Razorpay Sandbox Test State (Activated for demo test keys)
   const [razorpaySandboxData, setRazorpaySandboxData] = useState<{
@@ -167,7 +189,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (!mounted) return;
       if (!data.user) {
         setUser(null);
@@ -176,9 +198,48 @@ export default function CheckoutPage() {
         setIsAddingNewAddress(true);
       } else {
         setUser(data.user);
-        if (data.user.email) {
+        if (data.user.email && !data.user.email.endsWith("@phone.avsaraa.in")) {
           setNewAddress((prev) => ({ ...prev, email: data.user.email || "" }));
+          const isGoogle = data.user.app_metadata?.provider === "google";
+          if (data.user.email_confirmed_at || isGoogle) {
+            setVerifiedAuthEmail(data.user.email);
+          }
         }
+
+        // Check profile for verified phone
+        try {
+          let profData = null;
+          const { data: prof, error: profErr } = await supabase
+            .from("profiles")
+            .select("phone_number, phone_verified")
+            .eq("id", data.user.id)
+            .maybeSingle();
+
+          if (profErr) {
+            const fallback = await supabase
+              .from("profiles")
+              .select("phone_number")
+              .eq("id", data.user.id)
+              .maybeSingle();
+            profData = fallback.data;
+          } else {
+            profData = prof;
+          }
+
+          if (profData?.phone_number) {
+            const hasVerifiedFlag = Boolean((profData as any)?.phone_verified);
+            const isUserPhoneConfirmed = Boolean(
+              data.user.phone_confirmed_at ||
+              (data.user.user_metadata as any)?.auth_provider === "whatsapp_otp"
+            );
+            if (hasVerifiedFlag || isUserPhoneConfirmed) {
+              setVerifiedProfilePhone(profData.phone_number);
+            }
+          }
+        } catch {
+          // Non-blocking
+        }
+
         setAuthLoading(false);
         loadAddresses(data.user.id);
       }
@@ -410,11 +471,11 @@ export default function CheckoutPage() {
 
   const hasValidAddress = Boolean(selectedAddressId || (isAddingNewAddress && isGuestAddressFilled));
 
-  // Send WhatsApp / Dual-Contact OTP
-  const handleSendOtp = async (contactNumber?: string) => {
+  // Send WhatsApp Phone OTP
+  const handleSendPhoneOtp = async (contactNumber?: string) => {
     const targetContact = contactNumber || selectedAddress?.phone_number || newAddress.phone_number;
     if (!targetContact) {
-      setOtpError("Phone number required for verification.");
+      setOtpError("Mobile number is required for WhatsApp verification.");
       return;
     }
 
@@ -430,24 +491,71 @@ export default function CheckoutPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setOtpError(data.error || "Failed to dispatch verification code.");
+        setOtpError(data.error || "Failed to dispatch WhatsApp verification code.");
       } else {
-        setOtpSuccessMessage(`Verification code dispatched to ${targetContact}.`);
+        setOtpSuccessMessage(`Verification code sent via WhatsApp to ${targetContact}.`);
+        setResendCooldown(45);
         if (data.debugOtp) {
           setOtpInput(data.debugOtp);
         }
       }
     } catch {
-      setOtpError("Could not reach OTP service. Please retry.");
+      setOtpError("Could not reach WhatsApp verification service. Please retry.");
     } finally {
       setSendingOtp(false);
     }
   };
 
-  // Verify OTP
-  const handleVerifyOtp = async () => {
-    const targetContact = selectedAddress?.phone_number || newAddress.phone_number;
-    if (!targetContact || !otpInput.trim()) {
+  // Send Email OTP
+  const handleSendEmailOtp = async (emailAddress?: string) => {
+    const rawTargetEmail =
+      emailAddress ||
+      selectedAddress?.email ||
+      newAddress.email ||
+      (user?.email && !user.email.endsWith("@phone.avsaraa.in") ? user.email : "");
+    const targetEmail = rawTargetEmail && !rawTargetEmail.endsWith("@phone.avsaraa.in") ? rawTargetEmail.trim() : "";
+    if (!targetEmail || !targetEmail.includes("@")) {
+      setOtpError("A valid email address is required for order confirmation and invoice.");
+      return;
+    }
+
+    setSendingOtp(true);
+    setOtpError(null);
+    setOtpSuccessMessage(null);
+
+    try {
+      const res = await fetch("/api/auth/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contact: targetEmail, channel: "email" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setOtpError(data.error || "Failed to dispatch email verification code.");
+      } else {
+        setOtpSuccessMessage(`Verification code sent via Email to ${targetEmail} from support@avsaraa.in.`);
+        setResendCooldown(45);
+        if (data.debugOtp) {
+          setOtpInput(data.debugOtp);
+        }
+      }
+    } catch {
+      setOtpError("Could not reach email verification service. Please retry.");
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  // Verify Current OTP Step
+  const handleVerifyCurrentStep = async () => {
+    const currentPhone = selectedAddress?.phone_number || newAddress.phone_number;
+    const rawEmail =
+      selectedAddress?.email ||
+      newAddress.email ||
+      (user?.email && !user.email.endsWith("@phone.avsaraa.in") ? user.email : "");
+    const currentEmail = rawEmail.trim();
+
+    if (!otpInput.trim() || otpInput.trim().length !== 6) {
       setOtpError("Please enter the 6-digit verification code.");
       return;
     }
@@ -456,19 +564,98 @@ export default function CheckoutPage() {
     setOtpError(null);
 
     try {
-      const res = await fetch("/api/auth/otp/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contact: targetContact, otp: otpInput.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setOtpError(data.error || "Invalid verification code.");
+      if (verificationStep === "whatsapp") {
+        const res = await fetch("/api/auth/otp/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contact: currentPhone,
+            otp: otpInput.trim(),
+            purpose: "order_phone",
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          setOtpError(data.error || "Invalid WhatsApp verification code.");
+          setVerifyingOtp(false);
+          return;
+        }
+
+        const token = data.verificationToken || data.token;
+        setPhoneProofToken(token);
+        setVerifiedTokenPhone(currentPhone || null);
+        setOtpInput("");
+        setOtpSuccessMessage("Mobile number verified via WhatsApp!");
+
+        // Determine if email also needs verification for currentEmail
+        const targetEmailClean = (currentEmail || "").trim().toLowerCase();
+        const profileEmailClean = (verifiedAuthEmail || "").trim().toLowerCase();
+        const tokenEmailClean = (verifiedTokenEmail || "").trim().toLowerCase();
+
+        const isEmailGood =
+          Boolean(targetEmailClean) &&
+          ((Boolean(profileEmailClean) && profileEmailClean === targetEmailClean) ||
+            (Boolean(emailProofToken) &&
+              Boolean(tokenEmailClean) &&
+              tokenEmailClean === targetEmailClean));
+
+        if (!isEmailGood) {
+          setVerificationStep("email");
+          setOtpSuccessMessage(null);
+          handleSendEmailOtp(currentEmail);
+        } else {
+          setIsOtpModalOpen(false);
+          executePlaceOrder(token, emailProofToken || undefined);
+        }
       } else {
-        setIsContactVerified(true);
-        setIsOtpModalOpen(false);
-        // Automatically proceed to place order
-        executePlaceOrder();
+        // Email step
+        const res = await fetch("/api/auth/otp/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contact: currentEmail,
+            otp: otpInput.trim(),
+            purpose: "order_email",
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          setOtpError(data.error || "Invalid email verification code.");
+          setVerifyingOtp(false);
+          return;
+        }
+
+        const token = data.verificationToken || data.token;
+        setEmailProofToken(token);
+        setVerifiedTokenEmail(currentEmail || null);
+        setOtpInput("");
+        setOtpSuccessMessage("Email verified successfully!");
+
+        // Determine if phone was unverified for currentPhone
+        const targetPhoneNorm = currentPhone ? normalizePhoneNumber(currentPhone).normalized : "";
+        const profilePhoneNorm = verifiedProfilePhone
+          ? normalizePhoneNumber(verifiedProfilePhone).normalized
+          : "";
+        const tokenPhoneNorm =
+          phoneProofToken && verifiedTokenPhone
+            ? normalizePhoneNumber(verifiedTokenPhone).normalized
+            : "";
+
+        const isPhoneGood =
+          Boolean(targetPhoneNorm) &&
+          ((Boolean(profilePhoneNorm) && profilePhoneNorm === targetPhoneNorm) ||
+            (Boolean(phoneProofToken) &&
+              Boolean(tokenPhoneNorm) &&
+              tokenPhoneNorm === targetPhoneNorm));
+
+        if (!isPhoneGood) {
+          setVerificationStep("whatsapp");
+          setOtpSuccessMessage(null);
+          handleSendPhoneOtp(currentPhone);
+        } else {
+          setIsOtpModalOpen(false);
+          executePlaceOrder(phoneProofToken || undefined, token);
+        }
       }
     } catch {
       setOtpError("Verification failed. Please try again.");
@@ -547,18 +734,26 @@ export default function CheckoutPage() {
   };
 
   // Core Order Placement Execution
-  const executePlaceOrder = async () => {
+  const executePlaceOrder = async (
+    overridePhoneToken?: string,
+    overrideEmailToken?: string
+  ) => {
     if (cartItems.length === 0) {
       setErrorMessage("Your shopping bag is empty.");
       return;
     }
 
     let addressSnapshot: AddressSnapshot | null = null;
+    const userRealEmail = user?.email && !user.email.endsWith("@phone.avsaraa.in") ? user.email.trim() : null;
+
     if (selectedAddress) {
+      const selectedEmail = selectedAddress.email && !selectedAddress.email.endsWith("@phone.avsaraa.in") ? selectedAddress.email.trim() : null;
+      const snapshotEmail = selectedEmail || userRealEmail || (newAddress.email.trim() && !newAddress.email.endsWith("@phone.avsaraa.in") ? newAddress.email.trim() : null);
+
       addressSnapshot = {
         recipient_name: selectedAddress.recipient_name,
         phone_number: selectedAddress.phone_number,
-        email: user?.email || newAddress.email.trim() || null,
+        email: snapshotEmail,
         is_guest: !user,
         address_line1: selectedAddress.address_line1,
         address_line2: selectedAddress.address_line2,
@@ -577,14 +772,15 @@ export default function CheckoutPage() {
       newAddress.city &&
       newAddress.postal_code
     ) {
-      if (!user && (!newAddress.email || !newAddress.email.includes("@"))) {
-        setErrorMessage("Please provide a valid email address for your order confirmation.");
+      const resolvedEmail = (newAddress.email.trim() && !newAddress.email.endsWith("@phone.avsaraa.in")) ? newAddress.email.trim() : userRealEmail;
+      if (!resolvedEmail || !resolvedEmail.includes("@")) {
+        setErrorMessage("Please provide a valid email address for your order invoice and delivery updates.");
         return;
       }
       addressSnapshot = {
         recipient_name: newAddress.recipient_name.trim(),
         phone_number: newAddress.phone_number.trim(),
-        email: newAddress.email.trim() || user?.email || null,
+        email: resolvedEmail,
         is_guest: !user,
         address_line1: newAddress.address_line1.trim(),
         address_line2: newAddress.address_line2.trim() || null,
@@ -597,6 +793,11 @@ export default function CheckoutPage() {
       };
     } else {
       setErrorMessage("Please select or enter a delivery address to proceed.");
+      return;
+    }
+
+    if (!addressSnapshot.email || !addressSnapshot.email.includes("@") || addressSnapshot.email.endsWith("@phone.avsaraa.in")) {
+      setErrorMessage("Please provide a valid email address for your order invoice and delivery updates.");
       return;
     }
 
@@ -622,6 +823,24 @@ export default function CheckoutPage() {
         quantity: item.quantity,
       }));
 
+      const phoneNorm = normalizePhoneNumber(addressSnapshot.phone_number).normalized;
+      const finalPhoneToken =
+        overridePhoneToken ||
+        (phoneProofToken &&
+        verifiedTokenPhone &&
+        normalizePhoneNumber(verifiedTokenPhone).normalized === phoneNorm
+          ? phoneProofToken
+          : undefined);
+
+      const emailClean = (addressSnapshot.email || "").trim().toLowerCase();
+      const finalEmailToken =
+        overrideEmailToken ||
+        (emailProofToken &&
+        verifiedTokenEmail &&
+        verifiedTokenEmail.trim().toLowerCase() === emailClean
+          ? emailProofToken
+          : undefined);
+
       const payload = {
         shipping_address_id: selectedAddress?.id && selectedAddress.id !== "guest-address-id" ? selectedAddress.id : null,
         shipping_address_snapshot: addressSnapshot,
@@ -629,6 +848,10 @@ export default function CheckoutPage() {
         coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
         payment_method: paymentMethod,
         notes: orderNotes.trim() || undefined,
+        verification_tokens: (finalPhoneToken || finalEmailToken) ? {
+          phone_token: finalPhoneToken || undefined,
+          email_token: finalEmailToken || undefined,
+        } : undefined,
       };
 
       // Razorpay Gateway (Cards, UPI, Wallets, NetBanking)
@@ -648,6 +871,16 @@ export default function CheckoutPage() {
 
         const createData = await createRes.json();
         if (!createRes.ok || !createData.success || !createData.razorpay_order_id) {
+          if (createData.code === "TOKEN_ALREADY_USED") {
+            setPhoneProofToken(null);
+            setEmailProofToken(null);
+            setVerifiedTokenPhone(null);
+            setVerifiedTokenEmail(null);
+            setIsOtpModalOpen(true);
+            setOtpError("Verification code was already used. Please verify again to complete your order.");
+            setSubmittingOrder(false);
+            return;
+          }
           throw new Error(createData.message || "Could not initialize payment gateway. Please try again.");
         }
 
@@ -756,6 +989,16 @@ export default function CheckoutPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success || !data.order) {
+        if (data.code === "TOKEN_ALREADY_USED") {
+          setPhoneProofToken(null);
+          setEmailProofToken(null);
+          setVerifiedTokenPhone(null);
+          setVerifiedTokenEmail(null);
+          setIsOtpModalOpen(true);
+          setOtpError("Verification code was already used. Please verify again to complete your order.");
+          setSubmittingOrder(false);
+          return;
+        }
         throw new Error(data.message || "Failed to place order. Please try again.");
       }
 
@@ -778,7 +1021,7 @@ export default function CheckoutPage() {
     }
   };
 
-  // Trigger Place Order (With Dual-Contact Verification Gateway)
+  // Trigger Place Order (With Dual-Contact Verification Gateway: WhatsApp Phone + Email)
   const handlePlaceOrder = async () => {
     const targetPin = selectedAddress?.postal_code || newAddress.postal_code;
     if (targetPin && !isValidGujaratPincode(targetPin)) {
@@ -788,10 +1031,58 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!isContactVerified) {
+    const currentPhone = selectedAddress?.phone_number || newAddress.phone_number;
+    const rawEmail =
+      selectedAddress?.email ||
+      newAddress.email ||
+      (user?.email && !user.email.endsWith("@phone.avsaraa.in") ? user.email : "");
+    const currentEmail = rawEmail.trim();
+
+    if (!currentEmail || !currentEmail.includes("@")) {
+      setErrorMessage("Please enter a valid email address for your order invoice and delivery updates.");
+      return;
+    }
+
+    const targetPhoneNorm = currentPhone ? normalizePhoneNumber(currentPhone).normalized : "";
+    const profilePhoneNorm = verifiedProfilePhone
+      ? normalizePhoneNumber(verifiedProfilePhone).normalized
+      : "";
+    const tokenPhoneNorm =
+      phoneProofToken && verifiedTokenPhone
+        ? normalizePhoneNumber(verifiedTokenPhone).normalized
+        : "";
+
+    const isPhoneGood =
+      Boolean(targetPhoneNorm) &&
+      ((Boolean(profilePhoneNorm) && profilePhoneNorm === targetPhoneNorm) ||
+        (Boolean(phoneProofToken) &&
+          Boolean(tokenPhoneNorm) &&
+          tokenPhoneNorm === targetPhoneNorm));
+
+    const targetEmailClean = (currentEmail || "").trim().toLowerCase();
+    const profileEmailClean = (verifiedAuthEmail || "").trim().toLowerCase();
+    const tokenEmailClean = (verifiedTokenEmail || "").trim().toLowerCase();
+
+    const isEmailGood =
+      Boolean(targetEmailClean) &&
+      ((Boolean(profileEmailClean) && profileEmailClean === targetEmailClean) ||
+        (Boolean(emailProofToken) &&
+          Boolean(tokenEmailClean) &&
+          tokenEmailClean === targetEmailClean));
+
+    if (!isPhoneGood || !isEmailGood) {
       setIsOtpModalOpen(true);
-      const targetContact = selectedAddress?.phone_number || newAddress.phone_number;
-      handleSendOtp(targetContact);
+      setOtpInput("");
+      setOtpError(null);
+      setOtpSuccessMessage(null);
+
+      if (!isPhoneGood) {
+        setVerificationStep("whatsapp");
+        handleSendPhoneOtp(currentPhone);
+      } else {
+        setVerificationStep("email");
+        handleSendEmailOtp(currentEmail);
+      }
       return;
     }
 
@@ -2108,7 +2399,7 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* Mandatory Dual-Contact Verification Modal (WhatsApp / SMS / Email OTP) */}
+      {/* Mandatory Dual-Contact Verification Modal (WhatsApp Phone + Email OTP) */}
       {isOtpModalOpen && (
         <div
           style={{
@@ -2127,35 +2418,123 @@ export default function CheckoutPage() {
             style={{
               backgroundColor: "#FAF7F2",
               borderRadius: "16px",
-              padding: "32px",
-              maxWidth: "440px",
+              padding: "28px 24px",
+              maxWidth: "460px",
               width: "100%",
               boxShadow: "0 20px 40px rgba(0,0,0,0.25)",
               border: "1px solid #EAE3D9",
               position: "relative",
             }}
           >
-            <div style={{ textAlign: "center", marginBottom: "20px" }}>
+            {/* Stepper Progress Badges */}
+            {(() => {
+              const activePhone = selectedAddress?.phone_number || newAddress.phone_number || "";
+              const activeEmail = selectedAddress?.email || newAddress.email || user?.email || "";
+              const activePhoneNorm = activePhone ? normalizePhoneNumber(activePhone).normalized : "";
+              const activeEmailClean = activeEmail.trim().toLowerCase();
+
+              const step1Done =
+                Boolean(activePhoneNorm) &&
+                ((Boolean(verifiedProfilePhone) &&
+                  normalizePhoneNumber(verifiedProfilePhone || "").normalized === activePhoneNorm) ||
+                  (Boolean(phoneProofToken) &&
+                    Boolean(verifiedTokenPhone) &&
+                    normalizePhoneNumber(verifiedTokenPhone || "").normalized === activePhoneNorm));
+
+              const step2Done =
+                Boolean(activeEmailClean) &&
+                ((Boolean(verifiedAuthEmail) &&
+                  (verifiedAuthEmail || "").trim().toLowerCase() === activeEmailClean) ||
+                  (Boolean(emailProofToken) &&
+                    Boolean(verifiedTokenEmail) &&
+                    (verifiedTokenEmail || "").trim().toLowerCase() === activeEmailClean));
+
+              return (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "12px",
+                    marginBottom: "20px",
+                    padding: "8px 12px",
+                    backgroundColor: "#EFE6DC",
+                    borderRadius: "10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: step1Done ? "#1B5E20" : verificationStep === "whatsapp" ? "#25D366" : "#7E6E62",
+                    }}
+                  >
+                    <WhatsAppIcon
+                      size={14}
+                      color={step1Done ? "#1B5E20" : verificationStep === "whatsapp" ? "#25D366" : "#7E6E62"}
+                    />
+                    <span>1. WhatsApp {step1Done ? "✓" : ""}</span>
+                  </div>
+                  <span style={{ color: "#B8A89A", fontSize: "12px" }}>→</span>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: step2Done ? "#1B5E20" : verificationStep === "email" ? "#866951" : "#7E6E62",
+                    }}
+                  >
+                    <MailIcon
+                      size={14}
+                      color={step2Done ? "#1B5E20" : verificationStep === "email" ? "#866951" : "#7E6E62"}
+                    />
+                    <span>2. Email {step2Done ? "✓" : ""}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div style={{ textAlign: "center", marginBottom: "18px" }}>
               <div
                 style={{
                   width: "48px",
                   height: "48px",
                   borderRadius: "50%",
-                  backgroundColor: "rgba(134, 105, 81, 0.15)",
+                  backgroundColor: verificationStep === "whatsapp" ? "rgba(37, 211, 102, 0.15)" : "rgba(134, 105, 81, 0.15)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   margin: "0 auto 12px",
                 }}
               >
-                <ShieldCheckIcon size={24} color="#866951" />
+                {verificationStep === "whatsapp" ? (
+                  <WhatsAppIcon size={24} color="#25D366" />
+                ) : (
+                  <MailIcon size={24} color="#866951" />
+                )}
               </div>
-              <h3 style={{ fontSize: "20px", color: "#261B13", margin: "0 0 6px", fontWeight: 600 }}>
-                Verify Delivery Contact
+              <h3 style={{ fontSize: "19px", color: "#261B13", margin: "0 0 6px", fontWeight: 600 }}>
+                {verificationStep === "whatsapp"
+                  ? "Verify WhatsApp Mobile"
+                  : "Verify Email Address"}
               </h3>
               <p style={{ fontSize: "13px", color: "#6A5C52", margin: 0, lineHeight: 1.5 }}>
-                To verify your order, please enter the 6-digit verification code sent to{" "}
-                <strong>{selectedAddress?.phone_number || newAddress.phone_number || "your contact"}</strong>.
+                {verificationStep === "whatsapp" ? (
+                  <>
+                    Enter the 6-digit verification code sent to your WhatsApp at{" "}
+                    <strong>{selectedAddress?.phone_number || newAddress.phone_number}</strong>.
+                  </>
+                ) : (
+                  <>
+                    Enter the 6-digit verification code sent to{" "}
+                    <strong>{selectedAddress?.email || newAddress.email || user?.email}</strong> from support@avsaraa.in.
+                  </>
+                )}
               </p>
             </div>
 
@@ -2203,26 +2582,31 @@ export default function CheckoutPage() {
                   letterSpacing: "0.05em",
                   color: "#5A4535",
                   marginBottom: "8px",
+                  textAlign: "center",
                 }}
               >
                 Enter 6-Digit Code
               </label>
               <input
                 type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]*"
                 maxLength={6}
                 value={otpInput}
                 onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ""))}
-                placeholder="123456"
+                placeholder="• • • • • •"
+                autoFocus
                 style={{
                   width: "100%",
-                  height: "48px",
+                  height: "50px",
                   textAlign: "center",
-                  fontSize: "22px",
+                  fontSize: "24px",
                   letterSpacing: "0.3em",
                   fontWeight: 700,
                   color: "#261B13",
                   backgroundColor: "#FFFFFF",
-                  border: "1px solid #D4BEAA",
+                  border: `1.5px solid ${verificationStep === "whatsapp" ? "#25D366" : "#C5A265"}`,
                   borderRadius: "8px",
                   outline: "none",
                 }}
@@ -2249,14 +2633,14 @@ export default function CheckoutPage() {
               </button>
               <button
                 type="button"
-                onClick={handleVerifyOtp}
+                onClick={handleVerifyCurrentStep}
                 disabled={verifyingOtp || otpInput.trim().length !== 6}
                 style={{
                   flex: 2,
                   height: "44px",
                   borderRadius: "22px",
                   border: "none",
-                  backgroundColor: "#261B13",
+                  backgroundColor: verificationStep === "whatsapp" ? "#25D366" : "#261B13",
                   color: "#FAF7F2",
                   fontSize: "13px",
                   fontWeight: 600,
@@ -2273,7 +2657,11 @@ export default function CheckoutPage() {
                     <span>Verifying...</span>
                   </>
                 ) : (
-                  <span>Verify & Confirm Order</span>
+                  <span>
+                    {verificationStep === "whatsapp" && (!verifiedAuthEmail && !emailProofToken)
+                      ? "Verify & Continue to Email →"
+                      : "Verify & Confirm Order →"}
+                  </span>
                 )}
               </button>
             </div>
@@ -2281,18 +2669,30 @@ export default function CheckoutPage() {
             <div style={{ textAlign: "center" }}>
               <button
                 type="button"
-                onClick={() => handleSendOtp()}
-                disabled={sendingOtp}
+                onClick={() => {
+                  if (verificationStep === "whatsapp") {
+                    handleSendPhoneOtp();
+                  } else {
+                    handleSendEmailOtp();
+                  }
+                }}
+                disabled={sendingOtp || resendCooldown > 0}
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#866951",
+                  color: resendCooldown > 0 ? "#A3978C" : "#866951",
                   fontSize: "12px",
-                  cursor: "pointer",
-                  textDecoration: "underline",
+                  cursor: resendCooldown > 0 ? "default" : "pointer",
+                  textDecoration: resendCooldown > 0 ? "none" : "underline",
                 }}
               >
-                {sendingOtp ? "Resending code..." : "Resend WhatsApp / SMS code"}
+                {sendingOtp
+                  ? "Resending code..."
+                  : resendCooldown > 0
+                  ? `Resend code in ${resendCooldown}s`
+                  : verificationStep === "whatsapp"
+                  ? "Didn't receive WhatsApp code? Resend"
+                  : "Didn't receive email code? Resend"}
               </button>
             </div>
           </div>

@@ -15,7 +15,7 @@ export default function AvsaraaLogo({
   size = "md",
   width,
   height,
-  priority = true,
+  priority = false,
 }: AvsaraaLogoProps) {
   // HD Luxury Wordmark logo: 1940 x 510 master ratio (3.8039:1)
   const defaultWordmarkWidth = size === "sm" ? 135 : size === "lg" ? 190 : 160;

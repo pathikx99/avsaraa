@@ -7,6 +7,7 @@ import { verifyAdminSession } from "@/lib/jwtAdmin";
 import { deductInventory } from "@/lib/inventory";
 import { incrementCouponUsage } from "@/lib/couponManager";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { consumeContactProofTokens } from "@/lib/contactVerification";
 import type { Order, OrderItem } from "@/types/order";
 
 function timingSafeMatch(a: string, b: string): boolean {
@@ -206,6 +207,13 @@ export async function POST(request: Request) {
         // Concurrency-guarded coupon usage increment (AVS-006)
         if (fullOrder.coupon_code) {
           await incrementCouponUsage(adminClient, fullOrder.coupon_code);
+        }
+
+        // Single-use proof token deduplication: consume tokens now that payment is confirmed
+        const snapshot = fullOrder.shipping_address_snapshot as unknown as Record<string, unknown> | null;
+        if (snapshot && typeof snapshot === "object" && "verification_tokens" in snapshot) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await consumeContactProofTokens((snapshot as any).verification_tokens, adminClient);
         }
 
         // Fire-and-forget email notifications (Customer GST Tax Invoice + Admin Alert)

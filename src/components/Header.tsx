@@ -213,7 +213,7 @@ function HeaderInner() {
               className="logo-hover-glow header-logo-link"
               aria-label="Avsaraa Home"
             >
-              <AvsaraaLogo variant="wordmark" size={scrolled ? "sm" : "md"} className="header-brand-logo" />
+              <AvsaraaLogo variant="wordmark" size={scrolled ? "sm" : "md"} className="header-brand-logo" priority />
             </Link>
           </div>
 

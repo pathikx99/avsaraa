@@ -1189,8 +1189,6 @@ CREATE TABLE IF NOT EXISTS public.otp_codes (
 );
 
 ALTER TABLE public.otp_codes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can insert OTP codes" ON public.otp_codes FOR INSERT WITH CHECK (true);
-CREATE POLICY "Anyone can view own OTP codes" ON public.otp_codes FOR SELECT USING (true);
 CREATE POLICY "Super admin manages OTP codes" ON public.otp_codes FOR ALL USING (public.is_admin());
 CREATE INDEX IF NOT EXISTS idx_otp_codes_contact ON public.otp_codes(contact);
 CREATE INDEX IF NOT EXISTS idx_otp_codes_expires_at ON public.otp_codes(expires_at);
@@ -1208,8 +1206,6 @@ CREATE TABLE IF NOT EXISTS public.rate_limit_counters (
 );
 
 ALTER TABLE public.rate_limit_counters ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can insert rate limit counters" ON public.rate_limit_counters FOR INSERT WITH CHECK (true);
-CREATE POLICY "Anyone can view rate limit counters" ON public.rate_limit_counters FOR SELECT USING (true);
 CREATE POLICY "Super admin manages rate limit counters" ON public.rate_limit_counters FOR ALL USING (public.is_admin());
 CREATE INDEX IF NOT EXISTS idx_rate_limit_counters_identifier ON public.rate_limit_counters(identifier);
 CREATE INDEX IF NOT EXISTS idx_rate_limit_counters_reset_at ON public.rate_limit_counters(reset_at);
