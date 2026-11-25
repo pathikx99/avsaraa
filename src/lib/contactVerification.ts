@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { normalizePhoneNumber } from "./phoneUtils.ts";
+import { getRedisClient, type RedisLikeClient } from "./redisClient.ts";
 
 export type ContactPurpose = "phone" | "email" | "order_phone" | "order_email";
 
@@ -295,43 +296,80 @@ export function validateOrderContacts(
   return { valid: true, phoneVerified: true, emailVerified: true };
 }
 
+// Non-production / offline fallback set for proof token replay tracking
+const devConsumedProofTokens = new Map<string, number>();
+
+interface LegacyMockClient {
+  from: (table: string) => {
+    insert: (data: Record<string, unknown>) => Promise<{ error: { code?: string; message?: string } | null }>;
+    select: (cols: string) => {
+      eq: (col: string, val: string) => {
+        limit: (n: number) => Promise<{ data: unknown[] | null }>;
+      };
+    };
+  };
+}
+
+function isRedisLike(client: unknown): client is RedisLikeClient {
+  return Boolean(
+    client &&
+      typeof client === "object" &&
+      "set" in client &&
+      "exists" in client &&
+      typeof (client as RedisLikeClient).set === "function"
+  );
+}
+
 /**
  * Checks if a proof token has already been consumed for order placement.
  */
 export async function isContactProofTokenConsumed(
   token: string | undefined | null,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  customAdminClient?: any
+  customClient?: any
 ): Promise<boolean> {
   if (!token || typeof token !== "string") return false;
 
-  try {
-    let client = customAdminClient;
-    if (!client) {
-      const { getAdminSupabaseClient } = await import("./supabaseAdmin.ts");
-      client = getAdminSupabaseClient();
-    }
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-    const { data } = await client
-      .from("otp_codes")
-      .select("id")
-      .eq("otp_hash", `proof_consumed:${tokenHash}`)
-      .limit(1);
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
-    return Boolean(data && data.length > 0);
-  } catch {
-    return false;
+  try {
+    if (customClient && typeof customClient.from === "function") {
+      const { data } = await (customClient as LegacyMockClient)
+        .from("otp_codes")
+        .select("id")
+        .eq("otp_hash", `proof_consumed:${tokenHash}`)
+        .limit(1);
+      return Boolean(data && data.length > 0);
+    }
+
+    const redis = isRedisLike(customClient) ? customClient : getRedisClient();
+    if (redis) {
+      const exists = await redis.exists(`otp:proof_consumed:${tokenHash}`);
+      return exists > 0;
+    }
+
+    const exp = devConsumedProofTokens.get(tokenHash);
+    if (!exp) return false;
+    if (exp < Date.now()) {
+      devConsumedProofTokens.delete(tokenHash);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn("[ContactVerification] Proof-token check error:", err);
+    // Fail closed in production if proof-token store fails
+    return process.env.NODE_ENV === "production";
   }
 }
 
 /**
- * Records proof token hash as consumed in otp_codes table to prevent replay attacks.
- * Detects concurrent duplicate usage via database-level unique conflict handling.
+ * Atomically marks order verification proof tokens as consumed (15m TTL) in Upstash Redis
+ * using SET NX EX to prevent replay attacks and concurrent double-submission.
  */
 export async function consumeContactProofTokens(
   tokens: { phone_token?: string; email_token?: string } | undefined | null,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  customAdminClient?: any
+  customClient?: any
 ): Promise<{ success: boolean; duplicate?: boolean }> {
   if (!tokens) return { success: true };
   const tokenList = [tokens.phone_token, tokens.email_token].filter(
@@ -340,15 +378,49 @@ export async function consumeContactProofTokens(
   if (tokenList.length === 0) return { success: true };
 
   try {
-    let client = customAdminClient;
-    if (!client) {
-      const { getAdminSupabaseClient } = await import("./supabaseAdmin.ts");
-      client = getAdminSupabaseClient();
+    if (customClient && typeof customClient.from === "function") {
+      const legacyClient = customClient as LegacyMockClient;
+      for (const token of tokenList) {
+        const parts = token.split(".");
+        const timestamp = parseInt(parts[1] || `${Date.now()}`, 10);
+        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+        let cleanContact = "order_proof";
+        if (parts[0]) {
+          try {
+            cleanContact = Buffer.from(parts[0], "base64url").toString("utf-8");
+          } catch {
+            cleanContact = "order_proof";
+          }
+        }
+
+        const { error } = await legacyClient.from("otp_codes").insert({
+          contact: cleanContact,
+          otp_hash: `proof_consumed:${tokenHash}`,
+          channel: "proof_token",
+          expires_at: new Date(timestamp + 15 * 60 * 1000).toISOString(),
+          consumed: true,
+        });
+
+        if (error) {
+          if (error.code === "23505" || error.message?.includes("duplicate")) {
+            return { success: false, duplicate: true };
+          }
+        }
+      }
+      return { success: true };
     }
+
+    const redis = isRedisLike(customClient) ? customClient : getRedisClient();
+
     for (const token of tokenList) {
       const parts = token.split(".");
       const timestamp = parseInt(parts[1] || `${Date.now()}`, 10);
       const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+      const remainingSeconds = Math.max(
+        60,
+        Math.ceil((timestamp + 15 * 60 * 1000 - Date.now()) / 1000)
+      );
+
       let cleanContact = "order_proof";
       if (parts[0]) {
         try {
@@ -358,25 +430,29 @@ export async function consumeContactProofTokens(
         }
       }
 
-      const { error } = await client.from("otp_codes").insert({
-        contact: cleanContact,
-        otp_hash: `proof_consumed:${tokenHash}`,
-        channel: "proof_token",
-        expires_at: new Date(timestamp + 15 * 60 * 1000).toISOString(),
-        consumed: true,
-      });
-
-      if (error) {
-        // Postgres unique violation code 23505
-        if (error.code === "23505" || error.message?.includes("duplicate")) {
+      if (redis) {
+        const res = await redis.set(`otp:proof_consumed:${tokenHash}`, cleanContact, {
+          nx: true,
+          ex: remainingSeconds,
+        });
+        if (res === null) {
           return { success: false, duplicate: true };
         }
-        console.warn("[ContactVerification] Warning inserting consumed token:", error);
+      } else {
+        const existingExp = devConsumedProofTokens.get(tokenHash);
+        if (existingExp && existingExp >= Date.now()) {
+          return { success: false, duplicate: true };
+        }
+        devConsumedProofTokens.set(tokenHash, Date.now() + remainingSeconds * 1000);
       }
     }
+
     return { success: true };
   } catch (err) {
     console.warn("[ContactVerification] Warning consuming proof tokens:", err);
+    if (process.env.NODE_ENV === "production") {
+      return { success: false, duplicate: true };
+    }
     return { success: true };
   }
 }

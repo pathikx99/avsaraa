@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { normalizePhoneNumber } from "@/lib/phoneUtils";
 import { checkDbRateLimit } from "@/lib/dbRateLimit";
+import { verifyAndConsumeOtpCode, deleteOtpCode } from "@/lib/otpStore";
 import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function POST(request: Request) {
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Verify OTP in database
+    // 3. Verify & atomically consume OTP in Upstash Redis
     const isTestExecution =
       process.env.NODE_ENV !== "production" &&
       (process.env.ENABLE_TEST_OTP === "true" || process.env.NODE_ENV === "test");
@@ -61,28 +61,13 @@ export async function POST(request: Request) {
 
     const adminClient = getAdminSupabaseClient();
 
-    // Match OTP records using either normalized format or clean format
-    const { data: otpRecords, error: fetchErr } = await adminClient
-      .from("otp_codes")
-      .select("otp_hash, expires_at, consumed")
-      .or(`contact.eq.${normalizedPhone},contact.eq.${digitsOnly}`)
-      .eq("consumed", false)
-      .gte("expires_at", new Date().toISOString())
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (fetchErr) {
-      throw new Error(fetchErr.message || "Failed to query verification records.");
-    }
-
     let isOtpValid = false;
-    if (otpRecords && otpRecords.length > 0 && otpRecords[0].otp_hash) {
-      const computedHash = crypto.createHash("sha256").update(cleanOtp).digest("hex");
-      const bufA = Buffer.from(computedHash, "utf-8");
-      const bufB = Buffer.from(otpRecords[0].otp_hash, "utf-8");
-      if (bufA.length === bufB.length) {
-        isOtpValid = crypto.timingSafeEqual(bufA, bufB);
-      }
+    if (isMasterCode) {
+      await deleteOtpCode(normalizedPhone);
+      await deleteOtpCode(digitsOnly);
+    } else {
+      const otpResult = await verifyAndConsumeOtpCode([normalizedPhone, digitsOnly], cleanOtp);
+      isOtpValid = otpResult.valid;
     }
 
     if (!isMasterCode && !isOtpValid) {
@@ -90,15 +75,6 @@ export async function POST(request: Request) {
         { success: false, error: "Invalid or expired WhatsApp verification code." },
         { status: 400 }
       );
-    }
-
-    // 4. Invalidate verified OTP
-    if (otpRecords && otpRecords.length > 0) {
-      await adminClient
-        .from("otp_codes")
-        .update({ consumed: true })
-        .or(`contact.eq.${normalizedPhone},contact.eq.${digitsOnly}`)
-        .eq("consumed", false);
     }
 
     // 5. Look up existing profile or provision new account

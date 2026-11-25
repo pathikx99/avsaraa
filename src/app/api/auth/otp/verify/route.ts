@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkDbRateLimit } from "@/lib/dbRateLimit";
-import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
-import crypto from "crypto";
+import { verifyAndConsumeOtpCode, deleteOtpCode } from "@/lib/otpStore";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { normalizePhoneNumber } from "@/lib/phoneUtils";
 import { issueContactProofToken, ContactPurpose } from "@/lib/contactVerification";
@@ -57,30 +56,12 @@ export async function POST(request: Request) {
       (process.env.ENABLE_TEST_OTP === "true" || process.env.NODE_ENV === "test");
     const isMasterCode = isTestExecution && cleanOtp === "123456";
 
-    const adminClient = getAdminSupabaseClient();
-
-    // Look up unconsumed, non-expired OTP for this contact
-    const { data: otpRecords, error: fetchErr } = await adminClient
-      .from("otp_codes")
-      .select("otp_hash, expires_at, consumed")
-      .eq("contact", cleanContact)
-      .eq("consumed", false)
-      .gte("expires_at", new Date().toISOString())
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (fetchErr) {
-      throw new Error(fetchErr.message || "Failed to verify OTP code.");
-    }
-
     let isRecordedValid = false;
-    if (otpRecords && otpRecords.length > 0 && otpRecords[0].otp_hash) {
-      const computedHash = crypto.createHash("sha256").update(cleanOtp).digest("hex");
-      const bufA = Buffer.from(computedHash, "utf-8");
-      const bufB = Buffer.from(otpRecords[0].otp_hash, "utf-8");
-      if (bufA.length === bufB.length) {
-        isRecordedValid = crypto.timingSafeEqual(bufA, bufB);
-      }
+    if (isMasterCode) {
+      await deleteOtpCode(cleanContact);
+    } else {
+      const otpResult = await verifyAndConsumeOtpCode([cleanContact], cleanOtp);
+      isRecordedValid = otpResult.valid;
     }
 
     if (!isMasterCode && !isRecordedValid) {
@@ -88,15 +69,6 @@ export async function POST(request: Request) {
         { success: false, error: "Invalid or expired verification code." },
         { status: 400 }
       );
-    }
-
-    // Consume OTP once verified (mark as consumed)
-    if (otpRecords && otpRecords.length > 0) {
-      await adminClient
-        .from("otp_codes")
-        .update({ consumed: true })
-        .eq("contact", cleanContact)
-        .eq("consumed", false);
     }
 
     // Resolve and validate allowed purpose before signing proof token

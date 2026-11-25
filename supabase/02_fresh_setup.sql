@@ -6,10 +6,12 @@
 -- (after running 01_delete_full_database.sql).
 -- It creates:
 --   - Storage buckets ('items', 'avatars') with public CDN access
---   - Core tables: admin_users, profiles, addresses, products, inquiries,
---     newsletter, wishlists, reviews, coupons, orders, order_items, payments, carts
+--   - 16 active durable tables: admin_users, profiles, addresses, products,
+--     contact_inquiries, newsletter_subscribers, wishlists, product_reviews,
+--     coupons, orders, order_items, payments, user_carts, processed_webhooks,
+--     back_in_stock_subscriptions, order_edits
 --   - Row Level Security (RLS) policies & Super Admin authority model
---   - Atomic checkout RPC with stock lock and deadlock prevention
+--   - Atomic stock deduction & restoration RPCs (OTPs & rate limits use Upstash Redis)
 -- ==============================================================================
 
 -- ------------------------------------------------------------------------------
@@ -147,7 +149,6 @@ CREATE TABLE public.profiles (
     status TEXT DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Suspended')),
     membership_tier TEXT DEFAULT 'Standard' CHECK (membership_tier IN ('Standard', 'Privilege', 'Atelier Circle', 'VIP')),
     reward_points INTEGER DEFAULT 0 CHECK (reward_points >= 0),
-    store_credit_cents INTEGER DEFAULT 0 CHECK (store_credit_cents >= 0),
     preferred_currency TEXT DEFAULT 'INR',
     concierge_notes TEXT,
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
@@ -263,14 +264,12 @@ BEGIN
             NEW.status := 'Active';
             NEW.phone_verified := false;
             NEW.phone_verified_at := NULL;
-            NEW.store_credit_cents := 0;
         ELSIF TG_OP = 'UPDATE' THEN
             NEW.membership_tier := OLD.membership_tier;
             NEW.reward_points := OLD.reward_points;
             NEW.status := OLD.status;
             NEW.phone_verified := OLD.phone_verified;
             NEW.phone_verified_at := OLD.phone_verified_at;
-            NEW.store_credit_cents := OLD.store_credit_cents;
         END IF;
     END IF;
     RETURN NEW;
@@ -755,211 +754,7 @@ CREATE INDEX idx_coupons_code ON public.coupons(code);
 CREATE INDEX idx_processed_webhooks_processed_at ON public.processed_webhooks(processed_at DESC);
 
 -- ------------------------------------------------------------------------------
--- 15. ATOMIC CHECKOUT & INVENTORY ORCHESTRATION RPC
--- ------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.create_checkout_order(
-    p_user_id UUID,
-    p_order_number TEXT,
-    p_shipping_address_id UUID,
-    p_shipping_address_snapshot JSONB,
-    p_items JSONB,
-    p_subtotal NUMERIC,
-    p_discount_amount NUMERIC,
-    p_shipping_fee NUMERIC,
-    p_total_amount NUMERIC,
-    p_coupon_code TEXT DEFAULT NULL,
-    p_payment_method TEXT DEFAULT 'Online Card / UPI',
-    p_notes TEXT DEFAULT NULL
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-    v_order_id UUID;
-    v_item RECORD;
-    v_current_stock INTEGER;
-    v_product_name TEXT;
-BEGIN
-    FOR v_item IN
-        SELECT 
-            (elem->>'product_id')::uuid AS p_id,
-            COALESCE((elem->>'quantity')::integer, 1) AS p_qty,
-            elem->>'product_name' AS p_name,
-            COALESCE((elem->>'unit_price')::numeric, 0) AS p_unit_price,
-            elem->>'image_url' AS p_image_url,
-            COALESCE(elem->>'size', 'Standard Size') AS p_size,
-            COALESCE(elem->>'color', 'Default') AS p_color
-        FROM jsonb_array_elements(p_items) AS elem
-        WHERE elem->>'product_id' IS NOT NULL
-        ORDER BY (elem->>'product_id')::uuid ASC
-    LOOP
-        SELECT stock_count, name INTO v_current_stock, v_product_name
-        FROM public.products
-        WHERE id = v_item.p_id
-        FOR UPDATE;
-
-        IF NOT FOUND THEN
-            RAISE EXCEPTION 'Product % does not exist in catalog', v_item.p_id;
-        END IF;
-
-        IF v_current_stock < v_item.p_qty THEN
-            RAISE EXCEPTION 'Insufficient stock for product "%": requested %, available %',
-                v_product_name, v_item.p_qty, v_current_stock;
-        END IF;
-
-        UPDATE public.products
-        SET stock_count = stock_count - v_item.p_qty
-        WHERE id = v_item.p_id;
-    END LOOP;
-
-    INSERT INTO public.orders (
-        user_id,
-        shipping_address_id,
-        shipping_address_snapshot,
-        order_number,
-        subtotal,
-        discount_amount,
-        shipping_fee,
-        total_amount,
-        coupon_code,
-        order_status,
-        payment_status,
-        payment_method,
-        notes
-    ) VALUES (
-        p_user_id,
-        p_shipping_address_id,
-        p_shipping_address_snapshot,
-        p_order_number,
-        p_subtotal,
-        p_discount_amount,
-        p_shipping_fee,
-        p_total_amount,
-        p_coupon_code,
-        'Confirmed',
-        CASE WHEN p_payment_method = 'COD' THEN 'Pending' ELSE 'Paid' END,
-        p_payment_method,
-        p_notes
-    )
-    RETURNING id INTO v_order_id;
-
-    FOR v_item IN
-        SELECT 
-            (elem->>'product_id')::uuid AS p_id,
-            COALESCE((elem->>'quantity')::integer, 1) AS p_qty,
-            elem->>'product_name' AS p_name,
-            COALESCE((elem->>'unit_price')::numeric, 0) AS p_unit_price,
-            elem->>'image_url' AS p_image_url,
-            COALESCE(elem->>'size', 'Standard Size') AS p_size,
-            COALESCE(elem->>'color', 'Default') AS p_color,
-            COALESCE((elem->>'tailored_blouse')::boolean, false) AS p_tailored
-        FROM jsonb_array_elements(p_items) AS elem
-    LOOP
-        INSERT INTO public.order_items (
-            order_id,
-            product_id,
-            product_name,
-            image_url,
-            size,
-            color,
-            tailored_blouse,
-            unit_price,
-            quantity,
-            total_price
-        ) VALUES (
-            v_order_id,
-            v_item.p_id,
-            v_item.p_name,
-            COALESCE(v_item.p_image_url, '/images/botanical_flowers.jpg'),
-            v_item.p_size,
-            v_item.p_color,
-            v_item.p_tailored,
-            v_item.p_unit_price,
-            v_item.p_qty,
-            v_item.p_unit_price * v_item.p_qty
-        );
-    END LOOP;
-
-    IF p_coupon_code IS NOT NULL THEN
-        UPDATE public.coupons
-        SET used_count = used_count + 1
-        WHERE code ILIKE p_coupon_code;
-    END IF;
-
-    RETURN jsonb_build_object(
-        'success', true,
-        'order_id', v_order_id,
-        'order_number', p_order_number
-    );
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.cleanup_abandoned_orders()
-RETURNS INTEGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-    v_order RECORD;
-    v_item RECORD;
-    v_restored_count INTEGER := 0;
-BEGIN
-    FOR v_order IN
-        SELECT id, order_number
-        FROM public.orders
-        WHERE payment_status = 'Pending'
-          AND order_status = 'Pending'
-          AND created_at < (TIMEZONE('utc', NOW()) - INTERVAL '30 minutes')
-        FOR UPDATE
-    LOOP
-        FOR v_item IN
-            SELECT product_id, quantity
-            FROM public.order_items
-            WHERE order_id = v_order.id
-              AND product_id IS NOT NULL
-        LOOP
-            UPDATE public.products
-            SET stock_count = stock_count + v_item.quantity
-            WHERE id = v_item.product_id;
-        END LOOP;
-
-        UPDATE public.orders
-        SET order_status = 'Cancelled',
-            notes = COALESCE(notes || ' | ', '') || 'Auto-cancelled due to payment timeout (30m expired). Inventory released.',
-            updated_at = TIMEZONE('utc', NOW())
-        WHERE id = v_order.id;
-
-        v_restored_count := v_restored_count + 1;
-    END LOOP;
-
-    RETURN v_restored_count;
-END;
-$$;
-
--- ------------------------------------------------------------------------------
--- 16. PRODUCT SIZE GUIDES (per product / per category fit charts)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.product_size_guides (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
-    category TEXT,
-    guide_title TEXT NOT NULL DEFAULT 'Size Guide',
-    measurements JSONB DEFAULT '{}'::jsonb,
-    fit_description TEXT,
-    size_chart JSONB DEFAULT '[]'::jsonb,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.product_size_guides ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can view size guides" ON public.product_size_guides FOR SELECT USING (true);
-CREATE POLICY "Super admin manages size guides" ON public.product_size_guides FOR ALL USING (public.is_admin());
-
--- ------------------------------------------------------------------------------
--- 17. BACK-IN-STOCK SUBSCRIPTIONS
+-- 15. BACK-IN-STOCK SUBSCRIPTIONS
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.back_in_stock_subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -980,48 +775,7 @@ CREATE POLICY "Users can view own subscriptions" ON public.back_in_stock_subscri
 CREATE POLICY "Super admin manages subscriptions" ON public.back_in_stock_subscriptions FOR ALL USING (public.is_admin());
 
 -- ------------------------------------------------------------------------------
--- 18. GIFT CARDS & STORE CREDIT
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.gift_cards (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code TEXT UNIQUE NOT NULL,
-    buyer_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    recipient_name TEXT,
-    recipient_email TEXT,
-    recipient_message TEXT,
-    balance_cents INTEGER NOT NULL CHECK (balance_cents >= 0),
-    original_amount_cents INTEGER NOT NULL CHECK (original_amount_cents > 0),
-    currency TEXT DEFAULT 'INR',
-    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'partially_used', 'redeemed', 'expired')),
-    purchased_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    expires_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.gift_cards ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Gift cards viewable by buyer or admin" ON public.gift_cards FOR SELECT USING (auth.uid() = buyer_id OR public.is_admin());
-CREATE POLICY "Super admin can insert gift cards" ON public.gift_cards FOR INSERT WITH CHECK (public.is_admin());
-CREATE POLICY "Super admin manages gift cards" ON public.gift_cards FOR ALL USING (public.is_admin());
-
-CREATE TABLE IF NOT EXISTS public.gift_card_transactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    gift_card_id UUID REFERENCES public.gift_cards(id) ON DELETE CASCADE,
-    order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
-    amount_cents INTEGER NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('purchase', 'redemption', 'refund')),
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.gift_card_transactions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Gift card transactions viewable by admin" ON public.gift_card_transactions FOR SELECT USING (public.is_admin());
-
--- Store credit balance on profiles
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS store_credit_cents INTEGER DEFAULT 0 CHECK (store_credit_cents >= 0);
-
--- ------------------------------------------------------------------------------
--- 19. ORDER EXTENSIONS: gift wrap, gift message, international shipping, exchange tracking
+-- 16. ORDER EXTENSIONS: gift wrap, gift message, exchange tracking
 -- ------------------------------------------------------------------------------
 ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS gift_wrap BOOLEAN DEFAULT false,
@@ -1033,7 +787,7 @@ ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS exchange_replacement_order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL;
 
 -- ------------------------------------------------------------------------------
--- 20. ORDER CANCELLATION & EDITING AUDIT
+-- 17. ORDER CANCELLATION & EDITING AUDIT
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.order_edits (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1053,117 +807,7 @@ CREATE POLICY "Order edits viewable by owner or admin" ON public.order_edits FOR
 CREATE POLICY "Super admin manages order edits" ON public.order_edits FOR ALL USING (public.is_admin());
 
 -- ------------------------------------------------------------------------------
--- 21. INTERNATIONAL SHIPPING ZONES & RATES
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.shipping_zones (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    zone_code TEXT UNIQUE NOT NULL,
-    countries TEXT[] DEFAULT ARRAY[]::TEXT[],
-    postal_code_prefixes TEXT[] DEFAULT ARRAY[]::TEXT[],
-    base_fee_cents INTEGER NOT NULL DEFAULT 0 CHECK (base_fee_cents >= 0),
-    fee_per_kg_cents INTEGER DEFAULT 0 CHECK (fee_per_kg_cents >= 0),
-    free_shipping_threshold_cents INTEGER,
-    estimated_delivery_days_min INTEGER DEFAULT 3,
-    estimated_delivery_days_max INTEGER DEFAULT 7,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.shipping_zones ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can view active shipping zones" ON public.shipping_zones FOR SELECT USING (is_active = true OR public.is_admin());
-CREATE POLICY "Super admin manages shipping zones" ON public.shipping_zones FOR ALL USING (public.is_admin());
-
-INSERT INTO public.shipping_zones (name, zone_code, countries, base_fee_cents, fee_per_kg_cents, free_shipping_threshold_cents, estimated_delivery_days_min, estimated_delivery_days_max, is_active)
-VALUES
-  ('Gujarat (Local)', 'gujarat', ARRAY['India'], 6000, 0, 50000, 1, 3, true),
-  ('Rest of India', 'india', ARRAY['India'], 9000, 0, 75000, 3, 5, true),
-  ('International', 'international', ARRAY[]::TEXT[], 25000, 500, NULL, 7, 14, true)
-ON CONFLICT (zone_code) DO NOTHING;
-
--- ------------------------------------------------------------------------------
--- 22. LOW STOCK ALERTS
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.low_stock_alerts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
-    alert_type TEXT NOT NULL DEFAULT 'low_stock' CHECK (alert_type IN ('low_stock', 'out_of_stock', 'back_in_stock')),
-    threshold_value INTEGER,
-    notified BOOLEAN DEFAULT false,
-    notified_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.low_stock_alerts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Low stock alerts viewable by admin" ON public.low_stock_alerts FOR SELECT USING (public.is_admin());
-CREATE POLICY "Super admin manages low stock alerts" ON public.low_stock_alerts FOR ALL USING (public.is_admin());
-
--- ------------------------------------------------------------------------------
--- 23. CURRENCY RATES (for multi-currency display)
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.currency_rates (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    base_currency TEXT NOT NULL DEFAULT 'INR',
-    target_currency TEXT NOT NULL,
-    rate NUMERIC(12, 6) NOT NULL CHECK (rate > 0),
-    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-    UNIQUE (base_currency, target_currency)
-);
-
-ALTER TABLE public.currency_rates ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can view currency rates" ON public.currency_rates FOR SELECT USING (true);
-CREATE POLICY "Super admin manages currency rates" ON public.currency_rates FOR ALL USING (public.is_admin());
-
-INSERT INTO public.currency_rates (base_currency, target_currency, rate)
-VALUES
-  ('INR', 'USD', 0.0120),
-  ('INR', 'EUR', 0.0110),
-  ('INR', 'GBP', 0.0095),
-  ('INR', 'AED', 0.0440),
-  ('INR', 'SGD', 0.0160)
-ON CONFLICT (base_currency, target_currency) DO NOTHING;
-
--- ------------------------------------------------------------------------------
--- 27. OTP STORAGE (database-backed for serverless-safe OTP verification)
--- Replaces in-memory OTP store so verification works across serverless instances.
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.otp_codes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    contact TEXT NOT NULL,
-    otp_hash TEXT NOT NULL,
-    channel TEXT NOT NULL DEFAULT 'email',
-    expires_at TIMESTAMPTZ NOT NULL,
-    consumed BOOLEAN DEFAULT false,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.otp_codes ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Super admin manages OTP codes" ON public.otp_codes FOR ALL USING (public.is_admin());
-CREATE INDEX IF NOT EXISTS idx_otp_codes_contact ON public.otp_codes(contact);
-CREATE INDEX IF NOT EXISTS idx_otp_codes_expires_at ON public.otp_codes(expires_at);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_otp_codes_proof_hash
-    ON public.otp_codes(otp_hash)
-    WHERE channel = 'proof_token';
-
--- ------------------------------------------------------------------------------
--- 28. RATE LIMIT COUNTERS (database-backed for serverless-safe rate limiting)
--- Replaces in-memory rate limiter so limits are enforced globally across instances.
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.rate_limit_counters (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    identifier TEXT NOT NULL,
-    count INTEGER NOT NULL DEFAULT 0,
-    reset_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.rate_limit_counters ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Super admin manages rate limit counters" ON public.rate_limit_counters FOR ALL USING (public.is_admin());
-CREATE INDEX IF NOT EXISTS idx_rate_limit_counters_identifier ON public.rate_limit_counters(identifier);
-CREATE INDEX IF NOT EXISTS idx_rate_limit_counters_reset_at ON public.rate_limit_counters(reset_at);
-
--- ------------------------------------------------------------------------------
--- 29. INVENTORY RESTORE RPC (used when cancelling orders)
+-- 18. INVENTORY RESTORE RPC (used when cancelling orders)
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.increment_stock(
     p_id UUID,

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { sendEmailVerificationEmail } from "@/lib/emailService";
 import { sendWhatsAppOtp } from "@/lib/whatsappService";
 import { normalizePhoneNumber } from "@/lib/phoneUtils";
 import crypto from "crypto";
 import { checkDbRateLimit } from "@/lib/dbRateLimit";
+import { storeOtpCode, deleteOtpCode } from "@/lib/otpStore";
 import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function POST(request: Request) {
@@ -69,29 +69,14 @@ export async function POST(request: Request) {
     // Generate 6-digit cryptographic OTP
     const otp = crypto.randomInt(100000, 999999).toString();
     const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    // Store OTP hash in database (serverless-safe across instances)
-    const adminClient = getAdminSupabaseClient();
-
-    // Invalidate any previous unconsumed OTPs for this contact
-    await adminClient
-      .from("otp_codes")
-      .update({ consumed: true })
-      .eq("contact", cleanContact)
-      .eq("consumed", false);
-
-    const { error: insertErr } = await adminClient.from("otp_codes").insert({
+    // Store OTP hash in Upstash Redis (5-minute TTL, atomically supersedes prior code)
+    await storeOtpCode({
       contact: cleanContact,
-      otp_hash: otpHash,
+      otpHash,
       channel: resolvedChannel,
-      expires_at: expiresAt.toISOString(),
-      consumed: false,
+      ttlSeconds: 300,
     });
-
-    if (insertErr) {
-      throw new Error(insertErr.message || "Failed to store OTP code.");
-    }
 
     // Dispatch OTP via appropriate channel
     let emailResult = null;
@@ -103,14 +88,10 @@ export async function POST(request: Request) {
         otp,
       });
 
-      // Fail-closed enforcement: if provider rejects delivery, cancel OTP and surface error
+      // Fail-closed enforcement: if provider rejects delivery, remove stored OTP and surface error
       if (!whatsappResult.success && !whatsappResult.simulated) {
         console.warn("[OtpSend] WhatsApp delivery failure:", whatsappResult.error);
-        await adminClient
-          .from("otp_codes")
-          .update({ consumed: true })
-          .eq("contact", cleanContact)
-          .eq("consumed", false);
+        await deleteOtpCode(cleanContact);
 
         const rawErr = whatsappResult.error || "";
         // Sanitize technical Meta API errors (e.g. "(#100) Parameter ...") for end users
@@ -136,14 +117,10 @@ export async function POST(request: Request) {
         otp,
       });
 
-      // Fail-closed enforcement: if email provider rejects delivery, cancel OTP and surface error
+      // Fail-closed enforcement: if email provider rejects delivery, remove stored OTP and surface error
       if (!emailResult.success && !emailResult.simulated) {
         console.warn("[OtpSend] Email delivery failure:", emailResult.error);
-        await adminClient
-          .from("otp_codes")
-          .update({ consumed: true })
-          .eq("contact", cleanContact)
-          .eq("consumed", false);
+        await deleteOtpCode(cleanContact);
 
         return NextResponse.json(
           {

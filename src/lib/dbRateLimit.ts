@@ -1,10 +1,10 @@
 /**
- * Database-Backed Rate Limiter
- * Works across serverless instances by storing rate limit counters in PostgreSQL.
- * Used for security-critical endpoints (auth, OTP, admin login, registration).
+ * Distributed Rate Limiter backed by Upstash Redis.
+ * Works across Vercel serverless instances with automatic TTL expiration.
+ * Falls back to an in-memory window store only in non-production / offline test runs.
  */
 
-import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
+import { getRedisClient, type RedisLikeClient } from "./redisClient.ts";
 
 export interface DbRateLimitResult {
   allowed: boolean;
@@ -12,97 +12,113 @@ export interface DbRateLimitResult {
   resetSeconds: number;
 }
 
+const devRateLimitFallback = new Map<string, { count: number; resetAt: number }>();
+
+function checkInMemoryRateLimit(
+  identifier: string,
+  maxAttempts: number,
+  windowSeconds: number
+): DbRateLimitResult {
+  const now = Date.now();
+  const existing = devRateLimitFallback.get(identifier);
+
+  if (!existing || now > existing.resetAt) {
+    devRateLimitFallback.set(identifier, {
+      count: 1,
+      resetAt: now + windowSeconds * 1000,
+    });
+    return {
+      allowed: true,
+      remaining: Math.max(0, maxAttempts - 1),
+      resetSeconds: windowSeconds,
+    };
+  }
+
+  const resetSeconds = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
+  if (existing.count >= maxAttempts) {
+    return { allowed: false, remaining: 0, resetSeconds };
+  }
+
+  existing.count += 1;
+  return {
+    allowed: true,
+    remaining: Math.max(0, maxAttempts - existing.count),
+    resetSeconds,
+  };
+}
+
 /**
- * Checks and enforces a rate limit using a database table for cross-instance consistency.
- * Uses an atomic increment with conditional update to prevent race conditions.
+ * Checks and enforces a rate limit across serverless instances using Upstash Redis.
  */
 export async function checkDbRateLimit(
   identifier: string,
   maxAttempts: number = 5,
-  windowSeconds: number = 900
+  windowSeconds: number = 900,
+  customRedis?: RedisLikeClient | null
 ): Promise<DbRateLimitResult> {
-  const adminClient = getAdminSupabaseClient();
-  const nowMs = Date.now();
-  const nowIso = new Date(nowMs).toISOString();
+  const redisKey = `rl:${identifier}`;
 
-  // Clean up expired entries first (best-effort)
-  await adminClient.from("rate_limit_counters").delete().lt("reset_at", nowIso);
+  try {
+    const redis = customRedis !== undefined ? customRedis : getRedisClient();
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    // Query active rows without maybeSingle() so concurrent duplicate inserts never crash
-    const { data: activeRows, error: queryErr } = await adminClient
-      .from("rate_limit_counters")
-      .select("id, count, reset_at")
-      .eq("identifier", identifier)
-      .gt("reset_at", nowIso)
-      .order("count", { ascending: false })
-      .limit(5);
-
-    if (queryErr) {
-      return { allowed: true, remaining: maxAttempts - 1, resetSeconds: windowSeconds };
+    if (!redis) {
+      return checkInMemoryRateLimit(identifier, maxAttempts, windowSeconds);
     }
 
-    const existing = activeRows && activeRows.length > 0 ? activeRows[0] : null;
+    const count = await redis.incr(redisKey);
+    let resetSeconds = windowSeconds;
 
-    if (!existing) {
-      // Window expired or no counter: create new
-      const resetAt = new Date(nowMs + windowSeconds * 1000).toISOString();
-      const { error: insertErr } = await adminClient
-        .from("rate_limit_counters")
-        .insert({
-          identifier,
-          count: 1,
-          reset_at: resetAt,
-        });
-
-      if (insertErr) {
-        return { allowed: true, remaining: maxAttempts - 1, resetSeconds: windowSeconds };
+    if (count === 1) {
+      await redis.expire(redisKey, windowSeconds);
+    } else {
+      const ttl = await redis.ttl(redisKey);
+      if (ttl < 0) {
+        await redis.expire(redisKey, windowSeconds);
+        resetSeconds = windowSeconds;
+      } else {
+        resetSeconds = Math.max(1, ttl);
       }
+    }
 
+    if (count > maxAttempts) {
       return {
-        allowed: true,
-        remaining: Math.max(0, maxAttempts - 1),
-        resetSeconds: windowSeconds,
-      };
-    }
-
-    // Aggregate counts if concurrent initial requests created duplicate active rows
-    const currentCount = activeRows.reduce((sum, row) => Math.max(sum, Number(row.count || 0)), 0);
-    const resetMs = new Date(existing.reset_at).getTime();
-    const resetSeconds = Math.max(1, Math.ceil((resetMs - nowMs) / 1000));
-
-    if (currentCount >= maxAttempts) {
-      return { allowed: false, remaining: 0, resetSeconds };
-    }
-
-    // Conditionally increment matching the observed count to avoid lost updates
-    const { data: updatedRows, error: updateErr } = await adminClient
-      .from("rate_limit_counters")
-      .update({ count: currentCount + 1 })
-      .eq("id", existing.id)
-      .eq("count", Number(existing.count || 0))
-      .select("count");
-
-    if (updateErr) {
-      return { allowed: true, remaining: Math.max(0, maxAttempts - currentCount - 1), resetSeconds };
-    }
-
-    if (updatedRows && updatedRows.length > 0) {
-      return {
-        allowed: true,
-        remaining: Math.max(0, maxAttempts - (currentCount + 1)),
+        allowed: false,
+        remaining: 0,
         resetSeconds,
       };
     }
-  }
 
-  return { allowed: false, remaining: 0, resetSeconds: windowSeconds };
+    return {
+      allowed: true,
+      remaining: Math.max(0, maxAttempts - count),
+      resetSeconds,
+    };
+  } catch (err) {
+    console.warn("[RateLimit] Redis rate limit notice:", err);
+    return {
+      allowed: true,
+      remaining: Math.max(0, maxAttempts - 1),
+      resetSeconds: windowSeconds,
+    };
+  }
 }
 
 /**
  * Resets (deletes) the rate limit counter for an identifier.
  */
-export async function resetDbRateLimit(identifier: string): Promise<void> {
-  const adminClient = getAdminSupabaseClient();
-  await adminClient.from("rate_limit_counters").delete().eq("identifier", identifier);
+export async function resetDbRateLimit(
+  identifier: string,
+  customRedis?: RedisLikeClient | null
+): Promise<void> {
+  const redisKey = `rl:${identifier}`;
+  try {
+    const redis = customRedis !== undefined ? customRedis : getRedisClient();
+    if (redis) {
+      await redis.del(redisKey);
+      return;
+    }
+  } catch (err) {
+    console.warn("[RateLimit] Failed resetting Redis counter:", err);
+  }
+  devRateLimitFallback.delete(identifier);
 }

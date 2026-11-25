@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import crypto from "crypto";
 import { sendWhatsAppOtp } from "../../src/lib/whatsappService.ts";
 import {
   issueContactProofToken,
@@ -8,6 +9,16 @@ import {
   isContactProofTokenConsumed,
   consumeContactProofTokens,
 } from "../../src/lib/contactVerification.ts";
+import {
+  storeOtpCode,
+  deleteOtpCode,
+  verifyAndConsumeOtpCode,
+} from "../../src/lib/otpStore.ts";
+import {
+  checkDbRateLimit,
+  resetDbRateLimit,
+} from "../../src/lib/dbRateLimit.ts";
+import type { RedisLikeClient } from "../../src/lib/redisClient.ts";
 
 describe("WhatsApp Service & Dual-Contact Verification Suite", () => {
   describe("1. WhatsApp OTP Messaging Service", () => {
@@ -370,6 +381,140 @@ describe("WhatsApp Service & Dual-Contact Verification Suite", () => {
           delete envRef.ENABLE_TEST_OTP;
         }
       }
+    });
+  });
+
+  describe("4. Upstash Redis OTP, Replay Protection & Rate Limiting", () => {
+    function createMockRedis(): RedisLikeClient {
+      const store = new Map<string, { value: string; expiresAt: number | null }>();
+      const purgeIfExpired = (k: string) => {
+        const entry = store.get(k);
+        if (entry?.expiresAt && entry.expiresAt <= Date.now()) {
+          store.delete(k);
+          return null;
+        }
+        return entry || null;
+      };
+
+      return {
+        async get<T = unknown>(key: string): Promise<T | null> {
+          const entry = purgeIfExpired(key);
+          return (entry ? (entry.value as unknown as T) : null);
+        },
+        async set(key: string, value: string, opts?: { ex?: number; nx?: boolean }) {
+          purgeIfExpired(key);
+          if (opts?.nx && store.has(key)) return null;
+          store.set(key, {
+            value,
+            expiresAt: opts?.ex ? Date.now() + opts.ex * 1000 : null,
+          });
+          return "OK";
+        },
+        async del(...keys: string[]) {
+          let count = 0;
+          for (const k of keys) {
+            if (store.delete(k)) count++;
+          }
+          return count;
+        },
+        async exists(...keys: string[]) {
+          let count = 0;
+          for (const k of keys) {
+            if (purgeIfExpired(k)) count++;
+          }
+          return count;
+        },
+        async incr(key: string) {
+          const existing = purgeIfExpired(key);
+          const next = (existing ? Number(existing.value) : 0) + 1;
+          store.set(key, {
+            value: String(next),
+            expiresAt: existing?.expiresAt ?? null,
+          });
+          return next;
+        },
+        async expire(key: string, seconds: number) {
+          const existing = store.get(key);
+          if (!existing) return 0;
+          existing.expiresAt = Date.now() + seconds * 1000;
+          return 1;
+        },
+        async ttl(key: string) {
+          const existing = purgeIfExpired(key);
+          if (!existing) return -2;
+          if (!existing.expiresAt) return -1;
+          return Math.max(1, Math.ceil((existing.expiresAt - Date.now()) / 1000));
+        },
+      };
+    }
+
+    it("Stores OTP hash in Redis, verifies atomically once, and blocks reuse or rollback", async () => {
+      const mockRedis = createMockRedis();
+      const otpHash = crypto.createHash("sha256").update("482910").digest("hex");
+
+      await storeOtpCode({
+        contact: "+918732993344",
+        otpHash,
+        channel: "whatsapp",
+        ttlSeconds: 300,
+        customRedis: mockRedis,
+      });
+
+      const wrong = await verifyAndConsumeOtpCode(["+918732993344"], "000000", mockRedis);
+      assert.equal(wrong.valid, false);
+
+      const ok = await verifyAndConsumeOtpCode(["8732993344", "+918732993344"], "482910", mockRedis);
+      assert.equal(ok.valid, true);
+      assert.equal(ok.matchedContact, "+918732993344");
+
+      const replay = await verifyAndConsumeOtpCode(["+918732993344"], "482910", mockRedis);
+      assert.equal(replay.valid, false);
+
+      await storeOtpCode({
+        contact: "patron@example.com",
+        otpHash,
+        channel: "email",
+        customRedis: mockRedis,
+      });
+      await deleteOtpCode("patron@example.com", mockRedis);
+      const afterDelete = await verifyAndConsumeOtpCode(["patron@example.com"], "482910", mockRedis);
+      assert.equal(afterDelete.valid, false);
+    });
+
+    it("Enforces single-use proof token replay protection via Redis SET NX EX", async () => {
+      const mockRedis = createMockRedis();
+      const phoneToken = issueContactProofToken("+918732993344", "order_phone");
+
+      assert.equal(await isContactProofTokenConsumed(phoneToken, mockRedis), false);
+
+      const firstConsume = await consumeContactProofTokens({ phone_token: phoneToken }, mockRedis);
+      assert.equal(firstConsume.success, true);
+      assert.equal(await isContactProofTokenConsumed(phoneToken, mockRedis), true);
+
+      const secondConsume = await consumeContactProofTokens({ phone_token: phoneToken }, mockRedis);
+      assert.equal(secondConsume.success, false);
+      assert.equal(secondConsume.duplicate, true);
+    });
+
+    it("Enforces distributed rate limit counters and resets via Redis", async () => {
+      const mockRedis = createMockRedis();
+      const key = "otp-send:+918732993344";
+
+      const r1 = await checkDbRateLimit(key, 2, 300, mockRedis);
+      assert.equal(r1.allowed, true);
+      assert.equal(r1.remaining, 1);
+
+      const r2 = await checkDbRateLimit(key, 2, 300, mockRedis);
+      assert.equal(r2.allowed, true);
+      assert.equal(r2.remaining, 0);
+
+      const r3 = await checkDbRateLimit(key, 2, 300, mockRedis);
+      assert.equal(r3.allowed, false);
+      assert.equal(r3.remaining, 0);
+
+      await resetDbRateLimit(key, mockRedis);
+      const r4 = await checkDbRateLimit(key, 2, 300, mockRedis);
+      assert.equal(r4.allowed, true);
     });
   });
 });
