@@ -72,9 +72,10 @@ export async function POST(request: Request) {
 
     const rawBuffer = Buffer.from(await file.arrayBuffer());
 
-    // Compress & downscale to WebP (max 1200x1600, quality 80)
+    // Compress, auto-orient from EXIF, & downscale to WebP (max 1200x1600, quality 80)
     // Preserves Supabase Free Tier 1GB storage and minimizes network egress
     const optimizedBuffer = await sharp(rawBuffer)
+      .rotate()
       .resize({
         width: 1200,
         height: 1600,

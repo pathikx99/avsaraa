@@ -67,10 +67,10 @@ export async function deductInventory(
       continue;
     }
 
-    // Size-level inventory adjustment (best-effort after successful atomic stock deduct)
+    // Size-level inventory adjustment inside specifications.size_inventory (best-effort after successful atomic stock deduct)
     const { data: product } = await adminClient
       .from("products")
-      .select("id, size_inventory")
+      .select("id, specifications")
       .eq("id", productId)
       .maybeSingle();
 
@@ -78,19 +78,26 @@ export async function deductInventory(
       continue;
     }
 
-    const currentInv: Record<string, number> =
-      product.size_inventory && typeof product.size_inventory === "object"
-        ? { ...(product.size_inventory as Record<string, number>) }
-        : {};
-    const newInv = { ...currentInv };
-
-    for (const [size, qty] of Object.entries(sizeQty)) {
-      newInv[size] = Math.max(0, Number(newInv[size] || 0) - qty);
+    const specs =
+      product.specifications && typeof product.specifications === "object"
+        ? { ...(product.specifications as Record<string, unknown>) }
+        : null;
+    const rawSizeInv = specs?.size_inventory;
+    if (!specs || !rawSizeInv || typeof rawSizeInv !== "object") {
+      continue;
     }
 
+    const newInv = { ...(rawSizeInv as Record<string, number>) };
+    for (const [size, qty] of Object.entries(sizeQty)) {
+      if (size in newInv) {
+        newInv[size] = Math.max(0, Number(newInv[size] || 0) - qty);
+      }
+    }
+
+    specs.size_inventory = newInv;
     await adminClient
       .from("products")
-      .update({ size_inventory: newInv })
+      .update({ specifications: specs })
       .eq("id", productId);
   }
 

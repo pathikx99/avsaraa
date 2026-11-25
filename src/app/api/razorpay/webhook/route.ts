@@ -181,7 +181,7 @@ export async function POST(request: Request) {
           }
         }
 
-        // Concurrency Guard: Only update if not already Paid
+        // Concurrency Guard: Only update if not already Paid and not Cancelled
         const { data: updatedOrder } = await adminClient
           .from("orders")
           .update({
@@ -191,6 +191,7 @@ export async function POST(request: Request) {
           })
           .eq("id", actualOrderId)
           .neq("payment_status", "Paid")
+          .neq("order_status", "Cancelled")
           .select(`
             *,
             order_items (*)
@@ -236,7 +237,26 @@ export async function POST(request: Request) {
           // Deduct inventory stock upon verified payment (AVS-004)
           try {
             const itemsToDeduct = (updatedOrder.order_items || []) as OrderItem[];
-            await deductInventory(adminClient, itemsToDeduct);
+            const invResult = await deductInventory(adminClient, itemsToDeduct);
+            if (!invResult.success) {
+              console.error(
+                `[RazorpayWebhook:StockConflict] Order ${actualOrderId} paid but stock deduction failed:`,
+                invResult.failedProducts
+              );
+              const failedIds = new Set(invResult.failedProducts.map((f) => f.productId));
+              for (const item of itemsToDeduct) {
+                if (item.product_id && !failedIds.has(item.product_id)) {
+                  await adminClient.rpc("increment_stock", { p_id: item.product_id, p_qty: item.quantity });
+                }
+              }
+              const conflictNote = `[STOCK CONFLICT] Out-of-stock at webhook capture for: ${invResult.failedProducts.map((f) => f.productId).join(", ")}`;
+              await adminClient
+                .from("orders")
+                .update({
+                  notes: updatedOrder.notes ? `${updatedOrder.notes}\n${conflictNote}` : conflictNote,
+                })
+                .eq("id", actualOrderId);
+            }
           } catch (invErr) {
             console.warn("Notice: Razorpay webhook inventory deduction notice:", invErr);
           }

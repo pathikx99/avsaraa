@@ -282,7 +282,8 @@ export async function validateCouponEngine({
         .from("orders")
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
-        .ilike("coupon_code", couponData.code);
+        .ilike("coupon_code", couponData.code)
+        .neq("order_status", "Cancelled");
 
       if (count !== null && count >= userLimit) {
         return {

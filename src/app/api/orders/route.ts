@@ -6,6 +6,7 @@ import { Order, OrderItem, CreateOrderPayload, PaymentStatus, OrderStatus } from
 import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import {
   isValidIndianPincode,
+  isValidGujaratPincode,
   calculateOrderTotals,
 } from "@/lib/financials";
 import { validateCouponEngine, incrementCouponUsage } from "@/lib/couponManager";
@@ -41,17 +42,17 @@ export async function POST(request: Request) {
     // 1. Authenticate Requester (or enable Guest Checkout)
     const serverClient = await createSupabaseServerClient();
     const {
-      data: { user },
+      data: { user: cookieUser },
     } = await serverClient.auth.getUser();
 
-    let currentUserId = user?.id;
-    if (!currentUserId) {
+    let authenticatedUser = cookieUser;
+    if (!authenticatedUser) {
       const authHeader = request.headers.get("authorization");
       if (authHeader?.startsWith("Bearer ")) {
         const token = authHeader.substring(7);
         const { data: jwtData } = await serverClient.auth.getUser(token);
         if (jwtData?.user) {
-          currentUserId = jwtData.user.id;
+          authenticatedUser = jwtData.user;
         }
       }
     }
@@ -59,10 +60,8 @@ export async function POST(request: Request) {
     // Guest Checkout Support:
     // When unauthenticated, route through system guest account for seamless zero-friction purchase
     const GUEST_SYSTEM_USER_ID = "7a3b2e24-820f-4706-8cc3-4218b42b0da3";
-    const isGuest = !currentUserId;
-    if (isGuest) {
-      currentUserId = GUEST_SYSTEM_USER_ID;
-    }
+    const isGuest = !authenticatedUser?.id;
+    const currentUserId = authenticatedUser?.id || GUEST_SYSTEM_USER_ID;
 
     // 2. Parse and Validate Request Payload
     const body = (await request.json()) as CreateOrderPayload;
@@ -108,19 +107,19 @@ export async function POST(request: Request) {
 
     // 2.1 Contact Verification: Ensure both WhatsApp Phone and Email are verified
     let userProfile: { phone_number?: string | null; phone_verified?: boolean | null; email?: string | null } | null = null;
-    if (user?.id) {
+    if (authenticatedUser?.id) {
       try {
         const { data: prof, error: profErr } = await getAdminSupabaseClient()
           .from("profiles")
           .select("phone_number, phone_verified, email")
-          .eq("id", user.id)
+          .eq("id", authenticatedUser.id)
           .maybeSingle();
 
         if (profErr) {
           const fallback = await getAdminSupabaseClient()
             .from("profiles")
             .select("phone_number, email")
-            .eq("id", user.id)
+            .eq("id", authenticatedUser.id)
             .maybeSingle();
           userProfile = fallback.data;
         } else {
@@ -135,7 +134,7 @@ export async function POST(request: Request) {
       phone: shipping_address_snapshot.phone_number,
       email: shipping_address_snapshot.email,
       verificationTokens: body.verification_tokens,
-      user,
+      user: authenticatedUser,
       userProfile,
     });
 
@@ -331,15 +330,24 @@ export async function POST(request: Request) {
       }
     }
 
+    const ALLOWED_PAYMENT_METHODS = ["Online Card / UPI", "Razorpay", "Cashfree", "COD"];
+    const resolvedPaymentMethod = payment_method || "Razorpay";
+    if (!ALLOWED_PAYMENT_METHODS.includes(resolvedPaymentMethod)) {
+      return NextResponse.json(
+        { success: false, message: `Unsupported payment method "${resolvedPaymentMethod}".` },
+        { status: 400 }
+      );
+    }
+
     // 6. Comprehensive Financial Breakdown (Courier fee, COD surcharge, 5% GST inclusive)
     const financials = calculateOrderTotals({
       subtotal: rawSubtotal,
       discountAmount,
-      paymentMethod: payment_method || "Razorpay",
+      paymentMethod: resolvedPaymentMethod,
       customShippingFee: isFreeShippingCoupon ? 0 : undefined,
     });
 
-    const isCOD = payment_method === "COD";
+    const isCOD = resolvedPaymentMethod === "COD";
     const orderStatus: OrderStatus = isCOD ? "Confirmed" : "Pending";
     const paymentStatus: PaymentStatus = "Pending";
     const orderNumber = generateOrderNumber();
@@ -364,11 +372,13 @@ export async function POST(request: Request) {
       coupon_code: validatedCoupon,
       order_status: orderStatus,
       payment_status: paymentStatus,
-      payment_method: payment_method || "Razorpay",
+      payment_method: resolvedPaymentMethod,
       notes: notes || null,
       courier_partner: postalCode.startsWith("395")
         ? "Avsaraa Dedicated Surat Courier"
-        : "Blue Dart Express Gujarat",
+        : isValidGujaratPincode(postalCode)
+        ? "Blue Dart Express Gujarat"
+        : "Shiprocket Air Express",
       tracking_number: `BLUEDART-${crypto.randomInt(100000000, 999999999)}`,
       estimated_delivery: estDelivery.toISOString(),
     };
@@ -525,7 +535,16 @@ export async function GET() {
         return NextResponse.json({ success: true, orders: [] });
       }
 
-      return NextResponse.json({ success: true, orders: orders || [] });
+      const sanitizedOrders = (orders || []).map((ord) => {
+        if (ord.shipping_address_snapshot && typeof ord.shipping_address_snapshot === "object") {
+          const cleanedSnap = { ...(ord.shipping_address_snapshot as Record<string, unknown>) };
+          delete cleanedSnap.verification_tokens;
+          return { ...ord, shipping_address_snapshot: cleanedSnap };
+        }
+        return ord;
+      });
+
+      return NextResponse.json({ success: true, orders: sanitizedOrders });
     } catch {
       return NextResponse.json({ success: true, orders: [] });
     }

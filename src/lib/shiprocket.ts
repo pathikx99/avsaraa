@@ -90,7 +90,7 @@ async function getShiprocketAuthToken(): Promise<string | null> {
 }
 
 /**
- * Generates realistic Gujarat courier tracking checkpoints based on order lifecycle.
+ * Generates realistic courier tracking checkpoints based on order lifecycle and destination.
  * Used when Shiprocket live AWB is allocating, offline, or running in development.
  */
 export function generateLogisticsMilestones(params: {
@@ -101,9 +101,13 @@ export function generateLogisticsMilestones(params: {
   postalCode: string;
   courierPartner: string;
 }): TrackingActivity[] {
-  const { status, createdAt, city, courierPartner } = params;
+  const { status, createdAt, city, postalCode, courierPartner } = params;
   const baseTime = new Date(createdAt || Date.now());
   const activities: TrackingActivity[] = [];
+  const cleanPin = String(postalCode || "").trim();
+  const pinNum = /^\d{6}$/.test(cleanPin) ? parseInt(cleanPin, 10) : 0;
+  const isGujaratDest = pinNum >= 360000 && pinNum <= 399999;
+  const regionSuffix = isGujaratDest ? "Gujarat" : "India";
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString("en-IN", {
@@ -169,7 +173,7 @@ export function generateLogisticsMilestones(params: {
       date: formatDate(inTransitTime),
       time: formatTime(inTransitTime),
       activity: "Arrived at Regional Distribution Hub. In transit to destination city.",
-      location: `${city || "Gujarat Central"} Hub`,
+      location: `${city || "Regional"} Hub`,
       status: "In Transit",
     });
   }
@@ -181,7 +185,7 @@ export function generateLogisticsMilestones(params: {
       date: formatDate(outTime),
       time: formatTime(outTime),
       activity: "Package assigned to express courier executive. Out for delivery to recipient.",
-      location: `${city || "Destination Branch"}, Gujarat`,
+      location: `${city || "Destination Branch"}, ${regionSuffix}`,
       status: "Out for Delivery",
     });
   }
@@ -193,7 +197,7 @@ export function generateLogisticsMilestones(params: {
       date: formatDate(deliveryTime),
       time: formatTime(deliveryTime),
       activity: "Consignment successfully delivered with secure OTP confirmation.",
-      location: `${city || "Destination"}, Gujarat`,
+      location: `${city || "Destination"}, ${regionSuffix}`,
       status: "Delivered",
     });
   }

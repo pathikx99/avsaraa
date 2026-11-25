@@ -239,14 +239,12 @@ export default function OrdersAccountTab({
               badgeBorder = "rgba(220, 53, 69, 0.25)";
             }
 
-            // Check if eligible for 7-day exchange
-            const createdAtDate = new Date(order.created_at);
-            const daysSinceOrder = (now - createdAtDate.getTime()) / (1000 * 60 * 60 * 24);
+            // Check if eligible for 7-day exchange (strictly Delivered orders within 7 days of delivery)
+            const deliveryTimestamp = new Date(order.updated_at || order.created_at).getTime();
+            const daysSinceDelivery = (now - deliveryTimestamp) / (1000 * 60 * 60 * 24);
             const canRequestExchange =
-              daysSinceOrder <= 7 &&
-              order.order_status !== "Cancelled" &&
-              order.order_status !== "Exchange Requested" &&
-              order.order_status !== "Exchanged";
+              order.order_status === "Delivered" &&
+              daysSinceDelivery <= 7;
 
             return (
               <div

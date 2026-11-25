@@ -333,19 +333,59 @@ export async function PUT(request: Request) {
       );
     }
     if (Array.isArray(body.available_sizes)) updatePayload.available_sizes = body.available_sizes;
-    const putSpecs = (body.specifications && typeof body.specifications === "object") ? { ...(body.specifications as Record<string, unknown>) } : {};
-    if (body.size_inventory && typeof body.size_inventory === "object") {
-      putSpecs.size_inventory = body.size_inventory;
-    }
-    if (body.sku) putSpecs.sku = String(body.sku).trim();
-    if (body.hsn_code) putSpecs.hsn_code = String(body.hsn_code).trim();
-    if (body.cluster_origin) putSpecs.cluster_origin = String(body.cluster_origin).trim();
-    if (Object.keys(putSpecs).length > 0) {
+    const hasSpecUpdates =
+      (body.specifications && typeof body.specifications === "object") ||
+      (body.size_inventory && typeof body.size_inventory === "object") ||
+      Boolean(body.sku) ||
+      Boolean(body.hsn_code) ||
+      Boolean(body.cluster_origin);
+
+    if (hasSpecUpdates) {
+      let existingSpecs: Record<string, unknown> = {};
+      if (!body.specifications) {
+        const { data: existingProd } = await supabaseAdmin
+          .from("products")
+          .select("specifications")
+          .eq("id", id)
+          .maybeSingle();
+        if (existingProd?.specifications && typeof existingProd.specifications === "object") {
+          existingSpecs = { ...(existingProd.specifications as Record<string, unknown>) };
+        }
+      }
+      const putSpecs =
+        body.specifications && typeof body.specifications === "object"
+          ? { ...(body.specifications as Record<string, unknown>) }
+          : existingSpecs;
+      if (body.size_inventory && typeof body.size_inventory === "object") {
+        putSpecs.size_inventory = body.size_inventory;
+      }
+      if (body.sku) putSpecs.sku = String(body.sku).trim();
+      if (body.hsn_code) putSpecs.hsn_code = String(body.hsn_code).trim();
+      if (body.cluster_origin) putSpecs.cluster_origin = String(body.cluster_origin).trim();
       updatePayload.specifications = putSpecs;
     }
-    if (body.stock_count !== undefined) updatePayload.stock_count = Number(body.stock_count);
-    if (body.mrp !== undefined) updatePayload.mrp = Number(body.mrp);
-    if (body.discount_percent !== undefined) updatePayload.discount_percent = Number(body.discount_percent);
+
+    if (body.stock_count !== undefined) {
+      const parsedStock = parseInt(String(body.stock_count), 10);
+      if (isNaN(parsedStock) || parsedStock < 0) {
+        return NextResponse.json({ success: false, error: "Stock count must be a non-negative integer." }, { status: 400 });
+      }
+      updatePayload.stock_count = parsedStock;
+    }
+    if (body.mrp !== undefined) {
+      const parsedMrp = Number(body.mrp);
+      if (isNaN(parsedMrp) || parsedMrp < 0) {
+        return NextResponse.json({ success: false, error: "MRP must be a non-negative number." }, { status: 400 });
+      }
+      updatePayload.mrp = parsedMrp;
+    }
+    if (body.discount_percent !== undefined) {
+      const parsedDiscount = Number(body.discount_percent);
+      if (isNaN(parsedDiscount) || parsedDiscount < 0 || parsedDiscount > 100) {
+        return NextResponse.json({ success: false, error: "Discount percent must be between 0 and 100." }, { status: 400 });
+      }
+      updatePayload.discount_percent = parsedDiscount;
+    }
     if (body.fabric !== undefined) updatePayload.fabric = body.fabric ? String(body.fabric).trim() : null;
     if (body.weave !== undefined) updatePayload.weave = body.weave ? String(body.weave).trim() : null;
     if (body.video_url !== undefined) {

@@ -5,6 +5,9 @@ import { ProductReview } from "@/types/review";
 import { rateLimitReviews } from "@/lib/rateLimit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 
+const PUBLIC_REVIEW_COLUMNS =
+  "id, product_id, product_name, customer_name, customer_city, rating, title, comment, photos, verified_purchase, helpful_count, status, created_at, updated_at";
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -20,7 +23,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from("product_reviews")
-      .select("*")
+      .select(PUBLIC_REVIEW_COLUMNS)
       .eq("status", "published")
       .order("created_at", { ascending: false });
 

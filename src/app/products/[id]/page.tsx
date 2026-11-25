@@ -53,7 +53,7 @@ export default async function ProductPage({ params }: PageProps) {
     },
     offers: {
       "@type": "Offer",
-      url: `https://avsaraa.com/products/${product.id}`,
+      url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://avsaraa.in"}/products/${product.id}`,
       priceCurrency: "INR",
       price: product.price,
       priceValidUntil: "2027-12-31",

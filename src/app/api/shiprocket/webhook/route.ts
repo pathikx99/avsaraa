@@ -140,35 +140,58 @@ export async function POST(request: Request) {
         .eq(lookupColumn, orderId)
         .maybeSingle();
 
-      if (existingOrder && existingOrder.order_status !== "Cancelled" && existingOrder.order_status !== "Exchanged") {
-        const updatePayload: Record<string, unknown> = {
-          order_status: mappedStatus,
-          courier_partner: event.courier_name || "Shiprocket Express",
-          tracking_number: event.awb || event.tracking_number,
-          updated_at: new Date().toISOString(),
+      if (
+        existingOrder &&
+        existingOrder.order_status !== "Cancelled" &&
+        existingOrder.order_status !== "Exchanged" &&
+        existingOrder.order_status !== "Exchange Requested"
+      ) {
+        const STATUS_RANK: Record<string, number> = {
+          Pending: 0,
+          Confirmed: 1,
+          Processing: 2,
+          Dispatched: 3,
+          "Out for Delivery": 4,
+          Delivered: 5,
         };
+        const currentRank = STATUS_RANK[existingOrder.order_status] ?? 0;
+        const nextRank = STATUS_RANK[mappedStatus] ?? 0;
+        const isMonotonicForward = mappedStatus === "Cancelled" || nextRank >= currentRank;
 
-        let updateQuery = adminClient
-          .from("orders")
-          .update(updatePayload)
-          .eq("id", existingOrder.id);
+        if (isMonotonicForward) {
+          const updatePayload: Record<string, unknown> = {
+            order_status: mappedStatus,
+            courier_partner: event.courier_name || "Shiprocket Express",
+            tracking_number: event.awb || event.tracking_number,
+            updated_at: new Date().toISOString(),
+          };
 
-        if (mappedStatus === "Cancelled") {
-          updateQuery = updateQuery.neq("order_status", "Cancelled");
-        }
+          if (mappedStatus === "Delivered") {
+            updatePayload.payment_status = "Paid";
+          }
 
-        const { data: updatedOrder } = await updateQuery.select("id").maybeSingle();
+          let updateQuery = adminClient
+            .from("orders")
+            .update(updatePayload)
+            .eq("id", existingOrder.id);
 
-        // Atomically restore inventory only if this webhook transitioned order -> Cancelled
-        if (updatedOrder && mappedStatus === "Cancelled") {
-          const { data: items } = await adminClient
-            .from("order_items")
-            .select("product_id, quantity")
-            .eq("order_id", existingOrder.id);
-          if (items) {
-            for (const item of items) {
-              if (item.product_id) {
-                await adminClient.rpc("increment_stock", { p_id: item.product_id, p_qty: item.quantity });
+          if (mappedStatus === "Cancelled") {
+            updateQuery = updateQuery.neq("order_status", "Cancelled");
+          }
+
+          const { data: updatedOrder } = await updateQuery.select("id").maybeSingle();
+
+          // Atomically restore inventory only if this webhook transitioned order -> Cancelled
+          if (updatedOrder && mappedStatus === "Cancelled") {
+            const { data: items } = await adminClient
+              .from("order_items")
+              .select("product_id, quantity")
+              .eq("order_id", existingOrder.id);
+            if (items) {
+              for (const item of items) {
+                if (item.product_id) {
+                  await adminClient.rpc("increment_stock", { p_id: item.product_id, p_qty: item.quantity });
+                }
               }
             }
           }

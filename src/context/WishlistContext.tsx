@@ -183,17 +183,12 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      let isRemoving = false;
-      let nextWishlist: Product[] = [];
+      const isRemoving = wishlist.some((item) => item.id === product.id);
+      const nextWishlist = isRemoving
+        ? wishlist.filter((item) => item.id !== product.id)
+        : [product, ...wishlist];
 
-      setWishlist((prev) => {
-        const exists = prev.some((item) => item.id === product.id);
-        isRemoving = exists;
-        nextWishlist = exists
-          ? prev.filter((item) => item.id !== product.id)
-          : [product, ...prev];
-        return nextWishlist;
-      });
+      setWishlist(nextWishlist);
 
       // Side effects & toasts executed cleanly outside of React's pure state reducer
       if (isRemoving) {
@@ -222,17 +217,14 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
 
       return true;
     },
-    [user, openAuthModal, showToast]
+    [user, wishlist, openAuthModal, showToast]
   );
 
   const removeFromWishlist = useCallback(
     (productId: string) => {
       if (!user) return;
-      let nextWishlist: Product[] = [];
-      setWishlist((prev) => {
-        nextWishlist = prev.filter((item) => item.id !== productId);
-        return nextWishlist;
-      });
+      const nextWishlist = wishlist.filter((item) => item.id !== productId);
+      setWishlist(nextWishlist);
 
       try {
         localStorage.setItem(`avsaraa_wishlist_${user.id}`, JSON.stringify(nextWishlist));
@@ -247,7 +239,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         .eq("user_id", user.id)
         .eq("product_id", productId);
     },
-    [user]
+    [user, wishlist]
   );
 
   const clearWishlist = useCallback(() => {

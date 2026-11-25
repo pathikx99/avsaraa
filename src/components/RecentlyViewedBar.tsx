@@ -67,11 +67,13 @@ export default function RecentlyViewedBar() {
     }
   };
 
-  // Hide on admin and checkout conversion funnels
+  // Hide on admin, checkout, and inquiry forms so controls are never obscured
   const isExcluded =
     pathname.startsWith("/admin") ||
     pathname.startsWith("/checkout") ||
-    pathname.startsWith("/order-success");
+    pathname.startsWith("/order-success") ||
+    pathname.startsWith("/contact") ||
+    pathname.startsWith("/b2b");
 
   if (isExcluded || items.length === 0) {
     return null;
@@ -86,7 +88,7 @@ export default function RecentlyViewedBar() {
       aria-label="Recently Viewed Drapes"
       style={{
         position: "fixed",
-        right: "18px",
+        left: "18px",
         bottom: "calc(18px + env(safe-area-inset-bottom, 0px))",
         zIndex: 140,
         fontFamily: "var(--font-sans), system-ui, sans-serif",

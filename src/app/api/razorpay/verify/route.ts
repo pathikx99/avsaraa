@@ -209,7 +209,18 @@ export async function POST(request: Request) {
       });
     }
 
-    // Concurrency lock: Only update if payment_status is NOT already 'Paid'
+    // Prevent resurrecting a cancelled order via late payment verification
+    if (order.order_status === "Cancelled") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This order has already been cancelled and cannot be confirmed.",
+        },
+        { status: 409 }
+      );
+    }
+
+    // Concurrency lock: Only update if payment_status is NOT already 'Paid' and order is not Cancelled
     const { data: updatedOrder, error: updateErr } = await adminClient
       .from("orders")
       .update({
@@ -219,6 +230,7 @@ export async function POST(request: Request) {
       })
       .eq("id", order.id)
       .neq("payment_status", "Paid")
+      .neq("order_status", "Cancelled")
       .select(`
         *,
         order_items (*)
@@ -264,7 +276,26 @@ export async function POST(request: Request) {
       // Deduct inventory stock upon verified payment (AVS-004)
       try {
         const itemsToDeduct = (updatedOrder.order_items || []) as OrderItem[];
-        await deductInventory(adminClient, itemsToDeduct);
+        const invResult = await deductInventory(adminClient, itemsToDeduct);
+        if (!invResult.success) {
+          console.error(
+            `[RazorpayVerify:StockConflict] Order ${order.id} paid but stock deduction failed:`,
+            invResult.failedProducts
+          );
+          const failedIds = new Set(invResult.failedProducts.map((f) => f.productId));
+          for (const item of itemsToDeduct) {
+            if (item.product_id && !failedIds.has(item.product_id)) {
+              await adminClient.rpc("increment_stock", { p_id: item.product_id, p_qty: item.quantity });
+            }
+          }
+          const conflictNote = `[STOCK CONFLICT] Out-of-stock at payment capture for: ${invResult.failedProducts.map((f) => f.productId).join(", ")}`;
+          await adminClient
+            .from("orders")
+            .update({
+              notes: fullOrder.notes ? `${fullOrder.notes}\n${conflictNote}` : conflictNote,
+            })
+            .eq("id", order.id);
+        }
       } catch (invErr) {
         console.warn("Notice: Payment verify inventory deduction notice:", invErr);
       }

@@ -505,19 +505,21 @@ export async function fetchProductById(id: string): Promise<DetailedProduct | nu
   const normalizedKey = (id || "").trim().toLowerCase();
   if (!normalizedKey) return null;
 
-  // 1. Check in-memory catalog cache first (instant 0ms response!)
-  try {
-    const catalog = await fetchCatalog();
-    const cachedMatch = catalog.find((p) =>
-      p.id === id ||
-      p.slug === id ||
-      p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") === normalizedKey
-    );
-    if (cachedMatch) {
-      return enrichProductToDetailed(cachedMatch);
+  // 1. Check in-memory catalog cache first on client (instant 0ms response!)
+  if (typeof window !== "undefined") {
+    try {
+      const catalog = await fetchCatalog();
+      const cachedMatch = catalog.find((p) =>
+        p.id === id ||
+        p.slug === id ||
+        p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") === normalizedKey
+      );
+      if (cachedMatch) {
+        return enrichProductToDetailed(cachedMatch);
+      }
+    } catch {
+      // fallback to remote lookup
     }
-  } catch {
-    // fallback to remote lookup
   }
 
   // 2. Query Supabase (primary source of truth if not in memory)
@@ -576,16 +578,18 @@ export async function fetchRelatedProducts(
   category: ProductCategory,
   limit: number = 4
 ): Promise<DetailedProduct[]> {
-  try {
-    const catalog = await fetchCatalog();
-    const related = catalog
-      .filter((p) => p.id !== currentId && p.category === category)
-      .slice(0, limit);
-    if (related.length > 0) {
-      return related.map(enrichProductToDetailed);
+  if (typeof window !== "undefined") {
+    try {
+      const catalog = await fetchCatalog();
+      const related = catalog
+        .filter((p) => p.id !== currentId && p.category === category)
+        .slice(0, limit);
+      if (related.length > 0) {
+        return related.map(enrichProductToDetailed);
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   try {

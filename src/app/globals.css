@@ -3145,7 +3145,8 @@ body {
   }
   .recently-viewed-floating-bar {
     bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important;
-    right: 12px !important;
+    left: 12px !important;
+    right: auto !important;
   }
 }
 
@@ -3179,8 +3180,8 @@ body {
 /* Keep all 5 footer directory columns aligned on desktop */
 @media (min-width: 1024px) {
   .footer-links-grid {
-    grid-template-columns: 1.35fr repeat(4, minmax(0, 1fr)) !important;
-    gap: 28px !important;
+    grid-template-columns: 1.25fr 0.85fr 0.85fr 1.25fr 0.95fr !important;
+    gap: 32px !important;
   }
 }
 

@@ -6,6 +6,7 @@ import { Order, OrderItem, OrderStatus, PaymentStatus } from "@/types/order";
 import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import {
   isValidIndianPincode,
+  isValidGujaratPincode,
   calculateOrderTotals,
 } from "@/lib/financials";
 import { validateCouponEngine } from "@/lib/couponManager";
@@ -369,7 +370,9 @@ export async function POST(request: Request) {
       notes: notes || null,
       courier_partner: postalCode.startsWith("395")
         ? "Avsaraa Dedicated Surat Courier"
-        : "Blue Dart Express Gujarat",
+        : isValidGujaratPincode(postalCode)
+        ? "Blue Dart Express Gujarat"
+        : "Shiprocket Air Express",
       tracking_number: `BLUEDART-${crypto.randomInt(100000000, 999999999)}`,
       estimated_delivery: estDelivery.toISOString(),
     };

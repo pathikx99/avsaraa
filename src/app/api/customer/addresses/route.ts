@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { isValidIndianPincode } from "@/lib/financials";
+
+const VALID_ADDRESS_TYPES = ["Home", "Work", "Studio", "Other"];
 
 export async function GET() {
   try {
@@ -76,6 +79,17 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!isValidIndianPincode(postal_code)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid PIN code. Must be a valid 6-digit Indian PIN code." },
+        { status: 400 }
+      );
+    }
+
+    const cleanAddressType = VALID_ADDRESS_TYPES.includes(String(address_type))
+      ? String(address_type)
+      : "Home";
+
     const adminClient = getAdminSupabaseClient();
 
     // If default, reset other addresses for this user
@@ -96,10 +110,10 @@ export async function POST(request: Request) {
         address_line2: address_line2 ? String(address_line2).trim() : null,
         landmark: landmark ? String(landmark).trim() : null,
         city: String(city).trim(),
-        state: String(state || "Gujarat").trim(),
+        state: String(state || "India").trim(),
         postal_code: String(postal_code).trim(),
         country: String(country).trim(),
-        address_type: String(address_type).trim(),
+        address_type: cleanAddressType,
         is_default: Boolean(is_default),
       })
       .select()
@@ -194,6 +208,17 @@ export async function PUT(request: Request) {
         { success: false, error: "No editable address fields provided" },
         { status: 400 }
       );
+    }
+
+    if ("postal_code" in sanitizedUpdates && !isValidIndianPincode(String(sanitizedUpdates.postal_code || ""))) {
+      return NextResponse.json(
+        { success: false, error: "Invalid PIN code. Must be a valid 6-digit Indian PIN code." },
+        { status: 400 }
+      );
+    }
+
+    if ("address_type" in sanitizedUpdates && !VALID_ADDRESS_TYPES.includes(String(sanitizedUpdates.address_type))) {
+      sanitizedUpdates.address_type = "Home";
     }
 
     // If making this address the default, unmark other user addresses

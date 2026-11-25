@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -277,11 +277,22 @@ export default function CheckoutPage() {
     } catch {}
   };
 
-  // Auto-apply stored coupon from product page or previous session
+  const autoCouponAttemptedRef = useRef<string | null>(null);
+
+  // Auto-apply stored coupon from product page or previous session (guarded against infinite retry loops)
   useEffect(() => {
     try {
       const savedCoupon = localStorage.getItem("avsaraa_applied_coupon");
-      if (savedCoupon && !appliedCoupon && subtotal > 0 && !validatingCoupon) {
+      const attemptKey = savedCoupon ? `${savedCoupon}:${subtotal}` : null;
+      if (
+        savedCoupon &&
+        attemptKey &&
+        autoCouponAttemptedRef.current !== attemptKey &&
+        !appliedCoupon &&
+        subtotal > 0 &&
+        !validatingCoupon
+      ) {
+        autoCouponAttemptedRef.current = attemptKey;
         const timer = setTimeout(() => {
           handleApplyCoupon(savedCoupon);
         }, 0);
@@ -742,6 +753,41 @@ export default function CheckoutPage() {
     );
   };
 
+  const handleOrderVerificationError = (
+    resData: { code?: string; message?: string; phoneVerified?: boolean; emailVerified?: boolean },
+    phoneNumber: string,
+    emailAddress: string | null
+  ): boolean => {
+    if (resData.code !== "TOKEN_ALREADY_USED" && resData.code !== "CONTACT_VERIFICATION_REQUIRED") {
+      return false;
+    }
+    const needsPhone = resData.code === "TOKEN_ALREADY_USED" || resData.phoneVerified === false;
+    const needsEmail = resData.code === "TOKEN_ALREADY_USED" || resData.emailVerified === false;
+    if (needsPhone) {
+      setPhoneProofToken(null);
+      setVerifiedTokenPhone(null);
+    }
+    if (needsEmail) {
+      setEmailProofToken(null);
+      setVerifiedTokenEmail(null);
+    }
+    setOtpInput("");
+    setIsOtpModalOpen(true);
+    setOtpError(
+      resData.message ||
+        "Your verification expired or was already used. Please verify again to complete your order."
+    );
+    if (needsPhone) {
+      setVerificationStep("whatsapp");
+      handleSendPhoneOtp(phoneNumber);
+    } else if (needsEmail && emailAddress) {
+      setVerificationStep("email");
+      handleSendEmailOtp(emailAddress);
+    }
+    setSubmittingOrder(false);
+    return true;
+  };
+
   // Core Order Placement Execution
   const executePlaceOrder = async (
     overridePhoneToken?: string,
@@ -888,14 +934,7 @@ export default function CheckoutPage() {
 
         const createData = await createRes.json();
         if (!createRes.ok || !createData.success || !createData.razorpay_order_id) {
-          if (createData.code === "TOKEN_ALREADY_USED") {
-            setPhoneProofToken(null);
-            setEmailProofToken(null);
-            setVerifiedTokenPhone(null);
-            setVerifiedTokenEmail(null);
-            setIsOtpModalOpen(true);
-            setOtpError("Verification code was already used. Please verify again to complete your order.");
-            setSubmittingOrder(false);
+          if (handleOrderVerificationError(createData, addressSnapshot.phone_number, addressSnapshot.email)) {
             return;
           }
           throw new Error(createData.message || "Could not initialize payment gateway. Please try again.");
@@ -1006,14 +1045,7 @@ export default function CheckoutPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success || !data.order) {
-        if (data.code === "TOKEN_ALREADY_USED") {
-          setPhoneProofToken(null);
-          setEmailProofToken(null);
-          setVerifiedTokenPhone(null);
-          setVerifiedTokenEmail(null);
-          setIsOtpModalOpen(true);
-          setOtpError("Verification code was already used. Please verify again to complete your order.");
-          setSubmittingOrder(false);
+        if (handleOrderVerificationError(data, addressSnapshot.phone_number, addressSnapshot.email)) {
           return;
         }
         throw new Error(data.message || "Failed to place order. Please try again.");
@@ -2328,7 +2360,9 @@ export default function CheckoutPage() {
 
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#866951" }}>
                   <span>Inclusive 5% GST</span>
-                  <span>₹{financials.gstAmount} (Included)</span>
+                  <span>
+                    ₹{financials.gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Included)
+                  </span>
                 </div>
 
                 <div

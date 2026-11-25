@@ -73,49 +73,51 @@ export function sortProductsByShowcase(products: Product[]): Product[] {
  * Persists a new showcase order: writes to local JSON store and updates remote Supabase specifications.
  */
 export async function saveShowcaseOrderedIds(orderedIds: string[]): Promise<boolean> {
+  let localSaved = false;
+  let remoteSaved = false;
+
+  // 1. Best-effort local JSON metadata file (skipped silently on read-only serverless filesystems like Vercel)
   try {
-    // 1. Persist to local JSON metadata file
     const meta: ShowcaseMetadata = {
       orderedIds,
       updatedAt: new Date().toISOString(),
     };
     fs.writeFileSync(SHOWCASE_FILE_PATH, JSON.stringify(meta, null, 2), "utf-8");
-
-    // 2. Best-effort async update to Supabase products table specifications
-    try {
-      const { getAdminSupabaseClient } = await import("./supabaseAdmin.ts");
-      const supabaseAdmin = getAdminSupabaseClient();
-      const updatePromises = orderedIds.map(async (id, index) => {
-        try {
-          // Fetch current specifications to avoid overwriting existing properties
-          const { data: prod } = await supabaseAdmin
-            .from("products")
-            .select("specifications")
-            .eq("id", id)
-            .single();
-
-          const currentSpecs = (prod?.specifications && typeof prod.specifications === "object")
-            ? { ...(prod.specifications as Record<string, unknown>) }
-            : {};
-
-          currentSpecs.display_order = index;
-
-          await supabaseAdmin
-            .from("products")
-            .update({ specifications: currentSpecs })
-            .eq("id", id);
-        } catch {
-          // Non-blocking: local JSON metadata file provides immediate fallback
-        }
-      });
-
-      await Promise.allSettled(updatePromises);
-    } catch {
-      // In non-Next environment (e.g. standalone test runner), remote sync is skipped
-    }
-    return true;
+    localSaved = true;
   } catch (err) {
-    console.error("Failed to save showcase ordering:", err);
-    return false;
+    console.warn("Notice: Unable to write catalogShowcaseOrder.json (read-only filesystem):", err);
   }
+
+  // 2. Remote update to Supabase products table specifications
+  try {
+    const { getAdminSupabaseClient } = await import("./supabaseAdmin.ts");
+    const supabaseAdmin = getAdminSupabaseClient();
+    const updatePromises = orderedIds.map(async (id, index) => {
+      const { data: prod } = await supabaseAdmin
+        .from("products")
+        .select("specifications")
+        .eq("id", id)
+        .single();
+
+      const currentSpecs = (prod?.specifications && typeof prod.specifications === "object")
+        ? { ...(prod.specifications as Record<string, unknown>) }
+        : {};
+
+      currentSpecs.display_order = index;
+
+      const { error } = await supabaseAdmin
+        .from("products")
+        .update({ specifications: currentSpecs })
+        .eq("id", id);
+
+      if (error) throw error;
+    });
+
+    const results = await Promise.allSettled(updatePromises);
+    remoteSaved = results.some((r) => r.status === "fulfilled");
+  } catch (err) {
+    console.warn("Notice: Unable to sync showcase ordering to Supabase:", err);
+  }
+
+  return localSaved || remoteSaved;
 }

@@ -46,7 +46,11 @@ export async function GET(request: Request) {
         }
         allProducts = normalizeProducts(SEED_CATALOG_PRODUCTS);
       } else {
-        allProducts = normalizeProducts(data);
+        const publishedOnly = data.filter((p) => {
+          const status = (p as { publish_status?: string | null }).publish_status;
+          return !status || status === "published";
+        });
+        allProducts = normalizeProducts(publishedOnly.length > 0 ? publishedOnly : SEED_CATALOG_PRODUCTS);
       }
 
       cachedCatalog = {

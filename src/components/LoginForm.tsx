@@ -561,7 +561,7 @@ export default function LoginForm({
             >
               Welcome back to Avsaraa.
               <br />
-              Sign in with your email or Google account.
+              Sign in with WhatsApp, email, or your Google account.
             </p>
           </div>
 
@@ -738,7 +738,15 @@ export default function LoginForm({
                         placeholder="Enter 10-digit mobile number"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
-                        style={{ flex: 1, fontSize: "14px", color: "#261B13" }}
+                        style={{
+                          flex: 1,
+                          fontSize: "14px",
+                          color: "#261B13",
+                          border: "none",
+                          outline: "none",
+                          background: "transparent",
+                          boxShadow: "none",
+                        }}
                         required
                         disabled={isWaOtpLoading}
                         autoFocus

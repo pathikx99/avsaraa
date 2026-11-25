@@ -78,12 +78,17 @@ export async function PUT(request: Request) {
 
     if (full_name !== undefined) updates.full_name = String(full_name).trim().slice(0, 100);
     if (phone_number !== undefined) {
-      const nextPhone = phone_number
-        ? (() => {
-            const phoneValidation = normalizePhoneNumber(String(phone_number));
-            return phoneValidation.isValid ? phoneValidation.normalized : String(phone_number).trim();
-          })()
-        : null;
+      let nextPhone: string | null = null;
+      if (phone_number && String(phone_number).trim()) {
+        const phoneValidation = normalizePhoneNumber(String(phone_number));
+        if (!phoneValidation.isValid) {
+          return NextResponse.json(
+            { success: false, error: phoneValidation.error || "Invalid mobile number format." },
+            { status: 400 }
+          );
+        }
+        nextPhone = phoneValidation.normalized;
+      }
       updates.phone_number = nextPhone;
       if (nextPhone !== (currentProfile?.phone_number ?? null)) {
         updates.phone_verified = false;

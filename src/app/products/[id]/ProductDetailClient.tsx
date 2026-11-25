@@ -41,7 +41,7 @@ interface ProductDetailClientProps {
 
 export default function ProductDetailClient({ initialProduct }: ProductDetailClientProps) {
   const router = useRouter();
-  const { addToCart, openCart } = useCart();
+  const { addToCart, openCart, totalItems } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
 
   const searchParams = useSearchParams();
@@ -187,6 +187,8 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   // Reviews state
   const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [newReviewForm, setNewReviewForm] = useState<{
     name: string;
     city: string;
@@ -237,7 +239,8 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     fetch(`/api/reviews?productId=${encodeURIComponent(product.id)}`)
       .then((res) => res.json())
       .then((data) => {
-        if (isMounted && data.success && Array.isArray(data.reviews) && data.reviews.length > 0) {
+        if (!isMounted) return;
+        if (data.success && Array.isArray(data.reviews) && data.reviews.length > 0) {
           setReviews(data.reviews);
         } else {
           // Curated authentic reviews fallback for atelier products
@@ -280,6 +283,9 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       })
       .catch(() => {
         // graceful fallback
+      })
+      .finally(() => {
+        if (isMounted) setReviewsLoading(false);
       });
 
     return () => {
@@ -633,6 +639,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReviewForm.name || !newReviewForm.comment) return;
+    setReviewError(null);
 
     try {
       const res = await fetch("/api/reviews", {
@@ -653,18 +660,21 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       const data = await res.json();
       if (res.ok && data.success && data.review) {
         setReviews((prev) => [data.review, ...prev]);
+        setReviewSubmitted(true);
+        setTimeout(() => {
+          setIsWriteReviewOpen(false);
+          setReviewSubmitted(false);
+          setReviewError(null);
+          setNewReviewForm({ name: "", city: "", rating: 5, title: "", comment: "", photos: [] });
+          setUploadError(null);
+        }, 2200);
+        return;
       }
-    } catch (err) {
-      console.warn("Review submission background notice:", err);
-    }
 
-    setReviewSubmitted(true);
-    setTimeout(() => {
-      setIsWriteReviewOpen(false);
-      setReviewSubmitted(false);
-      setNewReviewForm({ name: "", city: "", rating: 5, title: "", comment: "", photos: [] });
-      setUploadError(null);
-    }, 2200);
+      setReviewError(data?.error || "Unable to submit your review. Please try again.");
+    } catch {
+      setReviewError("Network error while submitting review. Please try again.");
+    }
   };
 
   // Size measurement chart data
@@ -830,7 +840,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             <button
               type="button"
               onClick={openCart}
-              aria-label="Shopping Bag"
+              aria-label={totalItems > 0 ? `Shopping Bag (${totalItems} items)` : "Shopping Bag"}
               style={{
                 width: "36px",
                 height: "36px",
@@ -845,6 +855,28 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               }}
             >
               <ShoppingBagIcon size={18} color="#261B13" />
+              {totalItems > 0 && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    top: "1px",
+                    right: "1px",
+                    minWidth: "16px",
+                    height: "16px",
+                    padding: "0 4px",
+                    borderRadius: "9999px",
+                    backgroundColor: "#C5A059",
+                    color: "#261B13",
+                    fontSize: "9.5px",
+                    fontWeight: 700,
+                    lineHeight: "16px",
+                    textAlign: "center",
+                  }}
+                >
+                  {totalItems > 99 ? "99+" : totalItems}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -2355,8 +2387,8 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     lineHeight: 1.4,
                   }}
                 >
-                  <div style={{ fontWeight: 600, marginBottom: "2px" }}>Delivery Territory Notice</div>
-                  {pinResult.message || "Currently delivering exclusively across Gujarat (Pincodes 360000–399999)."}
+                  <div style={{ fontWeight: 600, marginBottom: "2px" }}>Delivery Serviceability Notice</div>
+                  {pinResult.message || "Please enter a valid 6-digit Indian PIN code to check delivery serviceability."}
                 </div>
               )}
 
@@ -2807,44 +2839,67 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   marginBottom: "20px",
                 }}
               >
-                <div style={{ textAlign: "center", paddingRight: "16px", borderRight: "1px solid #E2D5C7" }}>
-                  <div style={{ fontSize: "36px", fontWeight: 700, color: "#261B13", lineHeight: 1 }}>
-                    4.9
-                  </div>
-                  <div style={{ display: "flex", gap: "2px", justifyContent: "center", marginTop: "4px" }}>
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <StarIcon key={s} size={13} color="#C5A059" filled />
-                    ))}
-                  </div>
-                  <div style={{ fontSize: "10.5px", color: "#8E7D70", marginTop: "4px" }}>
-                    {reviews.length} Verified Reviews
-                  </div>
-                </div>
+                {(() => {
+                  const totalRev = reviews.length;
+                  const avgScore =
+                    totalRev > 0
+                      ? (reviews.reduce((sum, r) => sum + (Number(r.rating) || 5), 0) / totalRev).toFixed(1)
+                      : "4.9";
+                  const pct = (stars: number) =>
+                    totalRev > 0
+                      ? Math.round((reviews.filter((r) => Math.round(Number(r.rating)) === stars).length / totalRev) * 100)
+                      : stars === 5
+                        ? 92
+                        : stars === 4
+                          ? 8
+                          : 0;
+                  const fivePct = pct(5);
+                  const fourPct = pct(4);
+                  const threePct = pct(3);
 
-                {/* Rating Distribution Breakdown */}
-                <div style={{ flex: 1, fontSize: "11.5px", color: "#6E5B4E" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                    <span style={{ width: "35px" }}>5 Star</span>
-                    <div style={{ flex: 1, height: "6px", backgroundColor: "#E6DACF", borderRadius: "3px", overflow: "hidden" }}>
-                      <div style={{ width: "92%", height: "100%", backgroundColor: "#C5A059" }} />
-                    </div>
-                    <span style={{ width: "24px", textAlign: "right" }}>92%</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                    <span style={{ width: "35px" }}>4 Star</span>
-                    <div style={{ flex: 1, height: "6px", backgroundColor: "#E6DACF", borderRadius: "3px", overflow: "hidden" }}>
-                      <div style={{ width: "8%", height: "100%", backgroundColor: "#C5A059" }} />
-                    </div>
-                    <span style={{ width: "24px", textAlign: "right" }}>8%</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ width: "35px" }}>3 Star</span>
-                    <div style={{ flex: 1, height: "6px", backgroundColor: "#E6DACF", borderRadius: "3px", overflow: "hidden" }}>
-                      <div style={{ width: "0%", height: "100%", backgroundColor: "#C5A059" }} />
-                    </div>
-                    <span style={{ width: "24px", textAlign: "right" }}>0%</span>
-                  </div>
-                </div>
+                  return (
+                    <>
+                      <div style={{ textAlign: "center", paddingRight: "16px", borderRight: "1px solid #E2D5C7" }}>
+                        <div style={{ fontSize: "36px", fontWeight: 700, color: "#261B13", lineHeight: 1 }}>
+                          {avgScore}
+                        </div>
+                        <div style={{ display: "flex", gap: "2px", justifyContent: "center", marginTop: "4px" }}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <StarIcon key={s} size={13} color="#C5A059" filled />
+                          ))}
+                        </div>
+                        <div style={{ fontSize: "10.5px", color: "#8E7D70", marginTop: "4px" }}>
+                          {reviewsLoading ? "Loading reviews..." : `${totalRev} Verified Reviews`}
+                        </div>
+                      </div>
+
+                      {/* Rating Distribution Breakdown */}
+                      <div style={{ flex: 1, fontSize: "11.5px", color: "#6E5B4E" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ width: "35px" }}>5 Star</span>
+                          <div style={{ flex: 1, height: "6px", backgroundColor: "#E6DACF", borderRadius: "3px", overflow: "hidden" }}>
+                            <div style={{ width: `${fivePct}%`, height: "100%", backgroundColor: "#C5A059" }} />
+                          </div>
+                          <span style={{ width: "30px", textAlign: "right" }}>{fivePct}%</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ width: "35px" }}>4 Star</span>
+                          <div style={{ flex: 1, height: "6px", backgroundColor: "#E6DACF", borderRadius: "3px", overflow: "hidden" }}>
+                            <div style={{ width: `${fourPct}%`, height: "100%", backgroundColor: "#C5A059" }} />
+                          </div>
+                          <span style={{ width: "30px", textAlign: "right" }}>{fourPct}%</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ width: "35px" }}>3 Star</span>
+                          <div style={{ flex: 1, height: "6px", backgroundColor: "#E6DACF", borderRadius: "3px", overflow: "hidden" }}>
+                            <div style={{ width: `${threePct}%`, height: "100%", backgroundColor: "#C5A059" }} />
+                          </div>
+                          <span style={{ width: "30px", textAlign: "right" }}>{threePct}%</span>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Customer Uploaded Photographs Strip (Requirement 16) */}
@@ -3990,6 +4045,22 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     </div>
                   )}
                 </div>
+
+                {reviewError && (
+                  <div
+                    role="alert"
+                    style={{
+                      color: "#8A1818",
+                      backgroundColor: "rgba(184, 80, 66, 0.08)",
+                      border: "1px solid rgba(184, 80, 66, 0.25)",
+                      borderRadius: "6px",
+                      padding: "8px 10px",
+                      fontSize: "12px",
+                    }}
+                  >
+                    {reviewError}
+                  </div>
+                )}
 
                 <button
                   type="submit"

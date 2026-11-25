@@ -290,7 +290,15 @@ export default function Footer() {
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
               <li><Link href="/contact" className="luxury-nav-link">Contact Us</Link></li>
               <li><Link href="/track" className="luxury-nav-link">Track Order</Link></li>
-              <li><a href="mailto:info.avsaraa@gmail.com" className="luxury-nav-link">info.avsaraa@gmail.com</a></li>
+              <li>
+                <a
+                  href="mailto:info.avsaraa@gmail.com"
+                  className="luxury-nav-link"
+                  style={{ overflowWrap: "anywhere" }}
+                >
+                  info.avsaraa@gmail.com
+                </a>
+              </li>
             </ul>
           </div>
 

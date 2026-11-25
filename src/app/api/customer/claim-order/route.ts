@@ -138,10 +138,19 @@ export async function POST(request: Request) {
       );
     }
 
+    const sanitizeOrderSnapshot = (rawOrder: typeof updatedOrder) => {
+      if (!rawOrder?.shipping_address_snapshot || typeof rawOrder.shipping_address_snapshot !== "object") {
+        return rawOrder;
+      }
+      const cleanedSnap = { ...(rawOrder.shipping_address_snapshot as Record<string, unknown>) };
+      delete cleanedSnap.verification_tokens;
+      return { ...rawOrder, shipping_address_snapshot: cleanedSnap };
+    };
+
     return NextResponse.json({
       success: true,
       message: "Order successfully claimed and linked to your account.",
-      order: updatedOrder,
+      order: sanitizeOrderSnapshot(updatedOrder),
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";

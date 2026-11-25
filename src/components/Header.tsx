@@ -82,9 +82,17 @@ function HeaderInner() {
   }, []);
 
   useEffect(() => {
-    if (isSearchOpen && searchInputRef.current) {
+    if (!isSearchOpen) return;
+    if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsSearchOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isSearchOpen]);
 
   const [prevPathname, setPrevPathname] = useState(pathname);

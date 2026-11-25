@@ -156,11 +156,6 @@ export default function ProductsSection({
       result = result.filter((p) => productMatchesOccasion(p, activeOccasion));
     }
 
-    // Filter by max price if active and not already applied by category
-    if (activeMaxPrice !== null && activeCategory !== "Under ₹1,299") {
-      result = result.filter((p) => p.price <= activeMaxPrice);
-    }
-
     // Filter by max price if active (e.g., Up to ₹1,299)
     if (activeMaxPrice !== null) {
       result = result.filter((p) => p.price <= activeMaxPrice);
@@ -884,6 +879,9 @@ export default function ProductsSection({
       {/* Quick View Modal */}
       {isMountedClient && selectedProduct && typeof document !== "undefined" && createPortal(
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Quick view: ${selectedProduct.name}`}
           style={{
             position: "fixed",
             top: 0,
@@ -1068,28 +1066,6 @@ export default function ProductsSection({
                   }}
                 >
                   <span>Select Size & Customization →</span>
-                </Link>
-
-                <Link
-                  href={`/products/${selectedProduct.id}`}
-                  onClick={() => setSelectedProduct(null)}
-                  className="avsaraa-btn-outline"
-                  style={{
-                    height: "44px",
-                    fontSize: "12.5px",
-                    backgroundColor: "#FAF7F2",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    textDecoration: "none",
-                    borderRadius: "22px",
-                    border: "1.5px solid #261B13",
-                    color: "#261B13",
-                    fontWeight: 600,
-                  }}
-                >
-                  <span>View Complete Details &amp; Size Guide →</span>
                 </Link>
 
                 <Link
