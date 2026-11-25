@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { sendEmail } from "@/lib/emailService";
+import { escapeHtml } from "@/lib/emailTemplates";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { checkRateLimit } from "@/lib/rateLimit";
 
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
 
     const { productId, email, phoneNumber, variantName, size } = body;
 
-    if (!productId || !email || !String(email).includes("@")) {
+    if (!productId || !email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
       return NextResponse.json(
         { success: false, message: "Product ID and valid email are required." },
         { status: 400 }
@@ -99,16 +100,21 @@ export async function POST(request: Request) {
       throw new Error(error?.message || "Failed to subscribe to restock alert.");
     }
 
-    // Send confirmation email (non-blocking)
+    // Send confirmation email (non-blocking, with strict HTML escaping)
+    const safeProductName = escapeHtml(product.name);
+    const safeVariant = variantName ? escapeHtml(String(variantName).trim()) : "";
+    const safeSize = size ? escapeHtml(String(size).trim()) : "";
+    const safeEmail = escapeHtml(cleanEmail);
+
     sendEmail({
-      to: email,
-      subject: `Restock Alert Subscribed · ${product.name} · AVSARAA`,
+      to: cleanEmail,
+      subject: `Restock Alert Subscribed · ${String(product.name).replace(/[\r\n]+/g, " ")} · AVSARAA`,
       html: `
         <div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;color:#261B13;">
           <h2 style="color:#866951;font-family:'Cinzel',Georgia,serif;">AVSARAA · Wear The Moment</h2>
-          <p>Thank you for subscribing to restock alerts for <strong>${product.name}</strong>.</p>
-          <p>${variantName ? `Variant: <strong>${variantName}</strong><br/>` : ""}${size ? `Size: <strong>${size}</strong><br/>` : ""}</p>
-          <p>We'll notify you at ${email} as soon as it's back in stock.</p>
+          <p>Thank you for subscribing to restock alerts for <strong>${safeProductName}</strong>.</p>
+          <p>${safeVariant ? `Variant: <strong>${safeVariant}</strong><br/>` : ""}${safeSize ? `Size: <strong>${safeSize}</strong><br/>` : ""}</p>
+          <p>We'll notify you at ${safeEmail} as soon as it's back in stock.</p>
           <p style="color:#6E5B4E;font-size:12px;">- The AVSARAA Concierge, Surat</p>
         </div>
       `,

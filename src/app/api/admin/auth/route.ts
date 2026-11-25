@@ -22,7 +22,6 @@ export async function GET() {
     return NextResponse.json({
       authenticated: true,
       admin: session.admin,
-      token: session.token,
     });
   } catch {
     return NextResponse.json({ authenticated: false }, { status: 401 });
@@ -165,7 +164,6 @@ export async function POST(request: Request) {
       const response = NextResponse.json({
         success: true,
         message: "Admin credentials verified against cryptographic authority.",
-        token: jwtToken,
       });
 
       // Set standalone HttpOnly JWT cookie 'admin-auth'
@@ -198,7 +196,15 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  const csrfCheck = validateCsrfOrigin(request);
+  if (!csrfCheck.allowed) {
+    return NextResponse.json(
+      { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+      { status: 403 }
+    );
+  }
+
   const response = NextResponse.json({
     success: true,
     message: "Admin session terminated.",

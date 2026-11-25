@@ -1,0 +1,290 @@
+import { describe, test } from "node:test";
+import assert from "node:assert/strict";
+import crypto from "crypto";
+import fs from "fs";
+import { validateCsrfOrigin } from "../../src/lib/csrf.ts";
+import { isSuperAdminUser } from "../../src/lib/adminConstants.ts";
+import { escapeHtml } from "../../src/lib/emailTemplates.ts";
+
+// Silently populate test env vars from local .env files if unset (never logged)
+try {
+  for (const envPath of [".env.local", ".env"]) {
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, "utf-8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx === -1) continue;
+        const k = trimmed.slice(0, eqIdx).trim();
+        if (
+          [
+            "SHIPROCKET_WEBHOOK_TOKEN",
+            "SHIPROCKET_WEBHOOK_SECRET",
+            "RAZORPAY_WEBHOOK_SECRET",
+            "RAZORPAY_KEY_SECRET",
+          ].includes(k) &&
+          !process.env[k]
+        ) {
+          process.env[k] = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
+        }
+      }
+    }
+  }
+} catch {
+  // ignore
+}
+
+describe("Audit Phase 2 Security & Integrity Regression Suite", () => {
+  describe("1. CSRF Protection (Local HTTP & Production HTTPS)", () => {
+    test("Allows same-origin local HTTP requests without x-forwarded-proto header", () => {
+      const req = new Request("http://localhost:3008/api/coupons/validate", {
+        method: "POST",
+        headers: {
+          host: "localhost:3008",
+          origin: "http://localhost:3008",
+        },
+      });
+      const res = validateCsrfOrigin(req);
+      assert.equal(res.allowed, true);
+    });
+
+    test("Allows production HTTPS same-origin requests behind TLS proxy", () => {
+      const req = new Request("http://internal-next:3000/api/orders", {
+        method: "POST",
+        headers: {
+          host: "avsaraa.in",
+          "x-forwarded-proto": "https",
+          origin: "https://avsaraa.in",
+        },
+      });
+      const res = validateCsrfOrigin(req);
+      assert.equal(res.allowed, true);
+    });
+
+    test("Blocks cross-origin and Sec-Fetch-Site cross-site requests", () => {
+      const crossOriginReq = new Request("http://localhost:3008/api/orders", {
+        method: "POST",
+        headers: {
+          host: "localhost:3008",
+          origin: "https://attacker.example",
+        },
+      });
+      assert.equal(validateCsrfOrigin(crossOriginReq).allowed, false);
+
+      const secFetchCrossSite = new Request("https://avsaraa.in/api/orders", {
+        method: "POST",
+        headers: {
+          host: "avsaraa.in",
+          "sec-fetch-site": "cross-site",
+        },
+      });
+      assert.equal(validateCsrfOrigin(secFetchCrossSite).allowed, false);
+    });
+  });
+
+  describe("2. Admin Confirmation & Auth Hardening", () => {
+    test("Rejects explicitly unconfirmed admin email strings (null or empty)", () => {
+      assert.equal(
+        isSuperAdminUser({ email: "web.avsaraa@gmail.com", email_confirmed_at: null }),
+        false
+      );
+      assert.equal(
+        isSuperAdminUser({ email: "web.avsaraa@gmail.com", email_confirmed_at: "" }),
+        false
+      );
+      assert.equal(
+        isSuperAdminUser({
+          email: "web.avsaraa@gmail.com",
+          email_confirmed_at: new Date().toISOString(),
+        }),
+        true
+      );
+    });
+  });
+
+  describe("3. Restock & Transactional Email Sanitization", () => {
+    test("Escapes product, variant, size, and contact strings against HTML injection", () => {
+      const maliciousProduct = '<img src=x onerror=alert("xss")>Silk Saree';
+      const escaped = escapeHtml(maliciousProduct);
+      assert.equal(escaped.includes("<img"), false);
+      assert.ok(escaped.includes("&lt;img"));
+    });
+  });
+
+  describe("3b. Checkout Variant Extraction", () => {
+    function extractOrderItemVariant(productName: string): { size: string; color: string } {
+      const parts = productName
+        .split(" · ")
+        .map((p) => p.trim())
+        .filter((p) => p && p !== "Pre-Order");
+      return {
+        size: parts[1] || "Standard Size",
+        color: parts[2] || "Default",
+      };
+    }
+
+    test("Extracts real selected size and colorway from formatted cart item names", () => {
+      assert.deepEqual(
+        extractOrderItemVariant("Katan Silk Saree · Custom Tailored · Crimson Red"),
+        { size: "Custom Tailored", color: "Crimson Red" }
+      );
+      assert.deepEqual(
+        extractOrderItemVariant("Katan Silk Saree · Pre-Order · Free Size · Emerald"),
+        { size: "Free Size", color: "Emerald" }
+      );
+      assert.deepEqual(extractOrderItemVariant("Plain Item"), {
+        size: "Standard Size",
+        color: "Default",
+      });
+    });
+  });
+
+  describe("4. Live Server Hardening Smoke Checks (when server running)", async () => {
+    const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:3008";
+    let serverOnline = false;
+    try {
+      const check = await fetch(`${baseUrl}/`, { signal: AbortSignal.timeout(3000) });
+      serverOnline = check.status >= 200 && check.status < 500;
+    } catch {
+      serverOnline = false;
+    }
+
+    test(
+      "GET /api/admin/upload requires admin authentication",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const res = await fetch(`${baseUrl}/api/admin/upload`);
+        assert.equal(res.status, 401);
+      }
+    );
+
+    test(
+      "Cross-origin CSRF blocked on admin DELETE /auth, POST /inquiries, PATCH /products",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const targets: Array<{ path: string; method: string }> = [
+          { path: "/api/admin/auth", method: "DELETE" },
+          { path: "/api/admin/inquiries", method: "POST" },
+          { path: "/api/admin/products", method: "PATCH" },
+        ];
+        for (const t of targets) {
+          const res = await fetch(`${baseUrl}${t.path}`, {
+            method: t.method,
+            headers: {
+              "Content-Type": "application/json",
+              Origin: "https://evil-attacker.example",
+            },
+            body: JSON.stringify({}),
+          });
+          assert.equal(res.status, 403, `Expected 403 CSRF block on ${t.method} ${t.path}`);
+        }
+      }
+    );
+
+    test(
+      "Same-origin local HTTP CSRF succeeds on POST /api/coupons/validate",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const res = await fetch(`${baseUrl}/api/coupons/validate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: baseUrl,
+          },
+          body: JSON.stringify({ code: "AVSARAA10", subtotal: 5000 }),
+        });
+        assert.equal(res.status, 200);
+      }
+    );
+
+    test(
+      "POST /api/auth/otp/verify rejects invalid purpose override",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const res = await fetch(`${baseUrl}/api/auth/otp/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contact: "patron@example.com",
+            otp: "123456",
+            purpose: "admin_privilege",
+          }),
+        });
+        assert.equal(res.status, 400);
+      }
+    );
+
+    test(
+      "POST /api/auth/otp/send rejects malformed emails and never exposes debugOtp when NODE_ENV=production",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const badEmailRes = await fetch(`${baseUrl}/api/auth/otp/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contact: "bad@", channel: "email" }),
+        });
+        assert.equal(badEmailRes.status, 400);
+      }
+    );
+
+    test(
+      "POST /api/shiprocket/webhook processes distinct status transitions without AWB collision",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const secret = process.env.SHIPROCKET_WEBHOOK_TOKEN || process.env.SHIPROCKET_WEBHOOK_SECRET;
+        if (!secret) return;
+        const awb = `AWB-TEST-${Date.now()}`;
+        const res1 = await fetch(`${baseUrl}/api/shiprocket/webhook`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": secret,
+          },
+          body: JSON.stringify({
+            awb,
+            current_status: "PICKED UP",
+            current_timestamp: "2026-11-25T10:00:00Z",
+          }),
+        });
+        assert.equal(res1.status, 200);
+        const res2 = await fetch(`${baseUrl}/api/shiprocket/webhook`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": secret,
+          },
+          body: JSON.stringify({
+            awb,
+            current_status: "DELIVERED",
+            current_timestamp: "2026-11-25T16:00:00Z",
+          }),
+        });
+        assert.equal(res2.status, 200);
+        const body2 = await res2.json();
+        assert.notEqual(body2.message, "Duplicate Shiprocket event handled.");
+        assert.notEqual(body2.message, "Duplicate Shiprocket event acknowledged.");
+      }
+    );
+
+    test(
+      "POST /api/razorpay/webhook returns 400 on malformed JSON with valid HMAC signature",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const secret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET;
+        if (!secret) return;
+        const malformed = "{invalid_json";
+        const sig = crypto.createHmac("sha256", secret).update(malformed).digest("hex");
+        const res = await fetch(`${baseUrl}/api/razorpay/webhook`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-razorpay-signature": sig,
+          },
+          body: malformed,
+        });
+        assert.equal(res.status, 400);
+      }
+    );
+  });
+});

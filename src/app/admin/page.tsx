@@ -2365,11 +2365,11 @@ export default function AdminDashboardPage() {
             style={{
               display: "flex",
               alignItems: "center",
+              flexWrap: "wrap",
               gap: "4px",
               backgroundColor: "#EFE8E1",
               borderRadius: "14px",
               padding: "4px",
-              overflowX: "auto",
               maxWidth: "100%",
               boxShadow: "inset 0 1px 3px rgba(38,27,19,0.06)",
             }}

@@ -47,6 +47,66 @@ describe("WhatsApp Service & Dual-Contact Verification Suite", () => {
       assert.equal(res.success, false);
       assert.match(res.error || "", /Cannot send verification OTP to the business sender number/i);
     });
+
+    it("Auto-retries Meta WhatsApp template with URL Copy-Code button when #131008 is returned", async () => {
+      const envRef = process.env as Record<string, string | undefined>;
+      const origToken = envRef.WHATSAPP_ACCESS_TOKEN;
+      const origPhoneId = envRef.WHATSAPP_PHONE_NUMBER_ID;
+      const origTpl = envRef.WHATSAPP_TEMPLATE_NAME;
+      const origHasBtn = envRef.WHATSAPP_TEMPLATE_HAS_BUTTON;
+      const origFetch = globalThis.fetch;
+
+      envRef.WHATSAPP_ACCESS_TOKEN = "meta-test-token";
+      envRef.WHATSAPP_PHONE_NUMBER_ID = "123456789";
+      envRef.WHATSAPP_TEMPLATE_NAME = "avsaraa_auth_otp";
+      delete envRef.WHATSAPP_TEMPLATE_HAS_BUTTON;
+
+      const recordedBodies: Array<Record<string, unknown>> = [];
+      globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+        const parsed = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+        recordedBodies.push(parsed);
+
+        if (recordedBodies.length === 1) {
+          return new Response(
+            JSON.stringify({
+              error: {
+                message: "(#131008) Required parameter is missing",
+                code: 131008,
+                error_data: { details: "buttons: Button at index 0 of type Url requires a parameter" },
+              },
+            }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ messages: [{ id: "wamid.retry.ok" }] }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }) as typeof fetch;
+
+      try {
+        const res = await sendWhatsAppOtp({ to: "9876543210", otp: "654321" });
+        assert.equal(res.success, true);
+        assert.equal(res.messageId, "wamid.retry.ok");
+        assert.equal(recordedBodies.length, 2);
+
+        const firstTpl = recordedBodies[0].template as { components?: Array<{ type: string }> };
+        const secondTpl = recordedBodies[1].template as { components?: Array<{ type: string; sub_type?: string }> };
+        assert.equal(firstTpl.components?.some((c) => c.type === "button"), false);
+        assert.equal(secondTpl.components?.some((c) => c.type === "button" && c.sub_type === "url"), true);
+      } finally {
+        globalThis.fetch = origFetch;
+        if (origToken !== undefined) envRef.WHATSAPP_ACCESS_TOKEN = origToken;
+        else delete envRef.WHATSAPP_ACCESS_TOKEN;
+        if (origPhoneId !== undefined) envRef.WHATSAPP_PHONE_NUMBER_ID = origPhoneId;
+        else delete envRef.WHATSAPP_PHONE_NUMBER_ID;
+        if (origTpl !== undefined) envRef.WHATSAPP_TEMPLATE_NAME = origTpl;
+        else delete envRef.WHATSAPP_TEMPLATE_NAME;
+        if (origHasBtn !== undefined) envRef.WHATSAPP_TEMPLATE_HAS_BUTTON = origHasBtn;
+        else delete envRef.WHATSAPP_TEMPLATE_HAS_BUTTON;
+      }
+    });
   });
 
   describe("2. Cryptographic Contact Proof Tokens", () => {

@@ -68,12 +68,23 @@ export async function sendWhatsAppOtp(
     try {
       const url = `https://graph.facebook.com/v20.0/${metaPhoneId}/messages`;
 
-      let requestBody: Record<string, unknown>;
-
-      if (templateName) {
-        const hasUrlButton =
-          process.env.WHATSAPP_TEMPLATE_HAS_BUTTON === "true" ||
-          process.env.WHATSAPP_TEMPLATE_BUTTON === "url";
+      const buildRequestBody = (includeUrlButton: boolean): Record<string, unknown> => {
+        if (!templateName) {
+          if (process.env.NODE_ENV === "production") {
+            console.warn(
+              "[WhatsAppService] Warning: WHATSAPP_TEMPLATE_NAME is not configured. Meta Cloud API rejects freeform text messages initiated to patrons outside the 24-hour service window."
+            );
+          }
+          return {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: digitsOnly,
+            type: "text",
+            text: {
+              body: `Your Avsaraa Atelier verification code is ${otp}. Valid for 5 minutes. Please do not share this code.`,
+            },
+          };
+        }
 
         const components: Array<Record<string, unknown>> = [
           {
@@ -82,7 +93,7 @@ export async function sendWhatsAppOtp(
           },
         ];
 
-        if (hasUrlButton) {
+        if (includeUrlButton) {
           components.push({
             type: "button",
             sub_type: "url",
@@ -91,7 +102,7 @@ export async function sendWhatsAppOtp(
           });
         }
 
-        requestBody = {
+        return {
           messaging_product: "whatsapp",
           recipient_type: "individual",
           to: digitsOnly,
@@ -102,33 +113,45 @@ export async function sendWhatsAppOtp(
             components,
           },
         };
-      } else {
-        if (process.env.NODE_ENV === "production") {
-          console.warn(
-            "[WhatsAppService] Warning: WHATSAPP_TEMPLATE_NAME is not configured. Meta Cloud API rejects freeform text messages initiated to patrons outside the 24-hour service window."
-          );
-        }
-        requestBody = {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: digitsOnly,
-          type: "text",
-          text: {
-            body: `Your Avsaraa Atelier verification code is ${otp}. Valid for 5 minutes. Please do not share this code.`,
+      };
+
+      const sendMetaPayload = async (body: Record<string, unknown>) => {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${metaToken}`,
+            "Content-Type": "application/json",
           },
-        };
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        return { res, data };
+      };
+
+      const configuredHasUrlButton =
+        process.env.WHATSAPP_TEMPLATE_HAS_BUTTON === "true" ||
+        process.env.WHATSAPP_TEMPLATE_BUTTON === "url";
+
+      let { res, data } = await sendMetaPayload(buildRequestBody(configuredHasUrlButton));
+
+      // Auto-recover if the approved Meta template requires a Copy-Code URL button parameter (#131008)
+      const metaDetails = String(data?.error?.error_data?.details || data?.error?.message || "").toLowerCase();
+      if (
+        (!res.ok || data.error) &&
+        templateName &&
+        !configuredHasUrlButton &&
+        (data?.error?.code === 131008 || metaDetails.includes("button at index 0"))
+      ) {
+        ({ res, data } = await sendMetaPayload(buildRequestBody(true)));
+      } else if (
+        (!res.ok || data.error) &&
+        templateName &&
+        configuredHasUrlButton &&
+        (data?.error?.code === 132000 || data?.error?.code === 132012 || metaDetails.includes("button"))
+      ) {
+        ({ res, data } = await sendMetaPayload(buildRequestBody(false)));
       }
 
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${metaToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const data = await res.json();
       if (!res.ok || data.error) {
         const errorMsg = data.error?.message || `Meta API HTTP ${res.status}`;
         console.error("[WhatsAppService:MetaError]", errorMsg, data.error);

@@ -188,28 +188,50 @@ export async function validateCouponEngine({
 
   const supabase = getAdminSupabaseClient();
   let couponData: Coupon | null = null;
+  let dbLookupSucceeded = false;
 
   try {
     const { data, error } = await supabase
       .from("coupons")
       .select("*")
       .ilike("code", rawCode)
-      .eq("is_active", true)
       .maybeSingle();
 
-    if (!error && data) {
-      couponData = enrichCoupon(data as Coupon);
+    if (!error) {
+      dbLookupSucceeded = true;
+      if (data) {
+        if (!data.is_active) {
+          return {
+            valid: false,
+            message: `Promotion code "${rawCode}" is inactive or expired.`,
+          };
+        }
+        couponData = enrichCoupon(data as Coupon);
+      }
     }
   } catch (err) {
     console.error("Coupon lookup error:", err);
   }
 
-  if (!couponData) {
+  if (!couponData && !dbLookupSucceeded) {
     const fallbackMatch = FALLBACK_COUPONS.find(
       (c) => c.code.toUpperCase() === rawCode && c.is_active
     );
     if (fallbackMatch) {
       couponData = enrichCoupon(fallbackMatch);
+    }
+  } else if (!couponData) {
+    // Allow static fallback only for seed promo codes when coupons table hasn't been seeded at all
+    const fallbackMatch = FALLBACK_COUPONS.find(
+      (c) => c.code.toUpperCase() === rawCode && c.is_active
+    );
+    if (fallbackMatch) {
+      const { count } = await supabase
+        .from("coupons")
+        .select("id", { count: "exact", head: true });
+      if (count === 0) {
+        couponData = enrichCoupon(fallbackMatch);
+      }
     }
   }
 
@@ -278,7 +300,10 @@ export async function validateCouponEngine({
       const { data: contactOrders } = await supabase
         .from("orders")
         .select("id, shipping_address_snapshot")
-        .ilike("coupon_code", couponData.code);
+        .ilike("coupon_code", couponData.code)
+        .neq("order_status", "Cancelled")
+        .order("created_at", { ascending: false })
+        .limit(500);
 
       if (contactOrders) {
         const matches = contactOrders.filter((o) => {
@@ -358,32 +383,42 @@ export async function incrementCouponUsage(
   if (!couponCode || !couponCode.trim()) return false;
   try {
     const cleanCode = couponCode.trim();
-    const { data: coupRow } = await adminClient
-      .from("coupons")
-      .select("id, used_count, usage_limit")
-      .ilike("code", cleanCode)
-      .maybeSingle();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data: coupRow } = await adminClient
+        .from("coupons")
+        .select("id, used_count, usage_limit")
+        .ilike("code", cleanCode)
+        .maybeSingle();
 
-    if (!coupRow) return false;
+      if (!coupRow) return false;
 
-    const used = Number(coupRow.used_count || 0);
-    const limit = coupRow.usage_limit == null ? null : Number(coupRow.usage_limit);
+      const used = Number(coupRow.used_count || 0);
+      const limit = coupRow.usage_limit == null ? null : Number(coupRow.usage_limit);
 
-    if (limit != null && used >= limit) {
-      return false;
+      if (limit != null && used >= limit) {
+        return false;
+      }
+
+      const updateQuery = adminClient
+        .from("coupons")
+        .update({ used_count: used + 1 })
+        .eq("id", coupRow.id)
+        .eq("used_count", used);
+
+      if (limit != null) {
+        updateQuery.lt("used_count", limit);
+      }
+
+      const { data: updatedRows, error } = await updateQuery.select("id");
+      if (error) {
+        return false;
+      }
+      if (updatedRows && updatedRows.length > 0) {
+        return true;
+      }
+      // Concurrent writer updated used_count first; retry once
     }
-
-    const updateQuery = adminClient
-      .from("coupons")
-      .update({ used_count: used + 1 })
-      .eq("id", coupRow.id);
-
-    if (limit != null) {
-      updateQuery.lt("used_count", limit);
-    }
-
-    const { error } = await updateQuery;
-    return !error;
+    return false;
   } catch (err) {
     console.warn("Notice: coupon used_count increment notice:", err);
     return false;

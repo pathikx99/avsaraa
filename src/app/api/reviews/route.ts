@@ -183,17 +183,18 @@ export async function POST(request: Request) {
         }
       }
 
-      if (authUserEmail) {
+      if (authUserEmail && !authUserEmail.endsWith("@phone.avsaraa.in")) {
         const cleanEmail = authUserEmail.toLowerCase().trim();
-        const { data: allOrders } = await adminClient
+        const { data: emailMatchedOrders } = await adminClient
           .from("orders")
-          .select("id, shipping_address_snapshot")
-          .neq("order_status", "Cancelled");
+          .select("id")
+          .neq("order_status", "Cancelled")
+          .eq("shipping_address_snapshot->>email", cleanEmail)
+          .limit(50);
 
-        if (allOrders) {
-          for (const ord of allOrders) {
-            const snap = ord.shipping_address_snapshot as { email?: string; phone_number?: string } | null;
-            if (snap?.email?.toLowerCase().trim() === cleanEmail && !matchedOrderIds.includes(ord.id)) {
+        if (emailMatchedOrders) {
+          for (const ord of emailMatchedOrders) {
+            if (!matchedOrderIds.includes(ord.id)) {
               matchedOrderIds.push(ord.id);
             }
           }

@@ -13,8 +13,8 @@ const BENEFITS = [
         <circle cx="18.5" cy="18.5" r="2.5" />
       </svg>
     ),
-    title: "Free Express Shipping",
-    subtitle: "Complimentary priority delivery on all prepaid orders across India.",
+    title: "Free Shipping ₹500+",
+    subtitle: "Complimentary priority Gujarat delivery on orders ₹500+.",
   },
   {
     icon: (
@@ -25,7 +25,7 @@ const BENEFITS = [
       </svg>
     ),
     title: "Cash on Delivery",
-    subtitle: "Flexible COD payment available across 18,000+ verified PIN codes.",
+    subtitle: "Flexible COD payment available across verified Gujarat PIN codes (₹20 COD fee).",
   },
   {
     icon: (

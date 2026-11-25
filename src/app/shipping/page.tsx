@@ -71,19 +71,19 @@ export default function ShippingPolicyPage() {
             </h2>
           </div>
           <p style={{ margin: "0 0 14px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            AVSARAA currently offers <strong>free standard shipping and delivery on prepaid orders</strong> across serviceable delivery locations in India.
+            AVSARAA currently offers <strong>free standard shipping and delivery on prepaid orders of ₹500+</strong> across serviceable delivery locations in Gujarat (₹49 standard shipping below ₹500).
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", marginBottom: "14px" }}>
             <div style={{ padding: "20px", backgroundColor: "#FAF7F2", border: "1px solid #CFBEAD", borderRadius: "10px" }}>
               <span style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#866951", display: "block", marginBottom: "4px" }}>
-                PREPAID ORDERS
+                PREPAID ORDERS (₹500+)
               </span>
               <div style={{ fontSize: "20px", fontFamily: "var(--font-serif), Georgia, serif", color: "#261B13", fontWeight: 600, marginBottom: "6px" }}>
                 Free Shipping &amp; Delivery
               </div>
               <p style={{ fontSize: "13px", color: "#6E5B4E", margin: 0 }}>
-                All prepaid orders (UPI, Cards, NetBanking via Razorpay) qualify for complimentary delivery.
+                Prepaid orders of ₹500 or above (UPI, Cards, NetBanking via Razorpay) qualify for complimentary Gujarat delivery. Orders under ₹500 carry a ₹49 shipping fee.
               </p>
             </div>
 

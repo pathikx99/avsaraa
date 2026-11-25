@@ -44,6 +44,12 @@ export async function POST(request: Request) {
       normalizedPhone = phoneCheck.normalized;
     } else {
       cleanContact = cleanContact.toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanContact) || cleanContact.length > 254) {
+        return NextResponse.json(
+          { success: false, error: "Please enter a valid email address." },
+          { status: 400 }
+        );
+      }
     }
 
     const resolvedChannel = channel === "whatsapp" || !isEmail ? "whatsapp" : "email";
@@ -151,9 +157,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // For automated verification in tests
+    // Restrict debugOtp strictly to non-production test environments
     const isTestExecution =
-      process.env.ENABLE_TEST_OTP === "true" || process.env.NODE_ENV === "test";
+      process.env.NODE_ENV !== "production" &&
+      (process.env.ENABLE_TEST_OTP === "true" || process.env.NODE_ENV === "test");
 
     const displayMsg =
       resolvedChannel === "whatsapp"

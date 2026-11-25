@@ -69,18 +69,29 @@ export async function PUT(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
+    const adminClient = getAdminSupabaseClient();
+    const { data: currentProfile } = await adminClient
+      .from("profiles")
+      .select("phone_number")
+      .eq("id", user.id)
+      .maybeSingle();
+
     if (full_name !== undefined) updates.full_name = String(full_name).trim().slice(0, 100);
     if (phone_number !== undefined) {
-      if (phone_number) {
-        const phoneValidation = normalizePhoneNumber(String(phone_number));
-        updates.phone_number = phoneValidation.isValid ? phoneValidation.normalized : String(phone_number).trim();
-      } else {
-        updates.phone_number = null;
+      const nextPhone = phone_number
+        ? (() => {
+            const phoneValidation = normalizePhoneNumber(String(phone_number));
+            return phoneValidation.isValid ? phoneValidation.normalized : String(phone_number).trim();
+          })()
+        : null;
+      updates.phone_number = nextPhone;
+      if (nextPhone !== (currentProfile?.phone_number ?? null)) {
+        updates.phone_verified = false;
+        updates.phone_verified_at = null;
       }
     }
     if (preferred_currency !== undefined) updates.preferred_currency = String(preferred_currency).trim();
 
-    const adminClient = getAdminSupabaseClient();
     const { data: updated, error } = await adminClient
       .from("profiles")
       .update(updates)

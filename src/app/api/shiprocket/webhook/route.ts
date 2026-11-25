@@ -49,18 +49,31 @@ export async function POST(request: Request) {
       order_id?: string;
       custom_order_id?: string;
       current_status?: string;
+      current_timestamp?: string;
+      etd?: string;
+      updated_at?: string;
       courier_name?: string;
       tracking_number?: string;
       [key: string]: unknown;
     }
 
-    let event: ShiprocketWebhookPayload = {};
+    let event: ShiprocketWebhookPayload;
     try {
       event = await request.json();
     } catch {
-      event = {};
+      return NextResponse.json(
+        { success: false, error: "Invalid JSON webhook payload." },
+        { status: 400 }
+      );
     }
-    const eventId = String(event.event_id || event.awb || `ship_${Date.now()}`);
+    const fallbackParts = [
+      event.awb || event.tracking_number,
+      event.current_status,
+      event.current_timestamp || event.etd || event.updated_at || String(Date.now()),
+    ].filter(Boolean);
+    const eventId = String(
+      event.event_id || (fallbackParts.length > 0 ? fallbackParts.join(":") : `ship_${Date.now()}`)
+    );
 
     // Deduplication via in-memory and database
     if (processedWebhooksMemory.has(eventId)) {
@@ -81,6 +94,7 @@ export async function POST(request: Request) {
       });
 
       if (dedupErr && dedupErr.code === "23505") {
+        processedWebhooksMemory.add(eventId);
         return NextResponse.json({
           success: true,
           message: "Duplicate Shiprocket event handled.",
@@ -90,8 +104,6 @@ export async function POST(request: Request) {
     } catch {
       // Memory fallback
     }
-
-    processedWebhooksMemory.add(eventId);
 
     // Map Shiprocket status to Avsaraa order_status
     const orderId = event.order_id || event.custom_order_id;
@@ -121,23 +133,50 @@ export async function POST(request: Request) {
 
     if (orderId && mappedStatus) {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
-      let updateQuery = adminClient
+      const lookupColumn = isUuid ? "id" : "order_number";
+      const { data: existingOrder } = await adminClient
         .from("orders")
-        .update({
+        .select("id, order_status")
+        .eq(lookupColumn, orderId)
+        .maybeSingle();
+
+      if (existingOrder && existingOrder.order_status !== "Cancelled" && existingOrder.order_status !== "Exchanged") {
+        const updatePayload: Record<string, unknown> = {
           order_status: mappedStatus,
           courier_partner: event.courier_name || "Shiprocket Express",
           tracking_number: event.awb || event.tracking_number,
           updated_at: new Date().toISOString(),
-        });
+        };
 
-      if (isUuid) {
-        updateQuery = updateQuery.eq("id", orderId);
-      } else {
-        updateQuery = updateQuery.eq("order_number", orderId);
+        let updateQuery = adminClient
+          .from("orders")
+          .update(updatePayload)
+          .eq("id", existingOrder.id);
+
+        if (mappedStatus === "Cancelled") {
+          updateQuery = updateQuery.neq("order_status", "Cancelled");
+        }
+
+        const { data: updatedOrder } = await updateQuery.select("id").maybeSingle();
+
+        // Atomically restore inventory only if this webhook transitioned order -> Cancelled
+        if (updatedOrder && mappedStatus === "Cancelled") {
+          const { data: items } = await adminClient
+            .from("order_items")
+            .select("product_id, quantity")
+            .eq("order_id", existingOrder.id);
+          if (items) {
+            for (const item of items) {
+              if (item.product_id) {
+                await adminClient.rpc("increment_stock", { p_id: item.product_id, p_qty: item.quantity });
+              }
+            }
+          }
+        }
       }
-
-      await updateQuery;
     }
+
+    processedWebhooksMemory.add(eventId);
 
     return NextResponse.json({
       success: true,

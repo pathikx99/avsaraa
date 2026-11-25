@@ -126,7 +126,7 @@ export default function CartDrawer() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
             <span style={{ fontSize: "12px", color: isGiftUnlocked ? "#866951" : "#5A4535", fontWeight: 600 }}>
               {subtotal === 0 ? (
-                <>✨ Complimentary Express Shipping Unlocked on All Orders</>
+                <>✨ Free Insured Delivery on Orders Above ₹500</>
               ) : isGiftUnlocked ? (
                 <>🎉 <strong>Keepsake Gift Box Unlocked!</strong> Handcrafted wrap included.</>
               ) : (
@@ -166,8 +166,8 @@ export default function CartDrawer() {
 
           {/* Milestone Badges */}
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "10px", color: "#866951" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "3px", fontWeight: 600, color: "#2E7D32" }}>
-              ✓ Free Shipping (All Orders)
+            <span style={{ display: "flex", alignItems: "center", gap: "3px", fontWeight: 600, color: subtotal >= 500 ? "#2E7D32" : "#866951" }}>
+              {subtotal >= 500 ? "✓ " : ""}Free Shipping (₹500+)
             </span>
             <span style={{ display: "flex", alignItems: "center", gap: "3px", fontWeight: isGiftUnlocked ? 700 : 500, color: isGiftUnlocked ? "#2E7D32" : "#866951" }}>
               {isGiftUnlocked ? "✓ " : "🎁 "} Keepsake Box (₹2,500)
@@ -478,9 +478,9 @@ export default function CartDrawer() {
                   color: "#6E5B4E",
                 }}
               >
-                <span>Shipping across India</span>
-                <span style={{ color: "#2E6930", fontWeight: 600 }}>
-                  FREE
+                <span>Gujarat Insured Delivery</span>
+                <span style={{ color: subtotal >= 500 || subtotal === 0 ? "#2E6930" : "#866951", fontWeight: 600 }}>
+                  {subtotal >= 500 || subtotal === 0 ? "FREE" : "₹50 (Free ₹500+)"}
                 </span>
               </div>
               <div

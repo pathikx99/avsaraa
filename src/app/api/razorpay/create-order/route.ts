@@ -21,7 +21,7 @@ function generateOrderNumber(): string {
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
-  const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const randomSuffix = crypto.randomBytes(4).toString("hex").toUpperCase();
   return `AVS-${year}${month}${day}-${randomSuffix}`;
 }
 
@@ -167,24 +167,29 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1. Verify product pricing server-side strictly against canonical database or seed catalog
+    // 1. Verify product pricing & stock server-side strictly against canonical database or seed catalog
     const adminClient = getAdminSupabaseClient();
     const productIds = items
       .map((i: { product_id: string }) => i.product_id)
       .filter((id): id is string => Boolean(id));
 
-    const priceMap = new Map<string, { price: number; name: string }>();
+    const priceMap = new Map<string, { price: number; name: string; inDb: boolean; stockCount: number | null }>();
 
     if (productIds.length > 0) {
       try {
         const { data: dbProducts } = await adminClient
           .from("products")
-          .select("id, price, name")
+          .select("id, price, name, stock_count")
           .in("id", productIds);
 
         if (dbProducts) {
           for (const p of dbProducts) {
-            priceMap.set(p.id, { price: Number(p.price), name: p.name });
+            priceMap.set(p.id, {
+              price: Number(p.price),
+              name: p.name,
+              inDb: true,
+              stockCount: p.stock_count == null ? null : Number(p.stock_count),
+            });
           }
         }
       } catch (dbErr) {
@@ -195,13 +200,20 @@ export async function POST(request: Request) {
     // Populate missing items from static verified seed catalog
     for (const seed of SEED_CATALOG_PRODUCTS) {
       if (!priceMap.has(seed.id)) {
-        priceMap.set(seed.id, { price: seed.price, name: seed.name });
+        priceMap.set(seed.id, {
+          price: seed.price,
+          name: seed.name,
+          inDb: false,
+          stockCount: seed.stock_count ?? null,
+        });
       }
     }
 
     let rawSubtotal = 0;
+    const requestedQtyByProduct = new Map<string, number>();
     const sanitizedItems: Array<{
-      product_id: string;
+      product_id: string | null;
+      catalog_product_id: string;
       product_name: string;
       image_url: string;
       size: string;
@@ -236,14 +248,38 @@ export async function POST(request: Request) {
         );
       }
 
-      const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+      const rawQty = Number(item.quantity);
+      if (!Number.isFinite(rawQty) || !Number.isInteger(rawQty) || rawQty < 1 || rawQty > 50) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Invalid quantity for "${item.product_name || verified.name}". Quantity must be a whole number between 1 and 50.`,
+          },
+          { status: 400 }
+        );
+      }
+      const quantity = rawQty;
+      const cumulativeQty = (requestedQtyByProduct.get(item.product_id) || 0) + quantity;
+      requestedQtyByProduct.set(item.product_id, cumulativeQty);
+
+      if (verified.inDb && verified.stockCount !== null && verified.stockCount < cumulativeQty) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Insufficient stock for "${item.product_name || verified.name}". Only ${verified.stockCount} available.`,
+          },
+          { status: 400 }
+        );
+      }
+
       const totalPrice = verifiedPrice * quantity;
       rawSubtotal += totalPrice;
 
       sanitizedItems.push({
-        product_id: item.product_id,
+        product_id: verified.inDb ? item.product_id : null,
+        catalog_product_id: item.product_id,
         product_name: item.product_name || verified.name,
-        image_url: item.image_url || "/images/placeholder.jpg",
+        image_url: item.image_url || "/images/botanical_flowers.jpg",
         size: item.size || "Standard Size",
         color: item.color || "Default",
         tailored_blouse: Boolean(item.tailored_blouse),
@@ -253,7 +289,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // 2. Validate Coupon Code
+    // 2. Validate Coupon Code (enforce guest per-contact limit using checkout contact)
     let discountAmount = 0;
     let validatedCoupon: string | null = null;
     let isFreeShippingCoupon = false;
@@ -263,6 +299,7 @@ export async function POST(request: Request) {
         code: coupon_code.trim(),
         subtotal: rawSubtotal,
         userId: isGuest ? null : currentUserId,
+        contact: shipping_address_snapshot?.email || shipping_address_snapshot?.phone_number || null,
       });
 
       if (!coupValidation.valid) {
@@ -291,6 +328,15 @@ export async function POST(request: Request) {
     });
 
     const amountInPaise = Math.round(financials.totalAmount * 100);
+    if (!Number.isFinite(amountInPaise) || amountInPaise < 100) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Minimum payable order amount for Razorpay checkout is ₹1.00 (100 paise).",
+        },
+        { status: 400 }
+      );
+    }
     const orderNumber = generateOrderNumber();
     const orderStatus: OrderStatus = "Pending";
     const paymentStatus: PaymentStatus = "Pending";
@@ -324,7 +370,7 @@ export async function POST(request: Request) {
       courier_partner: postalCode.startsWith("395")
         ? "Avsaraa Dedicated Surat Courier"
         : "Blue Dart Express Gujarat",
-      tracking_number: `BLUEDART-${Math.floor(100000000 + Math.random() * 900000000)}`,
+      tracking_number: `BLUEDART-${crypto.randomInt(100000000, 999999999)}`,
       estimated_delivery: estDelivery.toISOString(),
     };
 
@@ -343,17 +389,31 @@ export async function POST(request: Request) {
 
         const itemsToInsert = sanitizedItems.map((item) => ({
           order_id: dbOrder.id,
-          ...item,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          image_url: item.image_url,
+          size: item.size,
+          color: item.color,
+          tailored_blouse: item.tailored_blouse,
+          unit_price: item.unit_price,
+          quantity: item.quantity,
+          total_price: item.total_price,
         }));
 
-        const { data: dbItems } = await adminClient
+        const { data: dbItems, error: itemsErr } = await adminClient
           .from("order_items")
           .insert(itemsToInsert)
           .select();
 
-        if (dbItems) {
+        if (itemsErr || !dbItems || dbItems.length === 0) {
+          console.error("Razorpay create-order order_items insert error:", itemsErr?.message);
+          await adminClient.from("orders").delete().eq("id", dbOrder.id);
+          createdOrder = null;
+        } else {
           createdItems = dbItems as OrderItem[];
         }
+      } else if (orderErr) {
+        console.error("Razorpay create-order orders insert error:", orderErr.message);
       }
     } catch (dbEx) {
       console.warn("Notice: Database orders insert warning:", dbEx);
@@ -376,6 +436,7 @@ export async function POST(request: Request) {
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!keyId || !keySecret) {
+      await adminClient.from("orders").delete().eq("id", createdOrder.id);
       if (process.env.NODE_ENV === "production") {
         return NextResponse.json(
           { success: false, message: "Payment gateway configuration is missing in production." },
@@ -387,7 +448,14 @@ export async function POST(request: Request) {
       );
     }
 
-    let razorpayOrderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const isNonProduction = process.env.NODE_ENV !== "production";
+    const isLiveGateway = keyId.startsWith("rzp_live_");
+    const isMockDemoMode =
+      isNonProduction && (!keyId || keyId.includes("demo") || keyId.includes("your_key_here"));
+
+    let razorpayOrderId = `order_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+    let rzpGatewaySucceeded = false;
+    let rzpHttpStatus = 0;
 
     try {
       // Call Razorpay API with live/test credentials
@@ -413,25 +481,96 @@ export async function POST(request: Request) {
         signal: AbortSignal.timeout(6000),
       });
 
+      rzpHttpStatus = rzpRes.status;
       if (rzpRes.ok) {
         const rzpData = await rzpRes.json();
         if (rzpData?.id) {
           razorpayOrderId = rzpData.id;
+          rzpGatewaySucceeded = true;
         }
       } else {
         const errData = await rzpRes.json().catch(() => null);
         console.warn(
-          "Notice: Razorpay API returned non-200 (falling back to simulated order):",
+          "Notice: Razorpay API returned non-200:",
+          rzpHttpStatus,
           errData
         );
       }
     } catch (rzpErr) {
-      console.warn("Notice: Razorpay order API notice (fallback active):", rzpErr);
+      console.warn("Notice: Razorpay order API error:", rzpErr);
     }
 
-    const isNonProduction = process.env.NODE_ENV !== "production";
-    const isMockDemoMode =
-      isNonProduction && (!keyId || keyId.includes("demo") || keyId.includes("your_key_here"));
+    if (!rzpGatewaySucceeded && !isMockDemoMode) {
+      await adminClient.from("orders").delete().eq("id", createdOrder.id);
+      if (rzpHttpStatus === 401) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Razorpay authentication failed. Please verify merchant API credentials.",
+          },
+          { status: 401 }
+        );
+      }
+      if (isLiveGateway || !isNonProduction) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Unable to initialize Razorpay payment gateway. Please retry shortly.",
+          },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unable to create Razorpay order. Please check gateway configuration and try again.",
+        },
+        { status: 502 }
+      );
+    }
+
+    // Bind generated razorpay_order_id strictly to this order in orders.shipping_address_snapshot and best-effort payments row
+    const { error: snapBindErr } = await adminClient
+      .from("orders")
+      .update({
+        shipping_address_snapshot: {
+          ...(createdOrder.shipping_address_snapshot as unknown as Record<string, unknown>),
+          razorpay_order_id: razorpayOrderId,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", createdOrder.id);
+
+    if (snapBindErr) {
+      console.error("Razorpay create-order snapshot bind error:", snapBindErr.message);
+      await adminClient.from("orders").delete().eq("id", createdOrder.id);
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Failed to persist payment binding record.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const { error: bindErr } = await adminClient.from("payments").insert({
+      order_id: createdOrder.id,
+      gateway: "Razorpay",
+      transaction_id: razorpayOrderId,
+      amount: financials.totalAmount,
+      currency: "INR",
+      status: "Pending",
+      raw_payload: {
+        razorpay_order_id: razorpayOrderId,
+        order_id: createdOrder.id,
+        order_number: orderNumber,
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    if (bindErr) {
+      console.warn("Razorpay create-order pending payments row notice:", bindErr.message);
+    }
 
     let testPaymentId: string | undefined;
     let testSignature: string | undefined;

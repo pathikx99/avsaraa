@@ -254,6 +254,7 @@ export default function ProductsSection({
               return (
                 <button
                   key={cat}
+                  aria-pressed={isActive}
                   onClick={() => {
                     setActiveCategory(cat);
                     if (cat === "ALL") {
@@ -1014,7 +1015,7 @@ export default function ProductsSection({
                     marginBottom: "18px",
                   }}
                 >
-                  Inclusive of all taxes • Free delivery across India
+                  Inclusive of all taxes • Free Gujarat delivery ₹500+
                 </p>
 
                 <div

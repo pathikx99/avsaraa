@@ -58,22 +58,34 @@ export async function POST(request: Request) {
       );
     }
 
-    // Security Check: Order claiming verification
-    const userEmail = user.email ? user.email.toLowerCase().trim() : "";
+    // Security Check: Strict exact ownership match against verified user credentials (no notes substring matching)
+    const isGoogleOAuth = user.app_metadata?.provider === "google";
+    const isVerifiedEmail = Boolean(user.email_confirmed_at || isGoogleOAuth) && !user.email.endsWith("@phone.avsaraa.in");
+    const userEmail = isVerifiedEmail ? user.email.toLowerCase().trim() : "";
     const addressEmail = order.shipping_address_snapshot?.email
       ? String(order.shipping_address_snapshot.email).toLowerCase().trim()
       : null;
-    const orderNotes = order.notes ? String(order.notes).toLowerCase() : "";
 
-    const userPhone = user.phone ? user.phone.replace(/\D/g, "").slice(-10) : "";
+    let userPhoneDigits = "";
+    if (user.phone && user.phone_confirmed_at) {
+      userPhoneDigits = user.phone.replace(/\D/g, "").slice(-10);
+    } else {
+      const { data: prof } = await adminClient
+        .from("profiles")
+        .select("phone_number, phone_verified")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (prof?.phone_verified && prof.phone_number) {
+        userPhoneDigits = String(prof.phone_number).replace(/\D/g, "").slice(-10);
+      }
+    }
+
     const addressPhone = order.shipping_address_snapshot?.phone_number
       ? String(order.shipping_address_snapshot.phone_number).replace(/\D/g, "").slice(-10)
       : "";
 
-    const emailMatches =
-      Boolean(addressEmail && userEmail && addressEmail === userEmail) ||
-      (Boolean(userEmail) && orderNotes.includes(userEmail));
-    const phoneMatches = Boolean(userPhone && addressPhone && userPhone === addressPhone);
+    const emailMatches = Boolean(addressEmail && userEmail && addressEmail === userEmail);
+    const phoneMatches = Boolean(userPhoneDigits.length === 10 && addressPhone.length === 10 && userPhoneDigits === addressPhone);
 
     // If order is already owned by this user
     if (order.user_id === user.id) {

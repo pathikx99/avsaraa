@@ -75,7 +75,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const targetEmail = recipientEmail || user?.email || order.shipping_address_snapshot?.email;
+    // Only allow admins to specify arbitrary recipientEmail; non-admins can only dispatch to the order's email or their own verified account email
+    const orderSnapshotEmail = order.shipping_address_snapshot?.email;
+    const safeUserEmail =
+      user?.email && !user.email.endsWith("@phone.avsaraa.in") ? user.email : null;
+    const requestedEmail =
+      isAdmin && typeof recipientEmail === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())
+        ? recipientEmail.trim()
+        : null;
+    const targetEmail = requestedEmail || orderSnapshotEmail || safeUserEmail;
 
     if (!targetEmail) {
       return NextResponse.json(

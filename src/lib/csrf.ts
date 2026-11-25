@@ -26,10 +26,19 @@ export function validateCsrfOrigin(
 
   const originHeader = request.headers.get("origin");
   const refererHeader = request.headers.get("referer");
-  const hostHeader = request.headers.get("host");
+  const hostHeader = request.headers.get("x-forwarded-host") || request.headers.get("host");
+  const secFetchSite = request.headers.get("sec-fetch-site");
+
+  // Explicitly block browser-declared cross-site requests unless allowlisted
+  if (secFetchSite === "cross-site") {
+    if (originHeader && allowedOrigins.includes(originHeader)) {
+      return { allowed: true, reason: "Allowlisted cross-site origin" };
+    }
+    return { allowed: false, reason: "Cross-site request blocked by Sec-Fetch-Site policy" };
+  }
 
   // No Origin header: could be a same-origin request from a non-browser client
-  // (e.g., curl, mobile app, server-to-server). Allow but flag for review.
+  // (e.g., curl, mobile app, server-to-server). Allow for API/test automation compatibility.
   if (!originHeader && !refererHeader) {
     return { allowed: true, reason: "No Origin/Referer header (non-browser client)" };
   }
@@ -40,8 +49,16 @@ export function validateCsrfOrigin(
   if (hostHeader && origin) {
     try {
       const originUrl = new URL(origin);
-      const requestProtocol = request.headers.get("x-forwarded-proto") || "https";
-      const expectedOrigin = `${requestProtocol}://${hostHeader}`;
+      const cleanHost = hostHeader.split(",")[0].trim();
+      const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0].trim();
+      let urlProtocol = "https";
+      try {
+        urlProtocol = new URL(request.url).protocol.replace(":", "") || "https";
+      } catch {
+        urlProtocol = "https";
+      }
+      const requestProtocol = forwardedProto || urlProtocol;
+      const expectedOrigin = `${requestProtocol}://${cleanHost}`;
 
       if (originUrl.origin === expectedOrigin) {
         return { allowed: true, reason: "Same-origin request" };

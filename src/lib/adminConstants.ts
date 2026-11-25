@@ -55,7 +55,7 @@ export function isSuperAdminUser(user?: AdminUserLike | null): boolean {
 
   // Reject explicitly unconfirmed accounts (unless Google OAuth verified)
   const isGoogleOAuth = user.app_metadata?.provider === "google";
-  if (user.email_confirmed_at === null && !isGoogleOAuth) {
+  if ((user.email_confirmed_at === null || user.email_confirmed_at === "") && !isGoogleOAuth) {
     return false;
   }
 

@@ -51,7 +51,7 @@ const PRODUCT_FALLBACK_IMAGE = "/images/botanical_flowers.jpg";
  * Resolves product image URLs. Cloudflare, Supabase CDN, and external HTTPS URLs are returned directly.
  */
 export function resolveProductImage(url?: string): string {
-  if (!url) return PRODUCT_FALLBACK_IMAGE;
+  if (!url || url === "/images/placeholder.jpg") return PRODUCT_FALLBACK_IMAGE;
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   if (url.startsWith("/")) return url;
 

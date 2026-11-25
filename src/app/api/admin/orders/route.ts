@@ -97,36 +97,9 @@ export async function PATCH(request: Request) {
       }
       updatePayload.order_status = order_status;
 
-      // If status changed to Delivered, mark payment as Paid if COD
+      // If status changed to Delivered, mark payment as Paid
       if (order_status === "Delivered") {
         updatePayload.payment_status = "Paid";
-      }
-
-      // If status changed to Cancelled, restore inventory stock
-      if (order_status === "Cancelled") {
-        try {
-          const { data: existingOrder } = await supabaseAdmin
-            .from("orders")
-            .select("order_status")
-            .eq("id", id)
-            .maybeSingle();
-
-          if (existingOrder && existingOrder.order_status !== "Cancelled") {
-            const { data: items } = await supabaseAdmin
-              .from("order_items")
-              .select("product_id, quantity")
-              .eq("order_id", id);
-            if (items) {
-              for (const item of items) {
-                if (item.product_id) {
-                  await supabaseAdmin.rpc("increment_stock", { p_id: item.product_id, p_qty: item.quantity });
-                }
-              }
-            }
-          }
-        } catch (invErr) {
-          console.warn("Notice: Admin cancellation inventory increment warning:", invErr);
-        }
       }
     }
 
@@ -142,22 +115,50 @@ export async function PATCH(request: Request) {
       updatePayload.notes = notes;
     }
 
-    const { data: updatedOrder, error } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from("orders")
       .update(updatePayload)
-      .eq("id", id)
+      .eq("id", id);
+
+    // Atomic guard against concurrent double-cancellation stock restoration
+    if (order_status === "Cancelled") {
+      updateQuery = updateQuery.neq("order_status", "Cancelled");
+    }
+
+    const { data: updatedOrder, error } = await updateQuery
       .select(`
         *,
         order_items (*),
         payments (*)
       `)
-      .single();
+      .maybeSingle();
 
     if (error) {
       return NextResponse.json(
         { success: false, error: `Database update failed: ${error.message}` },
         { status: 400 }
       );
+    }
+
+    if (!updatedOrder) {
+      return NextResponse.json(
+        { success: false, error: order_status === "Cancelled" ? "Order not found or already cancelled." : "Order not found." },
+        { status: 409 }
+      );
+    }
+
+    // Restore inventory stock only if this PATCH atomically transitioned the order to Cancelled
+    if (order_status === "Cancelled") {
+      try {
+        const items = (updatedOrder.order_items || []) as Array<{ product_id?: string | null; quantity: number }>;
+        for (const item of items) {
+          if (item.product_id) {
+            await supabaseAdmin.rpc("increment_stock", { p_id: item.product_id, p_qty: item.quantity });
+          }
+        }
+      } catch (invErr) {
+        console.warn("Notice: Admin cancellation inventory increment warning:", invErr);
+      }
     }
 
     return NextResponse.json({

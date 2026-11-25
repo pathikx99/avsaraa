@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { Order, OrderItem, CreateOrderPayload, PaymentStatus, OrderStatus } from "@/types/order";
@@ -22,7 +23,7 @@ function generateOrderNumber(): string {
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
-  const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const randomSuffix = crypto.randomBytes(4).toString("hex").toUpperCase();
   return `AVS-${year}${month}${day}-${randomSuffix}`;
 }
 
@@ -199,18 +200,22 @@ export async function POST(request: Request) {
       .map((item) => item.product_id)
       .filter((id): id is string => Boolean(id));
 
-    // Fetch verified prices from database
-    const priceMap = new Map<string, number>();
+    // Fetch verified prices & stock from database
+    const priceMap = new Map<string, { price: number; inDb: boolean; stockCount: number | null }>();
     if (productIds.length > 0) {
       try {
         const { data: dbProducts } = await adminClient
           .from("products")
-          .select("id, price")
+          .select("id, price, stock_count")
           .in("id", productIds);
 
         if (dbProducts) {
           for (const p of dbProducts) {
-            priceMap.set(p.id, Number(p.price));
+            priceMap.set(p.id, {
+              price: Number(p.price),
+              inDb: true,
+              stockCount: p.stock_count == null ? null : Number(p.stock_count),
+            });
           }
         }
       } catch (err) {
@@ -221,11 +226,16 @@ export async function POST(request: Request) {
     // Populate missing from seed catalog
     for (const seed of SEED_CATALOG_PRODUCTS) {
       if (!priceMap.has(seed.id)) {
-        priceMap.set(seed.id, seed.price);
+        priceMap.set(seed.id, {
+          price: seed.price,
+          inDb: false,
+          stockCount: seed.stock_count ?? null,
+        });
       }
     }
 
     let rawSubtotal = 0;
+    const requestedQtyByProduct = new Map<string, number>();
     const sanitizedItems: OrderItem[] = [];
 
     for (const item of items) {
@@ -239,7 +249,8 @@ export async function POST(request: Request) {
         );
       }
 
-      const verifiedPrice = priceMap.get(item.product_id)!;
+      const verified = priceMap.get(item.product_id)!;
+      const verifiedPrice = verified.price;
       if (typeof verifiedPrice !== "number" || verifiedPrice <= 0 || isNaN(verifiedPrice)) {
         return NextResponse.json(
           {
@@ -250,14 +261,37 @@ export async function POST(request: Request) {
         );
       }
 
-      const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+      const rawQty = Number(item.quantity);
+      if (!Number.isFinite(rawQty) || !Number.isInteger(rawQty) || rawQty < 1 || rawQty > 50) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Invalid quantity for "${item.product_name}". Quantity must be a whole number between 1 and 50.`,
+          },
+          { status: 400 }
+        );
+      }
+      const quantity = rawQty;
+      const cumulativeQty = (requestedQtyByProduct.get(item.product_id) || 0) + quantity;
+      requestedQtyByProduct.set(item.product_id, cumulativeQty);
+
+      if (verified.inDb && verified.stockCount !== null && verified.stockCount < cumulativeQty) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Insufficient stock for "${item.product_name}". Only ${verified.stockCount} available.`,
+          },
+          { status: 400 }
+        );
+      }
+
       const totalPrice = verifiedPrice * quantity;
       rawSubtotal += totalPrice;
 
       sanitizedItems.push({
-        product_id: item.product_id,
+        product_id: verified.inDb ? item.product_id : undefined,
         product_name: item.product_name,
-        image_url: item.image_url || "/images/placeholder.jpg",
+        image_url: item.image_url || "/images/botanical_flowers.jpg",
         size: item.size || "Standard",
         color: item.color || "Default",
         tailored_blouse: Boolean(item.tailored_blouse),
@@ -335,7 +369,7 @@ export async function POST(request: Request) {
       courier_partner: postalCode.startsWith("395")
         ? "Avsaraa Dedicated Surat Courier"
         : "Blue Dart Express Gujarat",
-      tracking_number: `BLUEDART-${Math.floor(100000000 + Math.random() * 900000000)}`,
+      tracking_number: `BLUEDART-${crypto.randomInt(100000000, 999999999)}`,
       estimated_delivery: estDelivery.toISOString(),
     };
 
@@ -356,12 +390,7 @@ export async function POST(request: Request) {
 
     createdOrder = dbOrder as Order;
 
-    // Single-use proof token deduplication: consume tokens upon order creation
-    if (body.verification_tokens) {
-      await consumeContactProofTokens(body.verification_tokens, adminClient);
-    }
-
-    // Insert order items
+    // Insert order items (rollback order row on failure so no orphaned orders remain)
     const itemsToInsert = sanitizedItems.map((item) => ({
       order_id: dbOrder.id,
       ...item,
@@ -372,7 +401,8 @@ export async function POST(request: Request) {
       .insert(itemsToInsert)
       .select();
 
-    if (itemsErr || !dbItems) {
+    if (itemsErr || !dbItems || dbItems.length === 0) {
+      await adminClient.from("orders").delete().eq("id", dbOrder.id);
       throw new Error(
         `Failed to create order items in database: ${itemsErr?.message || "Insert returned no order items."}`
       );
@@ -380,13 +410,46 @@ export async function POST(request: Request) {
 
     createdItems = dbItems as OrderItem[];
 
+    // Atomically deduct inventory stock BEFORE consuming single-use tokens/coupons or sending emails (AVS-004 / AVS-005)
+    const dbProductIds = new Set(
+      Array.from(priceMap.entries())
+        .filter(([, meta]) => meta.inDb)
+        .map(([id]) => id)
+    );
+    const dbBackedItems = sanitizedItems.filter((item) => item.product_id && dbProductIds.has(item.product_id));
+    if (dbBackedItems.length > 0) {
+      const invResult = await deductInventory(adminClient, dbBackedItems);
+      if (!invResult.success) {
+        // Restore any subset that succeeded before the failed product to maintain exact stock invariant
+        const failedIds = new Set(invResult.failedProducts.map((f) => f.productId));
+        for (const item of dbBackedItems) {
+          if (item.product_id && !failedIds.has(item.product_id)) {
+            await adminClient.rpc("increment_stock", { p_id: item.product_id, p_qty: item.quantity });
+          }
+        }
+        await adminClient.from("orders").delete().eq("id", dbOrder.id);
+        return NextResponse.json(
+          {
+            success: false,
+            message: "One or more selected pieces just sold out. Your order was not placed.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Single-use proof token deduplication: consume tokens only after stock deduction succeeds
+    if (body.verification_tokens) {
+      await consumeContactProofTokens(body.verification_tokens, adminClient);
+    }
+
     // Insert payment record
     await adminClient.from("payments").insert({
       order_id: dbOrder.id,
       gateway: isCOD ? "Cash on Delivery" : payment_method,
       transaction_id: isCOD
         ? `COD-${orderNumber}`
-        : `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+        : `TXN-${crypto.randomBytes(6).toString("hex").toUpperCase()}`,
       amount: financials.totalAmount,
       currency: "INR",
       status: paymentStatus,
@@ -399,13 +462,6 @@ export async function POST(request: Request) {
         notes,
       },
     });
-
-    // Deduct inventory stock (AVS-004 / AVS-005)
-    try {
-      await deductInventory(adminClient, sanitizedItems);
-    } catch (invErr) {
-      console.warn("Notice: Inventory stock deduction error:", invErr);
-    }
 
     // Increment coupon used_count on successful placement, guarded by usage limits (AVS-006)
     if (validatedCoupon) {

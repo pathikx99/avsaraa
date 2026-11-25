@@ -70,7 +70,30 @@ export async function POST(
     const nowIso = new Date().toISOString();
     const cancelNote = `\n[Cancelled on ${new Date().toLocaleDateString("en-IN")}] Reason: ${reason || "Customer requested cancellation"}`;
 
-    // Restore inventory stock
+    // Atomic conditional transition prevents concurrent double cancellation / duplicate stock restoration
+    const { data: updatedOrder, error: updateErr } = await adminClient
+      .from("orders")
+      .update({
+        order_status: "Cancelled",
+        payment_status: order.payment_status === "Paid" ? "Refunded" : order.payment_status,
+        notes: order.notes ? `${order.notes}${cancelNote}` : cancelNote.trim(),
+        updated_at: nowIso,
+      })
+      .eq("id", order.id)
+      .neq("order_status", "Cancelled")
+      .select()
+      .maybeSingle();
+
+    if (updateErr) throw updateErr;
+
+    if (!updatedOrder) {
+      return NextResponse.json(
+        { success: false, message: "Order was already cancelled." },
+        { status: 409 }
+      );
+    }
+
+    // Restore inventory stock only for the winning transition
     try {
       const { data: items } = await adminClient
         .from("order_items")
@@ -84,20 +107,6 @@ export async function POST(
         }
       }
     } catch {}
-
-    const { data: updatedOrder, error: updateErr } = await adminClient
-      .from("orders")
-      .update({
-        order_status: "Cancelled",
-        payment_status: order.payment_status === "Paid" ? "Refunded" : order.payment_status,
-        notes: order.notes ? `${order.notes}${cancelNote}` : cancelNote.trim(),
-        updated_at: nowIso,
-      })
-      .eq("id", order.id)
-      .select()
-      .single();
-
-    if (updateErr) throw updateErr;
 
     // Audit edit record
     await adminClient.from("order_edits").insert({

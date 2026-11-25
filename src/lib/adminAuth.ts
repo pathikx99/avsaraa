@@ -96,24 +96,53 @@ export async function authenticateAdminRequest(): Promise<AdminAuthResult> {
     }
 
     if (user) {
-      const userEmail = user.email?.toLowerCase().trim();
+      const isGoogleOAuth = user.app_metadata?.provider === "google";
+      const appRole = typeof user.app_metadata?.role === "string" ? user.app_metadata.role.toLowerCase() : "";
+      const hasAdminAppRole = appRole === "super_admin" || appRole === "admin";
+      const hasConfirmedEmail = Boolean(user.email_confirmed_at) || isGoogleOAuth || hasAdminAppRole;
+
+      if (!hasConfirmedEmail) {
+        return {
+          authorized: false,
+          status: 401,
+          error: "Unauthorized: Verified email confirmation is required for administrative access.",
+        };
+      }
+
+      const userEmail = user.email?.toLowerCase().trim() || "";
       const adminClient = getAdminSupabaseClient();
 
-      // Check admin_users table for active Super Admin
-      const { data: adminRecord, error: adminQueryErr } = await adminClient
+      // Check admin_users table for active Super Admin (separate parameterized lookups avoid injection)
+      let adminRecord: AdminUser | null = null;
+      const { data: byUserId } = await adminClient
         .from("admin_users")
         .select("*")
-        .or(`user_id.eq.${user.id},email.eq.${userEmail}`)
+        .eq("user_id", user.id)
         .eq("status", "Active")
         .eq("role", "Super Admin")
         .maybeSingle();
 
-      if (!adminQueryErr && adminRecord) {
+      if (byUserId) {
+        adminRecord = byUserId as AdminUser;
+      } else if (userEmail) {
+        const { data: byEmail } = await adminClient
+          .from("admin_users")
+          .select("*")
+          .eq("email", userEmail)
+          .eq("status", "Active")
+          .eq("role", "Super Admin")
+          .maybeSingle();
+        if (byEmail) {
+          adminRecord = byEmail as AdminUser;
+        }
+      }
+
+      if (adminRecord) {
         return {
           authorized: true,
           status: 200,
           user,
-          adminProfile: adminRecord as AdminUser,
+          adminProfile: adminRecord,
         };
       }
 

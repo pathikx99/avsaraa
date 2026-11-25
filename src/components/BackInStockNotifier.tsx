@@ -60,8 +60,6 @@ export default function BackInStockNotifier({
     } catch {
       setStatus("error");
       setMessage("Network error. Please try again.");
-    } finally {
-      setStatus("idle");
     }
   };
 

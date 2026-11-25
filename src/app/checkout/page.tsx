@@ -208,30 +208,16 @@ export default function CheckoutPage() {
 
         // Check profile for verified phone
         try {
-          let profData = null;
-          const { data: prof, error: profErr } = await supabase
+          const { data: profData } = await supabase
             .from("profiles")
-            .select("phone_number, phone_verified")
+            .select("*")
             .eq("id", data.user.id)
             .maybeSingle();
 
-          if (profErr) {
-            const fallback = await supabase
-              .from("profiles")
-              .select("phone_number")
-              .eq("id", data.user.id)
-              .maybeSingle();
-            profData = fallback.data;
-          } else {
-            profData = prof;
-          }
-
           if (profData?.phone_number) {
-            const hasVerifiedFlag = Boolean((profData as any)?.phone_verified);
-            const isUserPhoneConfirmed = Boolean(
-              data.user.phone_confirmed_at ||
-              (data.user.user_metadata as any)?.auth_provider === "whatsapp_otp"
-            );
+            const profileRecord = profData as { phone_number?: string | null; phone_verified?: boolean | null };
+            const hasVerifiedFlag = Boolean(profileRecord.phone_verified);
+            const isUserPhoneConfirmed = Boolean(data.user.phone_confirmed_at);
             if (hasVerifiedFlag || isUserPhoneConfirmed) {
               setVerifiedProfilePhone(profData.phone_number);
             }
@@ -355,10 +341,10 @@ export default function CheckoutPage() {
     setErrorMessage(null);
 
     try {
-      const { data, error } = await supabase
-        .from("addresses")
-        .insert({
-          user_id: user.id,
+      const saveRes = await fetch("/api/customer/addresses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           recipient_name: newAddress.recipient_name.trim(),
           phone_number: newAddress.phone_number.trim(),
           address_line1: newAddress.address_line1.trim(),
@@ -370,12 +356,13 @@ export default function CheckoutPage() {
           country: "India",
           address_type: newAddress.address_type,
           is_default: addresses.length === 0 ? true : newAddress.is_default,
-        })
-        .select()
-        .single();
+        }),
+      });
+      const saveJson = await saveRes.json().catch(() => null);
+      const data = saveJson?.address;
 
-      if (error) {
-        console.warn("Could not persist address to database profile:", error.message);
+      if (!saveRes.ok || !data) {
+        console.warn("Could not persist address to database profile:", saveJson?.error || saveRes.status);
         // Resilient fallback: set address in local state so checkout is never blocked
         const localAddr: AddressItem = {
           id: `local-addr-${Date.now()}`,
@@ -460,6 +447,8 @@ export default function CheckoutPage() {
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
 
   // Address completeness check for both registered users & guests
+  const isNewAddressPinValid = isValidGujaratPincode(newAddress.postal_code.trim());
+  const isNewAddressStateValid = newAddress.state.trim().toLowerCase() === "gujarat";
   const isGuestAddressFilled = Boolean(
     newAddress.recipient_name.trim() &&
     newAddress.phone_number.trim() &&
@@ -469,7 +458,16 @@ export default function CheckoutPage() {
     newAddress.postal_code.trim()
   );
 
-  const hasValidAddress = Boolean(selectedAddressId || (isAddingNewAddress && isGuestAddressFilled));
+  const selectedAddressObj = addresses.find((a) => a.id === selectedAddressId) || null;
+  const isSelectedAddressValid = Boolean(
+    selectedAddressObj &&
+    isValidGujaratPincode(selectedAddressObj.postal_code) &&
+    selectedAddressObj.state.trim().toLowerCase() === "gujarat"
+  );
+
+  const hasValidAddress = isAddingNewAddress
+    ? isGuestAddressFilled && isNewAddressPinValid && isNewAddressStateValid
+    : isSelectedAddressValid;
 
   // Send WhatsApp Phone OTP
   const handleSendPhoneOtp = async (contactNumber?: string) => {
@@ -670,20 +668,31 @@ export default function CheckoutPage() {
       if (typeof window === "undefined") return resolve(false);
       if (window.Razorpay) return resolve(true);
 
-      const existingScript = document.querySelector(
+      const existingScript = document.querySelector<HTMLScriptElement>(
         'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
       );
       if (existingScript) {
-        existingScript.addEventListener("load", () => resolve(true));
-        existingScript.addEventListener("error", () => resolve(false));
-        return;
+        if (existingScript.dataset.status === "loading") {
+          existingScript.addEventListener("load", () => resolve(Boolean(window.Razorpay)), { once: true });
+          existingScript.addEventListener("error", () => resolve(false), { once: true });
+          return;
+        }
+        existingScript.remove();
       }
 
       const script = document.createElement("script");
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
       script.async = true;
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
+      script.dataset.status = "loading";
+      script.onload = () => {
+        script.dataset.status = "loaded";
+        resolve(true);
+      };
+      script.onerror = () => {
+        script.dataset.status = "error";
+        script.remove();
+        resolve(false);
+      };
       document.body.appendChild(script);
     });
   };
@@ -813,15 +822,23 @@ export default function CheckoutPage() {
     setErrorMessage(null);
 
     try {
-      const orderItemsPayload = cartItems.map((item) => ({
-        product_id: item.product.id,
-        product_name: item.product.name,
-        image_url: resolveProductImage(item.product.image_url),
-        size: "Standard Size",
-        color: "Default",
-        unit_price: item.product.price,
-        quantity: item.quantity,
-      }));
+      const orderItemsPayload = cartItems.map((item) => {
+        const nameParts = item.product.name
+          .split(" · ")
+          .map((p) => p.trim())
+          .filter((p) => p && p !== "Pre-Order");
+        const parsedSize = nameParts[1] || "Standard Size";
+        const parsedColor = nameParts[2] || "Default";
+        return {
+          product_id: item.product.id,
+          product_name: item.product.name,
+          image_url: resolveProductImage(item.product.image_url),
+          size: parsedSize,
+          color: parsedColor,
+          unit_price: item.product.price,
+          quantity: item.quantity,
+        };
+      });
 
       const phoneNorm = normalizePhoneNumber(addressSnapshot.phone_number).normalized;
       const finalPhoneToken =
@@ -1776,6 +1793,28 @@ export default function CheckoutPage() {
                         </div>
                       </div>
 
+                      {((newAddress.postal_code.trim().length > 0 &&
+                        newAddress.postal_code.trim().length === 6 &&
+                        !isNewAddressPinValid) ||
+                        !isNewAddressStateValid) && (
+                        <p
+                          role="alert"
+                          style={{
+                            margin: "6px 0 0",
+                            fontSize: "12px",
+                            color: "#9A2226",
+                            backgroundColor: "rgba(154, 34, 38, 0.08)",
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            border: "1px solid rgba(154, 34, 38, 0.25)",
+                          }}
+                        >
+                          {!isNewAddressStateValid
+                            ? "Avsaraa currently delivers exclusively within Gujarat (pincodes 360000–399999). Please select State: Gujarat."
+                            : `PIN Code "${newAddress.postal_code.trim()}" is outside Gujarat. Avsaraa delivers exclusively within Gujarat (360000–399999).`}
+                        </p>
+                      )}
+
                       <div style={{ display: "flex", alignItems: "center", gap: "16px", marginTop: "4px" }}>
                         <div style={{ display: "flex", gap: "8px" }}>
                           {["Home", "Work", "Studio", "Other"].map((type) => (
@@ -1905,6 +1944,7 @@ export default function CheckoutPage() {
                         style={{
                           width: "18px",
                           height: "18px",
+                          flexShrink: 0,
                           borderRadius: "50%",
                           border:
                             paymentMethod === "Razorpay"
@@ -1961,6 +2001,7 @@ export default function CheckoutPage() {
                         style={{
                           width: "18px",
                           height: "18px",
+                          flexShrink: 0,
                           borderRadius: "50%",
                           border:
                             paymentMethod === "COD"
@@ -2383,7 +2424,11 @@ export default function CheckoutPage() {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>
                   <DeliveryVanIcon size={16} color="#866951" />
-                  <span>Complimentary Pan-India Insured Express Shipping</span>
+                  <span>
+                    {subtotal >= 500
+                      ? "Complimentary Insured Express Shipping across Gujarat"
+                      : "Insured Express Shipping across Gujarat (Free ₹500+)"}
+                  </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>
                   <ReturnBoxIcon size={16} color="#866951" />

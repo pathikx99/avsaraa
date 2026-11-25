@@ -314,6 +314,9 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
       assert.match(data.message, /Delivery restriction/);
     });
 
+    let createdTestOrderId = "";
+    let createdRazorpayOrderId = "";
+
     it("POST /api/razorpay/create-order creates order with valid Gujarat pincode", async () => {
       const phone = "+919876543210";
       const email = "rohan@example.com";
@@ -355,12 +358,51 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
       assert.ok(data.amount > 0);
       assert.equal(data.currency, "INR");
       assert.ok(data.order_id);
+      createdTestOrderId = data.order_id;
+      createdRazorpayOrderId = data.razorpay_order_id;
     });
 
-    it("POST /api/razorpay/verify verifies valid signature using timingSafeMatch", async () => {
+    it("POST /api/razorpay/verify rejects missing order_id or mismatched razorpay_order_id with 400", async () => {
       const secret = process.env.RAZORPAY_KEY_SECRET || "avsaraa_test_razorpay_secret_key_2026";
-      const razorpay_order_id = "order_test_999888";
-      const razorpay_payment_id = "pay_test_111222";
+      const swappedRzpOrderId = "order_swapped_mismatch_999";
+      const razorpay_payment_id = "pay_test_swapped_111";
+      const sigForSwapped = crypto
+        .createHmac("sha256", secret)
+        .update(`${swappedRzpOrderId}|${razorpay_payment_id}`)
+        .digest("hex");
+
+      // Missing order_id must fail closed
+      const missingRes = await fetch(`${BASE_URL}/api/razorpay/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          razorpay_order_id: swappedRzpOrderId,
+          razorpay_payment_id,
+          razorpay_signature: sigForSwapped,
+        }),
+      });
+      assert.equal(missingRes.status, 400);
+
+      // Valid signature from another razorpay_order_id swapped onto our order_id must fail closed
+      if (createdTestOrderId) {
+        const swapRes = await fetch(`${BASE_URL}/api/razorpay/verify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            order_id: createdTestOrderId,
+            razorpay_order_id: swappedRzpOrderId,
+            razorpay_payment_id,
+            razorpay_signature: sigForSwapped,
+          }),
+        });
+        assert.equal(swapRes.status, 400);
+      }
+    });
+
+    it("POST /api/razorpay/verify verifies bound order signature using timingSafeMatch", async () => {
+      const secret = process.env.RAZORPAY_KEY_SECRET || "avsaraa_test_razorpay_secret_key_2026";
+      const razorpay_order_id = createdRazorpayOrderId;
+      const razorpay_payment_id = `pay_test_${Date.now()}`;
       const validSignature = crypto
         .createHmac("sha256", secret)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -370,6 +412,7 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          order_id: createdTestOrderId,
           razorpay_order_id,
           razorpay_payment_id,
           razorpay_signature: validSignature,

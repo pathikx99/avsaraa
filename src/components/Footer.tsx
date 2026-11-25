@@ -205,10 +205,11 @@ export default function Footer() {
       {/* 2. Main Footer Directory */}
       <div style={{ maxWidth: "1140px", margin: "0 auto", padding: "56px 24px 36px 24px" }}>
         <div
+          className="footer-links-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "36px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: "32px",
             marginBottom: "46px",
           }}
         >
@@ -325,8 +326,8 @@ export default function Footer() {
                 <DeliveryVanIcon size={20} color="#866951" />
               </div>
             </div>
-            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Free Shipping</h4>
-            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Free delivery on all orders across India</p>
+            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Free Shipping ₹500+</h4>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Complimentary delivery above ₹500</p>
           </div>
 
           <div>

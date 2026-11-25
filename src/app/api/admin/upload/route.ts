@@ -96,6 +96,11 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
+  const auth = await authenticateAdminRequest();
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
+
   const provider = getActiveStorageProvider();
   return NextResponse.json({
     activeProvider: provider,

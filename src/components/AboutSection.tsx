@@ -71,7 +71,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
                 lineHeight: 1.8,
               }}
             >
-              Avsaraa is rooted in Surat, the textile heart of India. We craft and curate authentic ethnic wear, festive ensembles, and handloom sarees, bringing timeless Indian craftsmanship directly to your doorstep with insured delivery across India.
+              Avsaraa is rooted in Surat, the textile heart of India. We craft and curate authentic ethnic wear, festive ensembles, and handloom sarees, bringing timeless Indian craftsmanship directly to your doorstep with insured express delivery across Gujarat.
             </p>
           </div>
         )}
@@ -80,7 +80,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
             gap: "16px",
             marginBottom: "54px",
           }}

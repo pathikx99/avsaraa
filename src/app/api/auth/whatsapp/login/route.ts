@@ -137,8 +137,11 @@ export async function POST(request: Request) {
     let displayName = fullName?.trim() || "Avsaraa Patron";
 
     const matchedProfile = existingProfiles?.[0];
+    // Require confirmed phone ownership (phone_verified === true) or synthetic WhatsApp email
+    // to prevent unverified phone pre-hijacking via profile/registration forms.
     const isVerifiedPhoneMatch = Boolean(
-      matchedProfile?.phone_number === normalizedPhone
+      matchedProfile?.phone_number === normalizedPhone &&
+      matchedProfile?.phone_verified === true
     );
     const isSyntheticEmailMatch = Boolean(matchedProfile?.email === syntheticEmail);
 

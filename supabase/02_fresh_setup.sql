@@ -147,6 +147,7 @@ CREATE TABLE public.profiles (
     status TEXT DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Suspended')),
     membership_tier TEXT DEFAULT 'Standard' CHECK (membership_tier IN ('Standard', 'Privilege', 'Atelier Circle', 'VIP')),
     reward_points INTEGER DEFAULT 0 CHECK (reward_points >= 0),
+    store_credit_cents INTEGER DEFAULT 0 CHECK (store_credit_cents >= 0),
     preferred_currency TEXT DEFAULT 'INR',
     concierge_notes TEXT,
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
@@ -158,6 +159,9 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 CREATE UNIQUE INDEX idx_profiles_phone_number_unique 
     ON public.profiles (phone_number) 
     WHERE phone_number IS NOT NULL AND phone_number <> '';
+
+CREATE INDEX IF NOT EXISTS idx_profiles_phone_verification 
+    ON public.profiles (phone_number, phone_verified);
 
 CREATE POLICY "Users can view their own profile or admin can view all" 
     ON public.profiles FOR SELECT 
@@ -249,18 +253,32 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 
 CREATE OR REPLACE FUNCTION public.protect_profile_fields()
 RETURNS TRIGGER AS $$
+DECLARE
+    caller_role TEXT := COALESCE(NULLIF(current_setting('request.jwt.claim.role', true), ''), auth.role(), '');
 BEGIN
-    IF NOT public.is_admin() THEN
-        NEW.membership_tier := OLD.membership_tier;
-        NEW.reward_points := OLD.reward_points;
-        NEW.status := OLD.status;
+    IF caller_role IN ('anon', 'authenticated') AND NOT public.is_admin() THEN
+        IF TG_OP = 'INSERT' THEN
+            NEW.membership_tier := 'Standard';
+            NEW.reward_points := 100;
+            NEW.status := 'Active';
+            NEW.phone_verified := false;
+            NEW.phone_verified_at := NULL;
+            NEW.store_credit_cents := 0;
+        ELSIF TG_OP = 'UPDATE' THEN
+            NEW.membership_tier := OLD.membership_tier;
+            NEW.reward_points := OLD.reward_points;
+            NEW.status := OLD.status;
+            NEW.phone_verified := OLD.phone_verified;
+            NEW.phone_verified_at := OLD.phone_verified_at;
+            NEW.store_credit_cents := OLD.store_credit_cents;
+        END IF;
     END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 CREATE OR REPLACE TRIGGER protect_profile_fields_trigger
-    BEFORE UPDATE ON public.profiles
+    BEFORE INSERT OR UPDATE ON public.profiles
     FOR EACH ROW EXECUTE FUNCTION public.protect_profile_fields();
 
 CREATE OR REPLACE FUNCTION public.check_phone_exists(phone_to_check TEXT, current_user_id UUID DEFAULT NULL)
@@ -756,6 +774,7 @@ CREATE OR REPLACE FUNCTION public.create_checkout_order(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_order_id UUID;
@@ -866,7 +885,7 @@ BEGIN
     IF p_coupon_code IS NOT NULL THEN
         UPDATE public.coupons
         SET used_count = used_count + 1
-        WHERE ilike(code, p_coupon_code);
+        WHERE code ILIKE p_coupon_code;
     END IF;
 
     RETURN jsonb_build_object(
@@ -881,6 +900,7 @@ CREATE OR REPLACE FUNCTION public.cleanup_abandoned_orders()
 RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_order RECORD;
@@ -981,7 +1001,7 @@ CREATE TABLE IF NOT EXISTS public.gift_cards (
 
 ALTER TABLE public.gift_cards ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Gift cards viewable by buyer or admin" ON public.gift_cards FOR SELECT USING (auth.uid() = buyer_id OR public.is_admin());
-CREATE POLICY "Anyone can insert gift cards" ON public.gift_cards FOR INSERT WITH CHECK (true);
+CREATE POLICY "Super admin can insert gift cards" ON public.gift_cards FOR INSERT WITH CHECK (public.is_admin());
 CREATE POLICY "Super admin manages gift cards" ON public.gift_cards FOR ALL USING (public.is_admin());
 
 CREATE TABLE IF NOT EXISTS public.gift_card_transactions (
@@ -1121,6 +1141,9 @@ ALTER TABLE public.otp_codes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Super admin manages OTP codes" ON public.otp_codes FOR ALL USING (public.is_admin());
 CREATE INDEX IF NOT EXISTS idx_otp_codes_contact ON public.otp_codes(contact);
 CREATE INDEX IF NOT EXISTS idx_otp_codes_expires_at ON public.otp_codes(expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_otp_codes_proof_hash
+    ON public.otp_codes(otp_hash)
+    WHERE channel = 'proof_token';
 
 -- ------------------------------------------------------------------------------
 -- 28. RATE LIMIT COUNTERS (database-backed for serverless-safe rate limiting)
@@ -1149,6 +1172,7 @@ CREATE OR REPLACE FUNCTION public.increment_stock(
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 BEGIN
     UPDATE public.products
@@ -1168,6 +1192,7 @@ CREATE OR REPLACE FUNCTION public.deduct_stock_atomic(
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_current_stock INTEGER;
@@ -1195,15 +1220,75 @@ END;
 $$;
 
 -- ------------------------------------------------------------------------------
--- 24. POSTGRES TABLE & SEQUENCE PRIVILEGES (ESSENTIAL FOR POSTGREST & RLS)
+-- 30. GUEST CHECKOUT PATRON SEED (satisfies FK constraints for guest orders)
+-- ------------------------------------------------------------------------------
+DO $$
+BEGIN
+    BEGIN
+        INSERT INTO auth.users (
+            id,
+            instance_id,
+            aud,
+            role,
+            email,
+            encrypted_password,
+            email_confirmed_at,
+            raw_app_meta_data,
+            raw_user_meta_data,
+            created_at,
+            updated_at
+        ) VALUES (
+            '7a3b2e24-820f-4706-8cc3-4218b42b0da3',
+            '00000000-0000-0000-0000-000000000000',
+            'authenticated',
+            'authenticated',
+            'guest@avsaraa.in',
+            '',
+            TIMEZONE('utc', NOW()),
+            '{"provider":"system","providers":["system"]}'::jsonb,
+            '{"full_name":"Guest Checkout Patron"}'::jsonb,
+            TIMEZONE('utc', NOW()),
+            TIMEZONE('utc', NOW())
+        ) ON CONFLICT (id) DO NOTHING;
+    EXCEPTION WHEN OTHERS THEN
+        NULL;
+    END;
+
+    IF EXISTS (SELECT 1 FROM auth.users WHERE id = '7a3b2e24-820f-4706-8cc3-4218b42b0da3') THEN
+        INSERT INTO public.profiles (
+            id,
+            full_name,
+            email,
+            status,
+            membership_tier,
+            reward_points
+        ) VALUES (
+            '7a3b2e24-820f-4706-8cc3-4218b42b0da3',
+            'Guest Checkout Patron',
+            'guest@avsaraa.in',
+            'Active',
+            'Standard',
+            0
+        ) ON CONFLICT (id) DO NOTHING;
+    END IF;
+END $$;
+
+-- ------------------------------------------------------------------------------
+-- 31. POSTGRES TABLE & SEQUENCE PRIVILEGES (ESSENTIAL FOR POSTGREST & RLS)
 -- ------------------------------------------------------------------------------
 -- Grants table and sequence access to Supabase system roles so RLS policies
 -- are evaluated properly instead of failing with PostgreSQL 42501 (permission denied).
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, service_role;
-GRANT ALL ON ALL ROUTINES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO postgres, service_role;
+
+-- Restrict sensitive SECURITY DEFINER RPCs strictly to server service_role
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.check_phone_exists(TEXT, UUID) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.check_email_exists(TEXT, UUID) TO anon, authenticated, service_role;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO postgres, service_role;

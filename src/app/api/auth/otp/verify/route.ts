@@ -99,10 +99,24 @@ export async function POST(request: Request) {
         .eq("consumed", false);
     }
 
-    // Resolve purpose and issue tamper-proof proof token
-    const resolvedPurpose: ContactPurpose =
-      (purpose as ContactPurpose) ||
-      (isEmail ? "order_email" : "order_phone");
+    // Resolve and validate allowed purpose before signing proof token
+    const ALLOWED_PURPOSES: ReadonlyArray<ContactPurpose> = [
+      "phone",
+      "email",
+      "order_phone",
+      "order_email",
+    ];
+    let resolvedPurpose: ContactPurpose = isEmail ? "order_email" : "order_phone";
+    if (purpose !== undefined && purpose !== null && String(purpose).trim() !== "") {
+      const cleanPurpose = String(purpose).trim() as ContactPurpose;
+      if (!ALLOWED_PURPOSES.includes(cleanPurpose)) {
+        return NextResponse.json(
+          { success: false, error: "Invalid verification purpose." },
+          { status: 400 }
+        );
+      }
+      resolvedPurpose = cleanPurpose;
+    }
 
     const proofToken = issueContactProofToken(cleanContact, resolvedPurpose);
 

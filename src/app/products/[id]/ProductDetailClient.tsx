@@ -844,7 +844,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       </header>
 
       {/* Main Container */}
-      <main style={{ maxWidth: "1240px", margin: "0 auto", paddingBottom: "90px" }}>
+      <main className="product-page-main" style={{ maxWidth: "1240px", margin: "0 auto", paddingBottom: "90px" }}>
         
         {/* Editorial Breadcrumbs */}
         <div
@@ -1172,7 +1172,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 <button
                   key={`${img}-${idx}`}
                   type="button"
-                  onClick={() => setSelectedImageIndex(idx)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedImageIndex(idx);
+                  }}
+                  aria-pressed={selectedImageIndex === idx}
                   aria-label={`View photo ${idx + 1}`}
                   style={{
                     position: "relative",
@@ -1324,7 +1328,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             </div>
 
             <p style={{ fontSize: "12px", color: "#6E5B4E", marginBottom: "14px" }}>
-              Inclusive of all taxes · Fall &amp; Pico Included · Free Pan-India Delivery
+              Inclusive of all taxes · Fall &amp; Pico Included · Free Gujarat Delivery ₹500+
             </p>
 
             {/* Short Product Description (2-3 lines) */}
@@ -1869,12 +1873,12 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
               {!preOrderMode ? (
                 <>
-                  {/* ADD TO CART BUTTON */}
+                  {/* ADD TO BAG BUTTON */}
                   <button
                     type="button"
                     onClick={handleAddToCart}
                     disabled={isCurrentVariantOutOfStock}
-                    aria-label={isCurrentVariantOutOfStock ? "Out of Stock" : "Add to Cart"}
+                    aria-label={isCurrentVariantOutOfStock ? "Out of Stock" : "Add to Bag"}
                     className="btn-shine"
                     style={{
                       height: "52px",
@@ -1896,7 +1900,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     }}
                   >
                     <ShoppingBagIcon size={16} color={isCurrentVariantOutOfStock ? "#866951" : isAddedToCart ? "#FFFFFF" : "#261B13"} />
-                    <span>{isCurrentVariantOutOfStock ? "OUT OF STOCK" : isAddedToCart ? "ADDED TO BAG ✓" : "ADD TO CART"}</span>
+                    <span>{isCurrentVariantOutOfStock ? "OUT OF STOCK" : isAddedToCart ? "ADDED TO BAG ✓" : "ADD TO BAG"}</span>
                   </button>
 
                   {/* BUY NOW BUTTON */}
@@ -2051,7 +2055,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 <div>
                   <div style={{ fontSize: "12px", fontWeight: 600, color: "#261B13" }}>FREE SHIPPING</div>
                   <div style={{ fontSize: "10.5px", color: "#6E5B4E", marginTop: "2px", lineHeight: 1.35 }}>
-                    Free shipping on orders across India
+                    Free shipping on Gujarat orders of ₹500+
                   </div>
                 </div>
               </div>
@@ -2180,7 +2184,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
                   <div style={{ maxWidth: "260px" }}>
                     <p style={{ fontSize: "12.5px", color: "#261B13", margin: "0 0 3px 0", lineHeight: "1.4" }}>
-                      Order within to guarantee dispatch{" "}
+                      Order before the timer ends for guaranteed dispatch on{" "}
                       <strong style={{ color: "#866951" }}>{expressCountdown.targetDateFormatted}</strong>:
                     </p>
                     <p style={{ fontSize: "11px", color: "#6E5B4E", margin: 0 }}>
@@ -2987,6 +2991,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: 1 }}>
           <div
+            className="sticky-bar-thumb"
             style={{
               position: "relative",
               width: "42px",
@@ -3017,6 +3022,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 {formatINR(currentPrice)}
               </span>
               <span
+                className="sticky-bar-size-badge"
                 style={{
                   fontSize: "10px",
                   backgroundColor: "#F3ECE1",
@@ -3032,9 +3038,10 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+        <div className="sticky-bar-actions" style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
           {/* Sticky Bar Quantity Stepper */}
           <div
+            className="sticky-bar-stepper"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -3115,8 +3122,8 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             type="button"
             onClick={handleAddToCart}
             disabled={isCurrentVariantOutOfStock}
-            aria-label="Add to Cart Sticky"
-            className="btn-shine"
+            aria-label="Add to Bag Sticky"
+            className="btn-shine sticky-bar-btn"
             style={{
               height: "44px",
               padding: "0 12px",
@@ -3140,7 +3147,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             onClick={handleBuyNow}
             disabled={isCurrentVariantOutOfStock}
             aria-label="Buy Now Sticky"
-            className="btn-shine"
+            className="btn-shine sticky-bar-btn"
             style={{
               height: "44px",
               padding: "0 14px",

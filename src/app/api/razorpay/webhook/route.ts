@@ -56,8 +56,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const event = JSON.parse(rawBody);
-    const eventId = String(event.id || event.event_id || `evt_${Date.now()}`);
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid JSON webhook payload" },
+        { status: 400 }
+      );
+    }
+
+    const payloadObj = event.payload as { payment?: { entity?: Record<string, unknown> } } | undefined;
+    const paymentEntity = payloadObj?.payment?.entity;
+    const headerEventId = request.headers.get("x-razorpay-event-id");
+    const eventId = String(
+      headerEventId ||
+      event.id ||
+      event.event_id ||
+      (paymentEntity?.id ? `${paymentEntity.id}:${String(event.event || "evt")}` : `evt_${Date.now()}`)
+    );
 
     // 2. Webhook Deduplication: Handle Code 23505 primary key constraint conflict
     if (processedWebhooksMemory.has(eventId)) {
@@ -69,6 +86,18 @@ export async function POST(request: Request) {
     }
 
     const adminClient = getAdminSupabaseClient();
+    const resolveOrderUuid = async (rawOrderId: string): Promise<string> => {
+      const cleanId = String(rawOrderId).trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
+      if (isUuid) return cleanId;
+      const { data: matchedOrder } = await adminClient
+        .from("orders")
+        .select("id")
+        .eq("order_number", cleanId)
+        .maybeSingle();
+      return matchedOrder?.id || cleanId;
+    };
+
     try {
       const { error: dedupErr } = await adminClient.from("processed_webhooks").insert({
         webhook_id: eventId,
@@ -77,49 +106,56 @@ export async function POST(request: Request) {
         processed_at: new Date().toISOString(),
       });
 
-      if (dedupErr) {
-        if (dedupErr.code === "23505") {
-          return NextResponse.json({
-            success: true,
-            message: "Duplicate webhook event acknowledged without re-processing.",
-            eventId,
-          });
-        }
+      if (dedupErr && dedupErr.code === "23505") {
+        processedWebhooksMemory.add(eventId);
+        return NextResponse.json({
+          success: true,
+          message: "Duplicate webhook event acknowledged without re-processing.",
+          eventId,
+        });
       }
     } catch {
       // Table may not exist in mock/fallback; memory dedup handles it
     }
 
-    processedWebhooksMemory.add(eventId);
-
     // 3. Process Payment Event
     if (event.event === "payment.captured" || event.event === "order.paid") {
-      const paymentEntity = event.payload?.payment?.entity;
-      const notes = paymentEntity?.notes || {};
+      const notes = (paymentEntity?.notes || {}) as Record<string, string | undefined>;
       const orderId = notes.order_id || notes.orderId;
 
       if (orderId) {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
-        let actualOrderId = orderId;
+        const actualOrderId = await resolveOrderUuid(orderId);
 
-        if (!isUuid) {
-          const { data: matchedOrder } = await adminClient
-            .from("orders")
-            .select("id")
-            .eq("order_number", orderId)
-            .maybeSingle();
-
-          if (matchedOrder?.id) {
-            actualOrderId = matchedOrder.id;
-          }
-        }
-
-        // Amount Verification: Prevent partial or underpaid payment capture
+        // Order-payment binding & amount validation
+        const webhookRzpOrderId = paymentEntity?.order_id ? String(paymentEntity.order_id) : null;
         const { data: existingOrder } = await adminClient
           .from("orders")
-          .select("id, total_amount, payment_status")
+          .select("id, total_amount, payment_status, shipping_address_snapshot")
           .eq("id", actualOrderId)
           .maybeSingle();
+
+        if (webhookRzpOrderId) {
+          const { data: orderPayments } = await adminClient
+            .from("payments")
+            .select("id, transaction_id, raw_payload")
+            .eq("order_id", actualOrderId);
+          const snapRzpId = (
+            existingOrder?.shipping_address_snapshot as { razorpay_order_id?: string } | null
+          )?.razorpay_order_id;
+          const hasPaymentBinding = Boolean(
+            orderPayments?.some((p) => {
+              const raw = (p.raw_payload || {}) as Record<string, unknown>;
+              return p.transaction_id === webhookRzpOrderId || raw.razorpay_order_id === webhookRzpOrderId;
+            })
+          );
+          const hasSnapshotBinding = Boolean(snapRzpId && snapRzpId === webhookRzpOrderId);
+          if ((orderPayments && orderPayments.length > 0 && !hasPaymentBinding) || (snapRzpId && !hasSnapshotBinding)) {
+            return NextResponse.json(
+              { success: false, error: "Webhook razorpay_order_id does not match target order." },
+              { status: 400 }
+            );
+          }
+        }
 
         if (existingOrder) {
           const paidAmountPaise = Number(paymentEntity?.amount || 0);
@@ -163,15 +199,39 @@ export async function POST(request: Request) {
 
         if (updatedOrder) {
           // This webhook won the race: record payment and trigger emails
-          await adminClient.from("payments").insert({
-            order_id: actualOrderId,
-            gateway: "Razorpay Webhook",
-            transaction_id: paymentEntity.id || `TXN_${Date.now()}`,
-            amount: (paymentEntity.amount || 0) / 100,
-            currency: paymentEntity.currency || "INR",
-            status: "Paid",
-            raw_payload: event,
-          });
+          const webhookTxnId = String(paymentEntity?.id || `TXN_${Date.now()}`);
+          const { data: pendingPayment } = webhookRzpOrderId
+            ? await adminClient
+                .from("payments")
+                .select("id")
+                .eq("order_id", actualOrderId)
+                .eq("transaction_id", webhookRzpOrderId)
+                .maybeSingle()
+            : { data: null };
+
+          if (pendingPayment?.id) {
+            await adminClient
+              .from("payments")
+              .update({
+                gateway: "Razorpay Webhook",
+                transaction_id: webhookTxnId,
+                amount: Number(paymentEntity?.amount || 0) / 100,
+                currency: String(paymentEntity?.currency || "INR"),
+                status: "Paid",
+                raw_payload: event,
+              })
+              .eq("id", pendingPayment.id);
+          } else {
+            await adminClient.from("payments").insert({
+              order_id: actualOrderId,
+              gateway: "Razorpay Webhook",
+              transaction_id: webhookTxnId,
+              amount: Number(paymentEntity?.amount || 0) / 100,
+              currency: String(paymentEntity?.currency || "INR"),
+              status: "Paid",
+              raw_payload: event,
+            });
+          }
 
           // Deduct inventory stock upon verified payment (AVS-004)
           try {
@@ -187,10 +247,9 @@ export async function POST(request: Request) {
           }
 
           // Single-use proof token deduplication: consume tokens now that payment is confirmed
-          const snapshot = updatedOrder.shipping_address_snapshot as Record<string, unknown> | null;
-          if (snapshot && typeof snapshot === "object" && "verification_tokens" in snapshot) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await consumeContactProofTokens((snapshot as any).verification_tokens, adminClient);
+          const snapshot = updatedOrder.shipping_address_snapshot as { verification_tokens?: { phone_token?: string; email_token?: string } } | null;
+          if (snapshot && typeof snapshot === "object" && snapshot.verification_tokens) {
+            await consumeContactProofTokens(snapshot.verification_tokens, adminClient);
           }
 
           // Asynchronous email dispatch (Customer GST Tax Invoice + Admin Alert)
@@ -200,25 +259,27 @@ export async function POST(request: Request) {
         }
       }
     } else if (event.event === "payment.failed") {
-      const paymentEntity = event.payload?.payment?.entity;
-      const notes = paymentEntity?.notes || {};
+      const notes = (paymentEntity?.notes || {}) as Record<string, string | undefined>;
       const orderId = notes.order_id || notes.orderId;
 
       if (orderId) {
         try {
+          const actualOrderId = await resolveOrderUuid(orderId);
           await adminClient
             .from("orders")
             .update({
               payment_status: "Failed",
               updated_at: new Date().toISOString(),
             })
-            .eq("id", orderId)
+            .eq("id", actualOrderId)
             .neq("payment_status", "Paid");
         } catch {
           // Ignore
         }
       }
     }
+
+    processedWebhooksMemory.add(eventId);
 
     return NextResponse.json({
       success: true,

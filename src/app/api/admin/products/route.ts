@@ -129,7 +129,9 @@ export async function POST(request: Request) {
       }
 
       const sanitizedDesc = item.description ? String(item.description).trim().slice(0, 2000) : null;
-      const gallery = Array.isArray(item.gallery_images) ? item.gallery_images : [];
+      const gallery = Array.isArray(item.gallery_images)
+        ? item.gallery_images.filter((g): g is string => typeof g === "string" && SAFE_URL_REGEX.test(g.trim()))
+        : [];
 
       const insertPayload: Record<string, unknown> = {
         name: name.trim(),
@@ -187,7 +189,12 @@ export async function POST(request: Request) {
       }
       if (item.mrp !== undefined) insertPayload.mrp = Number(item.mrp) || numericPrice;
       if (item.discount_percent !== undefined) insertPayload.discount_percent = Number(item.discount_percent);
-      if (item.video_url) insertPayload.video_url = String(item.video_url).trim();
+      if (item.video_url) {
+        const cleanVideo = String(item.video_url).trim();
+        if (SAFE_URL_REGEX.test(cleanVideo)) {
+          insertPayload.video_url = cleanVideo;
+        }
+      }
       if (Array.isArray(item.highlights)) insertPayload.highlights = item.highlights;
 
       validatedPayloads.push(insertPayload);
@@ -304,7 +311,9 @@ export async function PUT(request: Request) {
 
     if (body.product_type !== undefined) updatePayload.product_type = body.product_type;
     if (Array.isArray(body.occasion_tags)) updatePayload.occasion_tags = body.occasion_tags;
-    const putGallery = Array.isArray(body.gallery_images) ? body.gallery_images : [];
+    const putGallery: string[] = Array.isArray(body.gallery_images)
+      ? body.gallery_images.filter((g: unknown): g is string => typeof g === "string" && SAFE_URL_REGEX.test(g.trim()))
+      : [];
     if (Array.isArray(body.gallery_images)) updatePayload.gallery_images = putGallery;
 
     let putColors = body.color_variants;
@@ -339,7 +348,16 @@ export async function PUT(request: Request) {
     if (body.discount_percent !== undefined) updatePayload.discount_percent = Number(body.discount_percent);
     if (body.fabric !== undefined) updatePayload.fabric = body.fabric ? String(body.fabric).trim() : null;
     if (body.weave !== undefined) updatePayload.weave = body.weave ? String(body.weave).trim() : null;
-    if (body.video_url !== undefined) updatePayload.video_url = body.video_url ? String(body.video_url).trim() : null;
+    if (body.video_url !== undefined) {
+      const cleanPutVideo = body.video_url ? String(body.video_url).trim() : null;
+      if (cleanPutVideo && !SAFE_URL_REGEX.test(cleanPutVideo)) {
+        return NextResponse.json(
+          { success: false, error: "Video URL must be a valid HTTPS URL or local asset path." },
+          { status: 400 }
+        );
+      }
+      updatePayload.video_url = cleanPutVideo;
+    }
     if (Array.isArray(body.highlights)) updatePayload.highlights = body.highlights;
 
     const { data, error } = await supabaseAdmin
@@ -416,6 +434,14 @@ export async function DELETE(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     // 1. Authorization Guard
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {

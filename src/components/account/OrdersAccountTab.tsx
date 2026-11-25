@@ -96,6 +96,11 @@ export default function OrdersAccountTab({
         quantity: item.quantity,
       }));
 
+      if (items.length === 0) {
+        showToast("No items found in this order to add back to your bag.");
+        return;
+      }
+
       const success = items.every((item) => {
         return addToCart(
           {

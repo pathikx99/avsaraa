@@ -53,20 +53,28 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
       });
 
       if (!res.ok) {
-        // Fallback to client-side insert if API endpoint is unreachable
-        const { error } = await supabase.from("contact_inquiries").insert([
-          {
-            name: fullName.trim(),
-            email: email.trim().toLowerCase(),
-            phone_number: phone.trim() || null,
-            subject: "Customer Inquiry",
-            message: message.trim(),
-            user_id: user?.id || null,
-            status: "New",
-          },
-        ]);
-        if (error) {
-          console.warn("Contact form fallback insert note:", error.message);
+        const resData = await res.json().catch(() => null);
+        // Fallback to client-side insert only if API endpoint returned 5xx/unreachable, not validation 4xx
+        if (res.status >= 500) {
+          const { error } = await supabase.from("contact_inquiries").insert([
+            {
+              full_name: fullName.trim(),
+              name: fullName.trim(),
+              email: email.trim().toLowerCase(),
+              phone_number: phone.trim() || null,
+              subject: "Customer Inquiry",
+              message: message.trim(),
+              user_id: user?.id || null,
+              status: "New",
+            },
+          ]);
+          if (error) {
+            showToast("Unable to submit your message right now. Please email contact.avsaraa@gmail.com.");
+            return;
+          }
+        } else {
+          showToast(resData?.error || "Please check your details and try again.");
+          return;
         }
       }
 
@@ -77,8 +85,7 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
       setPhone("");
       setMessage("");
     } catch {
-      setSubmitted(true);
-      showToast("Thank you! Your message has been received.");
+      showToast("Network error while sending your message. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

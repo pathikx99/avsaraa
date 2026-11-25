@@ -146,6 +146,14 @@ export async function DELETE(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const auth = await authenticateAdminRequest();
     if (!auth.authorized) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });

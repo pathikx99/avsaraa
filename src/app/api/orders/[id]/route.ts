@@ -109,16 +109,25 @@ export async function GET(
       }
     }
 
+    // Sanitize internal OTP tokens out of snapshots before sending any response
+    const stripInternalTokens = (snapshot: Record<string, unknown> | null | undefined) => {
+      if (!snapshot || typeof snapshot !== "object") return snapshot;
+      const cleaned = { ...snapshot };
+      delete cleaned.verification_tokens;
+      return cleaned;
+    };
+
     // If guest and not verified by contact, mask sensitive PII to prevent scraping
     if (isGuestOrder && !isAdmin && !isOwner && !isContactVerified) {
       const snap = order.shipping_address_snapshot || {};
       const maskedSnap = {
-        ...snap,
+        ...stripInternalTokens(snap),
         recipient_name: snap.recipient_name ? `${snap.recipient_name.slice(0, 2)}••••` : "Customer",
         phone_number: snap.phone_number ? maskPhoneNumber(snap.phone_number) : "••••••••••",
         email: snap.email ? maskEmail(snap.email) : "••••@••••",
         address_line1: snap.address_line1 ? "•••• Protected Address ••••" : "",
         address_line2: null,
+        landmark: null,
       };
 
       return NextResponse.json({
@@ -138,7 +147,10 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      order,
+      order: {
+        ...order,
+        shipping_address_snapshot: stripInternalTokens(order.shipping_address_snapshot),
+      },
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error retrieving order";
