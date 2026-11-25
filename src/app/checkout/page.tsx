@@ -21,7 +21,7 @@ import {
 } from "@/components/Icons";
 import { AddressSnapshot, PaymentMethod, Order, RazorpayFailureResponse } from "@/types/order";
 import type { User } from "@supabase/supabase-js";
-import { isValidGujaratPincode, calculateOrderTotals } from "@/lib/financials";
+import { isValidIndianPincode, calculateOrderTotals } from "@/lib/financials";
 import { normalizePhoneNumber } from "@/lib/phoneUtils";
 
 interface AddressItem {
@@ -306,10 +306,10 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Strict Geographic Enforcement: Gujarat Pincode Verification (360000–399999)
-    if (!isValidGujaratPincode(newAddress.postal_code)) {
+    // Pan-India 6-Digit Pincode Verification (100000–999999)
+    if (!isValidIndianPincode(newAddress.postal_code)) {
       setErrorMessage(
-        `Delivery restriction: Pincode "${newAddress.postal_code}" is outside Gujarat. Avsaraa delivers exclusively within Gujarat (pincodes 360000–399999).`
+        `Invalid PIN code "${newAddress.postal_code}". Please enter a valid 6-digit Indian PIN code (e.g., 395007, 400001, 110001).`
       );
       return;
     }
@@ -446,9 +446,9 @@ export default function CheckoutPage() {
   // Selected Address Snapshot
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
 
-  // Address completeness check for both registered users & guests
-  const isNewAddressPinValid = isValidGujaratPincode(newAddress.postal_code.trim());
-  const isNewAddressStateValid = newAddress.state.trim().toLowerCase() === "gujarat";
+  // Address completeness check for both registered users & guests (Pan-India delivery)
+  const isNewAddressPinValid = isValidIndianPincode(newAddress.postal_code.trim());
+  const isNewAddressStateValid = Boolean(newAddress.state.trim());
   const isGuestAddressFilled = Boolean(
     newAddress.recipient_name.trim() &&
     newAddress.phone_number.trim() &&
@@ -461,8 +461,8 @@ export default function CheckoutPage() {
   const selectedAddressObj = addresses.find((a) => a.id === selectedAddressId) || null;
   const isSelectedAddressValid = Boolean(
     selectedAddressObj &&
-    isValidGujaratPincode(selectedAddressObj.postal_code) &&
-    selectedAddressObj.state.trim().toLowerCase() === "gujarat"
+    isValidIndianPincode(selectedAddressObj.postal_code) &&
+    selectedAddressObj.state.trim()
   );
 
   const hasValidAddress = isAddingNewAddress
@@ -810,10 +810,10 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Double-check Gujarat postal code before placing
-    if (!isValidGujaratPincode(addressSnapshot.postal_code)) {
+    // Validate 6-digit Indian PIN code before placing order
+    if (!isValidIndianPincode(addressSnapshot.postal_code)) {
       setErrorMessage(
-        `Delivery restriction: Postal code ${addressSnapshot.postal_code} is outside Gujarat. Avsaraa delivers exclusively within Gujarat (360000–399999).`
+        `Invalid postal code "${addressSnapshot.postal_code}". Please enter a valid 6-digit Indian PIN code.`
       );
       return;
     }
@@ -1041,9 +1041,9 @@ export default function CheckoutPage() {
   // Trigger Place Order (With Dual-Contact Verification Gateway: WhatsApp Phone + Email)
   const handlePlaceOrder = async () => {
     const targetPin = selectedAddress?.postal_code || newAddress.postal_code;
-    if (targetPin && !isValidGujaratPincode(targetPin)) {
+    if (targetPin && !isValidIndianPincode(targetPin)) {
       setErrorMessage(
-        `Delivery restriction: Pincode "${targetPin}" is outside Gujarat. Avsaraa delivers exclusively within Gujarat (pincodes 360000–399999).`
+        `Invalid PIN code "${targetPin}". Please enter a valid 6-digit Indian PIN code (e.g., 395007, 400001, 110001).`
       );
       return;
     }
@@ -1793,10 +1793,9 @@ export default function CheckoutPage() {
                         </div>
                       </div>
 
-                      {((newAddress.postal_code.trim().length > 0 &&
+                      {newAddress.postal_code.trim().length > 0 &&
                         newAddress.postal_code.trim().length === 6 &&
-                        !isNewAddressPinValid) ||
-                        !isNewAddressStateValid) && (
+                        !isNewAddressPinValid && (
                         <p
                           role="alert"
                           style={{
@@ -1809,9 +1808,7 @@ export default function CheckoutPage() {
                             border: "1px solid rgba(154, 34, 38, 0.25)",
                           }}
                         >
-                          {!isNewAddressStateValid
-                            ? "Avsaraa currently delivers exclusively within Gujarat (pincodes 360000–399999). Please select State: Gujarat."
-                            : `PIN Code "${newAddress.postal_code.trim()}" is outside Gujarat. Avsaraa delivers exclusively within Gujarat (360000–399999).`}
+                          {`PIN Code "${newAddress.postal_code.trim()}" is invalid. Please enter a valid 6-digit Indian PIN code (100000–999999).`}
                         </p>
                       )}
 
@@ -2301,7 +2298,7 @@ export default function CheckoutPage() {
 
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#5A4535" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                    <span>Gujarat Insured Courier Delivery</span>
+                    <span>Pan-India Insured Courier Delivery</span>
                     {financials.shippingFee === 0 && (
                       <span
                         style={{
@@ -2426,8 +2423,8 @@ export default function CheckoutPage() {
                   <DeliveryVanIcon size={16} color="#866951" />
                   <span>
                     {subtotal >= 500
-                      ? "Complimentary Insured Express Shipping across Gujarat"
-                      : "Insured Express Shipping across Gujarat (Free ₹500+)"}
+                      ? "Complimentary Pan-India Insured Express Shipping"
+                      : "Insured Pan-India Express Shipping (Free ₹500+)"}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>

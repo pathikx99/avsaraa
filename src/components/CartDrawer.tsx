@@ -478,7 +478,7 @@ export default function CartDrawer() {
                   color: "#6E5B4E",
                 }}
               >
-                <span>Gujarat Insured Delivery</span>
+                <span>Pan-India Insured Delivery</span>
                 <span style={{ color: subtotal >= 500 || subtotal === 0 ? "#2E6930" : "#866951", fontWeight: 600 }}>
                   {subtotal >= 500 || subtotal === 0 ? "FREE" : "₹50 (Free ₹500+)"}
                 </span>

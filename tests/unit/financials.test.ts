@@ -5,6 +5,7 @@ import {
   computeCourierFee,
   computeCodSurcharge,
   isValidGujaratPincode,
+  isValidIndianPincode,
   computeVolumetricWeight,
   computeChargeableWeight,
   calculateOrderTotals,
@@ -50,23 +51,28 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
     assert.strictEqual(computeCodSurcharge("Razorpay"), 0);
   });
 
-  test("Gujarat pincode verification strictly enforces 360000–399999 boundary", () => {
-    // Valid Gujarat pincodes
-    assert.strictEqual(isValidGujaratPincode("395007"), true); // Surat
-    assert.strictEqual(isValidGujaratPincode("380001"), true); // Ahmedabad
-    assert.strictEqual(isValidGujaratPincode("360001"), true); // Rajkot
-    assert.strictEqual(isValidGujaratPincode(390001), true);   // Vadodara (numeric)
-    assert.strictEqual(isValidGujaratPincode("360000"), true); // Lower bound
-    assert.strictEqual(isValidGujaratPincode("399999"), true); // Upper bound
+  test("Pan-India pincode verification accepts all valid 6-digit Indian PINs (100000–999999) and Gujarat helper detects intra-state range", () => {
+    // Valid Pan-India 6-digit PINs across states
+    assert.strictEqual(isValidIndianPincode("395007"), true); // Surat
+    assert.strictEqual(isValidIndianPincode("380001"), true); // Ahmedabad
+    assert.strictEqual(isValidIndianPincode("110001"), true); // Delhi
+    assert.strictEqual(isValidIndianPincode(400001), true);   // Mumbai (numeric)
+    assert.strictEqual(isValidIndianPincode("560001"), true); // Bengaluru
+    assert.strictEqual(isValidIndianPincode("700001"), true); // Kolkata
 
-    // Invalid non-Gujarat pincodes
-    assert.strictEqual(isValidGujaratPincode("110001"), false); // Delhi
-    assert.strictEqual(isValidGujaratPincode("400001"), false); // Mumbai
-    assert.strictEqual(isValidGujaratPincode("560001"), false); // Bengaluru
-    assert.strictEqual(isValidGujaratPincode("359999"), false); // Below lower bound
-    assert.strictEqual(isValidGujaratPincode("400000"), false); // Above upper bound
-    assert.strictEqual(isValidGujaratPincode("abc"), false);
-    assert.strictEqual(isValidGujaratPincode(""), false);
+    // Invalid Indian PINs rejected
+    assert.strictEqual(isValidIndianPincode("012345"), false); // Leading 0 invalid
+    assert.strictEqual(isValidIndianPincode("12345"), false);  // Too short
+    assert.strictEqual(isValidIndianPincode("1234567"), false);// Too long
+    assert.strictEqual(isValidIndianPincode("abc"), false);
+    assert.strictEqual(isValidIndianPincode(""), false);
+
+    // Intra-state Gujarat helper still identifies 360000–399999 for GST/local dispatch
+    assert.strictEqual(isValidGujaratPincode("395007"), true);
+    assert.strictEqual(isValidGujaratPincode("360000"), true);
+    assert.strictEqual(isValidGujaratPincode("399999"), true);
+    assert.strictEqual(isValidGujaratPincode("110001"), false);
+    assert.strictEqual(isValidGujaratPincode("400001"), false);
   });
 
   test("3D Volumetric Weight and Chargeable Weight calculation", () => {

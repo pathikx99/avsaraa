@@ -5,7 +5,7 @@ import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { Order, OrderItem, OrderStatus, PaymentStatus } from "@/types/order";
 import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import {
-  isValidGujaratPincode,
+  isValidIndianPincode,
   calculateOrderTotals,
 } from "@/lib/financials";
 import { validateCouponEngine } from "@/lib/couponManager";
@@ -74,11 +74,11 @@ export async function POST(request: Request) {
     }
 
     const postalCode = shipping_address_snapshot.postal_code;
-    if (!isValidGujaratPincode(postalCode)) {
+    if (!isValidIndianPincode(postalCode)) {
       return NextResponse.json(
         {
           success: false,
-          message: `Delivery restriction: Postal code "${postalCode}" is outside Gujarat. Avsaraa currently delivers exclusively within Gujarat (360000–399999).`,
+          message: `Invalid postal code: Postal code "${postalCode || "empty"}" must be a valid 6-digit Indian PIN code.`,
         },
         { status: 400 }
       );

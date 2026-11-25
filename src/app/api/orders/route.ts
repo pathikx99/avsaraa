@@ -5,7 +5,7 @@ import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { Order, OrderItem, CreateOrderPayload, PaymentStatus, OrderStatus } from "@/types/order";
 import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import {
-  isValidGujaratPincode,
+  isValidIndianPincode,
   calculateOrderTotals,
 } from "@/lib/financials";
 import { validateCouponEngine, incrementCouponUsage } from "@/lib/couponManager";
@@ -182,13 +182,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Strict Geographic Enforcement: Gujarat Pincode Verification (360000–399999)
+    // 3. Pan-India 6-Digit PIN Code Validation
     const postalCode = shipping_address_snapshot.postal_code;
-    if (!isValidGujaratPincode(postalCode)) {
+    if (!isValidIndianPincode(postalCode)) {
       return NextResponse.json(
         {
           success: false,
-          message: `Delivery restriction: Pin code ${postalCode} is outside our Gujarat service territory. Avsaraa currently delivers exclusively within Gujarat (pincodes 360000–399999).`,
+          message: `Invalid postal code: Pin code "${postalCode || "empty"}" must be a valid 6-digit Indian PIN code.`,
         },
         { status: 400 }
       );

@@ -33,7 +33,7 @@ const POLICIES = [
     badge: "LOGISTICS & DISPATCH",
     description: "Information regarding Shiprocket courier logistics, free shipping on prepaid orders, ₹20 COD handling charge, and tracking procedures.",
     icon: <DeliveryVanIcon size={24} color="#866951" />,
-    features: ["Free Gujarat Prepaid Delivery ₹500+", "₹20 Cash on Delivery Charge", "Real-Time Courier Tracking"],
+    features: ["Free Pan-India Prepaid Delivery ₹500+", "₹20 Cash on Delivery Charge", "Real-Time Courier Tracking"],
   },
   {
     title: "Return, Exchange & Refund Policy",

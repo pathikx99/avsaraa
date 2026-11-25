@@ -8,7 +8,16 @@ export const COD_SURCHARGE = 20;
 export const GST_RATE = 0.05; // 5% inclusive GST
 
 /**
- * Validates Gujarat pincode range (360000 to 399999).
+ * Validates Indian 6-digit pincode format (100000 to 999999, Pan-India delivery).
+ */
+export function isValidIndianPincode(pincode: string | number | undefined | null): boolean {
+  if (pincode === undefined || pincode === null) return false;
+  const clean = String(pincode).trim();
+  return /^[1-9]\d{5}$/.test(clean);
+}
+
+/**
+ * Validates Gujarat pincode range (360000 to 399999) for intra-state GST & local dispatch.
  */
 export function isValidGujaratPincode(pincode: string | number | undefined | null): boolean {
   if (!pincode) return false;

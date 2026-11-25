@@ -14,7 +14,7 @@ const BENEFITS = [
       </svg>
     ),
     title: "Free Shipping ₹500+",
-    subtitle: "Complimentary priority Gujarat delivery on orders ₹500+.",
+    subtitle: "Complimentary priority Pan-India delivery on orders ₹500+.",
   },
   {
     icon: (
@@ -25,7 +25,7 @@ const BENEFITS = [
       </svg>
     ),
     title: "Cash on Delivery",
-    subtitle: "Flexible COD payment available across verified Gujarat PIN codes (₹20 COD fee).",
+    subtitle: "Flexible COD payment available across 18,000+ verified Indian PIN codes (₹20 COD fee).",
   },
   {
     icon: (

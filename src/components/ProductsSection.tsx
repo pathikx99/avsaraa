@@ -1015,7 +1015,7 @@ export default function ProductsSection({
                     marginBottom: "18px",
                   }}
                 >
-                  Inclusive of all taxes • Free Gujarat delivery ₹500+
+                  Inclusive of all taxes • Free Pan-India delivery ₹500+
                 </p>
 
                 <div

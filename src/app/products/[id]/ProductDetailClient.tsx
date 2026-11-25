@@ -8,7 +8,7 @@ import { DetailedProduct, fetchRelatedProducts } from "@/lib/productDetailData";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { formatINR } from "@/lib/productUtils";
-import { isValidGujaratPincode } from "@/lib/financials";
+import { isValidGujaratPincode, isValidIndianPincode } from "@/lib/financials";
 import BackInStockNotifier from "@/components/BackInStockNotifier";
 import { ProductReview } from "@/types/review";
 import Footer from "@/components/Footer";
@@ -488,44 +488,51 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     }
   };
 
-  // PIN Code check logic (Gujarat territory: 360000–399999)
+  // PIN Code check logic (All-India Pan-India delivery)
   const checkPinValue = (pinString: string) => {
     const cleanPin = pinString.trim();
-    if (!/^\d{6}$/.test(cleanPin)) {
+    if (!isValidIndianPincode(cleanPin)) {
       setPinResult({
         status: "invalid",
-        message: "Please enter a valid 6-digit Indian PIN code.",
-      });
-      return;
-    }
-
-    if (!isValidGujaratPincode(cleanPin)) {
-      setPinResult({
-        status: "unserviceable",
-        message: "Currently delivering exclusively across Gujarat (Pincodes 360000–399999). Rest of India launching soon.",
+        message: "Please enter a valid 6-digit Indian PIN code (100000–999999).",
       });
       return;
     }
 
     const isSurat = cleanPin.startsWith("395");
-    const isAhmedabad = cleanPin.startsWith("380");
-    const isVadodara = cleanPin.startsWith("390");
-    const isRajkot = cleanPin.startsWith("360");
+    const isGujarat = isValidGujaratPincode(cleanPin);
+    const isMumbai = cleanPin.startsWith("40");
+    const isDelhi = cleanPin.startsWith("11");
+    const isBengaluru = cleanPin.startsWith("56");
+    const isHyderabad = cleanPin.startsWith("50");
+    const isChennai = cleanPin.startsWith("60");
+    const isKolkata = cleanPin.startsWith("70");
+    const isMetro = isMumbai || isDelhi || isBengaluru || isHyderabad || isChennai || isKolkata;
 
     const date = new Date();
-    date.setDate(date.getDate() + (isSurat ? 1 : isAhmedabad ? 2 : 3));
+    date.setDate(date.getDate() + (isSurat ? 1 : isGujarat ? 2 : isMetro ? 3 : 5));
     const options: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" };
     const formattedDate = date.toLocaleDateString("en-IN", options);
 
     const detectedCity = isSurat
       ? "Surat Local Region (Next-day)"
-      : isAhmedabad
+      : cleanPin.startsWith("380")
       ? "Ahmedabad"
-      : isVadodara
-      ? "Vadodara"
-      : isRajkot
-      ? "Rajkot"
-      : "Gujarat Central";
+      : isGujarat
+      ? "Gujarat Express"
+      : isMumbai
+      ? "Mumbai"
+      : isDelhi
+      ? "Delhi NCR"
+      : isBengaluru
+      ? "Bengaluru"
+      : isHyderabad
+      ? "Hyderabad"
+      : isChennai
+      ? "Chennai"
+      : isKolkata
+      ? "Kolkata"
+      : "Pan-India Express";
 
     setPinResult({
       status: "valid",
@@ -1328,7 +1335,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             </div>
 
             <p style={{ fontSize: "12px", color: "#6E5B4E", marginBottom: "14px" }}>
-              Inclusive of all taxes · Fall &amp; Pico Included · Free Gujarat Delivery ₹500+
+              Inclusive of all taxes · Fall &amp; Pico Included · Free Pan-India Delivery ₹500+
             </p>
 
             {/* Short Product Description (2-3 lines) */}
@@ -2055,7 +2062,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 <div>
                   <div style={{ fontSize: "12px", fontWeight: 600, color: "#261B13" }}>FREE SHIPPING</div>
                   <div style={{ fontSize: "10.5px", color: "#6E5B4E", marginTop: "2px", lineHeight: 1.35 }}>
-                    Free shipping on Gujarat orders of ₹500+
+                    Free Pan-India shipping on orders ₹500+
                   </div>
                 </div>
               </div>
@@ -2284,13 +2291,13 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 </button>
               </form>
 
-              {/* Quick Select Gujarat Cities */}
+              {/* Quick Select Major Cities */}
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
                 {[
                   { city: "Surat", pin: "395007" },
-                  { city: "Ahmedabad", pin: "380001" },
-                  { city: "Vadodara", pin: "390001" },
-                  { city: "Rajkot", pin: "360001" },
+                  { city: "Mumbai", pin: "400001" },
+                  { city: "Delhi", pin: "110001" },
+                  { city: "Bengaluru", pin: "560001" },
                 ].map((item) => (
                   <button
                     key={item.pin}
@@ -2330,7 +2337,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   </div>
                   <div style={{ fontSize: "11.5px", color: "#3B5244", marginTop: "4px", lineHeight: 1.4 }}>
                     ✦ Cash on Delivery (COD) available<br />
-                    ✦ Free Express Delivery across Gujarat directly from Surat
+                    ✦ Free Express Pan-India Delivery directly from Surat (Orders ₹500+)
                   </div>
                 </div>
               )}

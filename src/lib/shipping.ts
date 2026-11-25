@@ -1,4 +1,9 @@
-import { computeChargeableWeight, computeVolumetricWeight, isValidGujaratPincode } from "@/lib/financials";
+import {
+  computeChargeableWeight,
+  computeVolumetricWeight,
+  isValidGujaratPincode,
+  isValidIndianPincode,
+} from "@/lib/financials";
 
 export interface PackagingDimension {
   lengthCm: number;
@@ -80,8 +85,9 @@ export async function getShiprocketServiceability(
 
   const { chargeableWeightKg } = calculateParcelWeights(pkg);
 
-  // Validate Gujarat geographic criteria
+  // Validate Pan-India 6-digit pincode & regional tier
   const isGujarat = isValidGujaratPincode(cleanPin);
+  const isValidPin = isValidIndianPincode(cleanPin);
 
   let result: ServiceabilityResult;
 
@@ -91,26 +97,36 @@ export async function getShiprocketServiceability(
     result = {
       pincode: cleanPin,
       serviceable: true,
-      city: isSurat ? "Surat Atelier Region" : isAhmedabad ? "Ahmedabad" : "Gujarat Central",
+      city: isSurat ? "Surat Atelier Region" : isAhmedabad ? "Ahmedabad" : "Gujarat",
       state: "Gujarat",
       estimatedDeliveryDays: isSurat ? 1 : 2,
       courierPartner: isSurat ? "Avsaraa White Glove Dedicated" : "Blue Dart Express",
       codAvailable: true,
-      rate: 45,
+      rate: 50,
       chargeableWeightKg,
       source: "fallback_matrix",
     };
-  } else if (/^\d{6}$/.test(cleanPin)) {
-    // Valid national pincode outside Gujarat territory (Avsaraa currently delivers exclusively in Gujarat 360000–399999)
+  } else if (isValidPin) {
+    const cityMap: Array<[string, string, string, number]> = [
+      ["11", "Delhi NCR", "Delhi", 3],
+      ["40", "Mumbai", "Maharashtra", 3],
+      ["41", "Pune", "Maharashtra", 3],
+      ["56", "Bengaluru", "Karnataka", 4],
+      ["50", "Hyderabad", "Telangana", 4],
+      ["60", "Chennai", "Tamil Nadu", 4],
+      ["70", "Kolkata", "West Bengal", 4],
+      ["30", "Jaipur", "Rajasthan", 3],
+    ];
+    const matched = cityMap.find(([prefix]) => cleanPin.startsWith(prefix));
     result = {
       pincode: cleanPin,
-      serviceable: false,
-      city: cleanPin.startsWith("11") ? "Delhi NCR" : cleanPin.startsWith("40") ? "Mumbai" : "India Rest",
-      state: "Outside Gujarat",
-      estimatedDeliveryDays: 0,
-      courierPartner: "None",
-      codAvailable: false,
-      rate: 0,
+      serviceable: true,
+      city: matched ? matched[1] : "Serviceable City (Pan-India)",
+      state: matched ? matched[2] : "India",
+      estimatedDeliveryDays: matched ? matched[3] : 5,
+      courierPartner: "Shiprocket Air Express",
+      codAvailable: true,
+      rate: 50,
       chargeableWeightKg,
       source: "fallback_matrix",
     };

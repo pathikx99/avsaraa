@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert";
 import { calculateOrderTotals } from "../../src/lib/financials.ts";
-import { isValidGujaratPincode } from "../../src/lib/financials.ts";
+import { isValidIndianPincode } from "../../src/lib/financials.ts";
 
 /**
  * End-to-End Order Journey Logic Tests
@@ -126,25 +126,23 @@ describe("E2E Order Journey - Financial Calculations", () => {
 });
 
 describe("E2E Order Journey - Pincode Validation", () => {
-  test("Valid Gujarat pincodes are accepted", () => {
-    assert.strictEqual(isValidGujaratPincode("395007"), true); // Surat
-    assert.strictEqual(isValidGujaratPincode("380001"), true); // Ahmedabad
-    assert.strictEqual(isValidGujaratPincode("390001"), true); // Vadodara
-    assert.strictEqual(isValidGujaratPincode("360001"), true); // Rajkot
-    assert.strictEqual(isValidGujaratPincode("360000"), true); // Lower boundary
-    assert.strictEqual(isValidGujaratPincode("399999"), true); // Upper boundary
+  test("Valid Pan-India 6-digit pincodes are accepted", () => {
+    assert.strictEqual(isValidIndianPincode("395007"), true); // Surat
+    assert.strictEqual(isValidIndianPincode("380001"), true); // Ahmedabad
+    assert.strictEqual(isValidIndianPincode("110001"), true); // Delhi
+    assert.strictEqual(isValidIndianPincode("400001"), true); // Mumbai
+    assert.strictEqual(isValidIndianPincode("560001"), true); // Bengaluru
+    assert.strictEqual(isValidIndianPincode("700001"), true); // Kolkata
   });
 
   test("Invalid pincodes are rejected", () => {
-    assert.strictEqual(isValidGujaratPincode("110001"), false); // Delhi
-    assert.strictEqual(isValidGujaratPincode("400001"), false); // Mumbai
-    assert.strictEqual(isValidGujaratPincode("560001"), false); // Bangalore
-    assert.strictEqual(isValidGujaratPincode("12345"), false); // Too short
-    assert.strictEqual(isValidGujaratPincode("1234567"), false); // Too long
-    assert.strictEqual(isValidGujaratPincode("abcdef"), false); // Non-numeric
-    assert.strictEqual(isValidGujaratPincode(""), false); // Empty
-    assert.strictEqual(isValidGujaratPincode(null), false); // Null
-    assert.strictEqual(isValidGujaratPincode(undefined), false); // Undefined
+    assert.strictEqual(isValidIndianPincode("000000"), false); // Zero-prefixed
+    assert.strictEqual(isValidIndianPincode("12345"), false); // Too short
+    assert.strictEqual(isValidIndianPincode("1234567"), false); // Too long
+    assert.strictEqual(isValidIndianPincode("abcdef"), false); // Non-numeric
+    assert.strictEqual(isValidIndianPincode(""), false); // Empty
+    assert.strictEqual(isValidIndianPincode(null), false); // Null
+    assert.strictEqual(isValidIndianPincode(undefined), false); // Undefined
   });
 });
 

@@ -295,7 +295,7 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
       assert.equal(data.success, false);
     });
 
-    it("POST /api/razorpay/create-order rejects non-Gujarat pincodes with 400", async () => {
+    it("POST /api/razorpay/create-order rejects malformed pincodes with 400", async () => {
       const res = await fetch(`${BASE_URL}/api/razorpay/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -303,7 +303,7 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
           shipping_address_snapshot: {
             recipient_name: "Test User",
             phone_number: "9876543210",
-            postal_code: "110001", // Delhi pincode
+            postal_code: "12345", // Invalid 5-digit PIN
           },
           items: [{ product_id: "e0000000-0000-0000-0000-000000000001", quantity: 1 }],
         }),
@@ -311,13 +311,13 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
 
       assert.equal(res.status, 400);
       const data = await res.json();
-      assert.match(data.message, /Delivery restriction/);
+      assert.match(data.message, /Invalid postal code/i);
     });
 
     let createdTestOrderId = "";
     let createdRazorpayOrderId = "";
 
-    it("POST /api/razorpay/create-order creates order with valid Gujarat pincode", async () => {
+    it("POST /api/razorpay/create-order creates order with valid Pan-India pincode", async () => {
       const phone = "+919876543210";
       const email = "rohan@example.com";
       const phoneToken = issueContactProofToken(phone, "order_phone");
@@ -331,10 +331,10 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
             recipient_name: "Rohan Patel",
             phone_number: phone,
             email: email,
-            address_line1: "101 Ashwamegh Complex",
-            city: "Ahmedabad",
-            state: "Gujarat",
-            postal_code: "380015",
+            address_line1: "42 Connaught Place",
+            city: "New Delhi",
+            state: "Delhi",
+            postal_code: "110001",
           },
           verification_tokens: {
             phone_token: phoneToken,

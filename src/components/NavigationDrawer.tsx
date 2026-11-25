@@ -482,7 +482,7 @@ export default function NavigationDrawer({
             <span>→</span>
           </Link>
           <p style={{ marginTop: "4px", textAlign: "center", fontSize: "11px", color: "#8E7D70" }}>
-            Surat Handloom Studio • Gujarat Express Delivery (Free ₹500+)
+            Surat Handloom Studio • Pan-India Express Delivery (Free ₹500+)
           </p>
         </div>
       </div>

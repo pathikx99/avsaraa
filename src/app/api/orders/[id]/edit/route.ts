@@ -5,7 +5,7 @@ import { verifyAdminSession } from "@/lib/jwtAdmin";
 import { isSuperAdminUser } from "@/lib/adminConstants";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { isValidGujaratPincode } from "@/lib/financials";
+import { isValidIndianPincode } from "@/lib/financials";
 
 export async function PATCH(
   request: Request,
@@ -72,11 +72,11 @@ export async function PATCH(
     const updateFields: Record<string, unknown> = { updated_at: nowIso };
     if (shipping_address_snapshot) {
       const postalCode = shipping_address_snapshot.postal_code;
-      if (!postalCode || !isValidGujaratPincode(postalCode)) {
+      if (!postalCode || !isValidIndianPincode(postalCode)) {
         return NextResponse.json(
           {
             success: false,
-            message: `Delivery restriction: Pin code ${postalCode || "empty"} is outside our Gujarat service territory. Avsaraa currently delivers exclusively within Gujarat (pincodes 360000–399999).`,
+            message: `Invalid postal code: Pin code "${postalCode || "empty"}" must be a valid 6-digit Indian PIN code.`,
           },
           { status: 400 }
         );

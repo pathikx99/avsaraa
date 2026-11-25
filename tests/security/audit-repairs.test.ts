@@ -263,17 +263,17 @@ describe("Audit Defect & Security Patch Regression Tests", () => {
     assert.strictEqual(canRequestExchange("Delivered", tenDaysAgo).eligible, false);
   });
 
-  test("Order edit address validation strictly enforces Gujarat pincode boundary", () => {
+  test("Order edit address validation strictly enforces valid Pan-India 6-digit pincode", () => {
     function validateEditAddress(snap: { postal_code?: string; recipient_name?: string }): boolean {
       if (!snap || !snap.postal_code) return false;
-      const code = parseInt(snap.postal_code, 10);
-      const isGujarat = !isNaN(code) && code >= 360000 && code <= 399999;
-      return isGujarat && Boolean(snap.recipient_name);
+      const isIndianPin = /^[1-9]\d{5}$/.test(snap.postal_code.trim());
+      return isIndianPin && Boolean(snap.recipient_name);
     }
 
     assert.strictEqual(validateEditAddress({ postal_code: "395006", recipient_name: "Meera" }), true);
-    assert.strictEqual(validateEditAddress({ postal_code: "380001", recipient_name: "Pooja" }), true);
-    assert.strictEqual(validateEditAddress({ postal_code: "110001", recipient_name: "Attacker" }), false);
-    assert.strictEqual(validateEditAddress({ postal_code: "400001", recipient_name: "Attacker" }), false);
+    assert.strictEqual(validateEditAddress({ postal_code: "110001", recipient_name: "Pooja" }), true);
+    assert.strictEqual(validateEditAddress({ postal_code: "400001", recipient_name: "Riya" }), true);
+    assert.strictEqual(validateEditAddress({ postal_code: "12345", recipient_name: "Bad" }), false);
+    assert.strictEqual(validateEditAddress({ postal_code: "000001", recipient_name: "Bad" }), false);
   });
 });
