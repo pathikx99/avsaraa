@@ -77,7 +77,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         try {
           const { data: dbWishlist, error: dbErr } = await supabase
             .from("wishlists")
-            .select("product_id, products(*)")
+            .select("product_id, product_data, created_at")
             .eq("user_id", currentUser.id);
 
           if (!dbErr && dbWishlist && isMounted) {
@@ -87,18 +87,10 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
               const rowData = row as unknown as {
                 product_id: string;
                 product_data?: Product | null;
-                products?: Product | Product[] | null;
               };
 
-              const joined = rowData.products;
-              const productObj: Product | null = Array.isArray(joined)
-                ? (joined[0] ?? null)
-                : (joined ?? null);
-
-              if (rowData.product_data) {
-                dbProducts.push(rowData.product_data as Product);
-              } else if (productObj && productObj.id) {
-                dbProducts.push(productObj);
+              if (rowData.product_data && rowData.product_data.id) {
+                dbProducts.push(rowData.product_data);
               } else {
                 const cached = existingWishlist.find((p) => p.id === row.product_id);
                 if (cached) {
@@ -118,6 +110,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
                   {
                     user_id: currentUser.id,
                     product_id: p.id,
+                    product_data: p,
                   },
                   { onConflict: "user_id,product_id" }
                 );
@@ -201,6 +194,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
           {
             user_id: user.id,
             product_id: product.id,
+            product_data: product,
           },
           { onConflict: "user_id,product_id" }
         );

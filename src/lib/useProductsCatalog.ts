@@ -11,7 +11,7 @@ interface CatalogCache {
 
 let memoryCache: CatalogCache | null = null;
 let inFlightPromise: Promise<Product[]> | null = null;
-const CLIENT_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const CLIENT_CACHE_TTL_MS = 10 * 1000; // 10 seconds
 
 export async function fetchCatalog(bypassCache = false): Promise<Product[]> {
   const now = Date.now();
@@ -27,6 +27,7 @@ export async function fetchCatalog(bypassCache = false): Promise<Product[]> {
   inFlightPromise = (async () => {
     try {
       const res = await fetch(`/api/products${bypassCache ? "?fresh=true" : ""}`, {
+        cache: "no-store",
         headers: { "Accept": "application/json" },
       });
 

@@ -506,16 +506,6 @@ export default function AdminDashboardPage() {
       setIsAuthorizedAdmin(true);
       showToast("Signed in to Admin!");
       void fetchData();
-
-      // Background attempt to sync client-side Supabase auth session
-      try {
-        await supabase.auth.signInWithPassword({
-          email: ADMIN_EMAIL,
-          password: authGatePassword,
-        });
-      } catch {
-        // Standalone JWT cookie handles all admin route authorization
-      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Authentication failed.";
       setAuthGateError(message);

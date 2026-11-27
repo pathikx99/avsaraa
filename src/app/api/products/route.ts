@@ -1,20 +1,21 @@
 import { NextResponse } from "next/server";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { normalizeProducts } from "@/lib/productUtils";
 import { Product } from "@/types/product";
 import { sortProductsByShowcase } from "@/lib/showcaseOrderManager";
 
-// In-Memory Server Cache for Ultra-Fast Product Fetching
-interface CacheEntry {
-  data: Product[];
-  timestamp: number;
-}
-
-let cachedCatalog: CacheEntry | null = null;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+export const dynamic = "force-dynamic";
 
 export function invalidateProductsCache() {
-  cachedCatalog = null;
+  try {
+    revalidateTag("products", { expire: 0 });
+    revalidatePath("/");
+    revalidatePath("/products");
+    revalidatePath("/products/[id]", "page");
+  } catch {
+    // Safe no-op when invoked outside Next.js request context (e.g. unit tests)
+  }
 }
 
 export async function GET(request: Request) {
@@ -25,37 +26,25 @@ export async function GET(request: Request) {
     const sort = searchParams.get("sort"); // "bestselling" | "newest" | "price-asc" | "price-desc"
     const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!, 10) : null;
     const occasion = searchParams.get("occasion");
-    const bypassCache = searchParams.get("fresh") === "true";
 
-    const now = Date.now();
+    const supabaseAdmin = getAdminSupabaseClient();
+    const { data, error } = await supabaseAdmin
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: false });
+
     let allProducts: Product[];
-
-    if (!bypassCache && cachedCatalog && now - cachedCatalog.timestamp < CACHE_TTL_MS) {
-      allProducts = cachedCatalog.data;
-    } else {
-      const supabaseAdmin = getAdminSupabaseClient();
-      const { data, error } = await supabaseAdmin
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error || !data || data.length === 0) {
-        if (error) {
-          console.warn("Products API Supabase note:", error.message || error);
-        }
-        allProducts = [];
-      } else {
-        const publishedOnly = data.filter((p) => {
-          const status = (p as { publish_status?: string | null }).publish_status;
-          return !status || status === "published";
-        });
-        allProducts = normalizeProducts(publishedOnly);
+    if (error || !data || data.length === 0) {
+      if (error) {
+        console.warn("Products API Supabase note:", error.message || error);
       }
-
-      cachedCatalog = {
-        data: allProducts,
-        timestamp: now,
-      };
+      allProducts = [];
+    } else {
+      const publishedOnly = data.filter((p) => {
+        const status = (p as { publish_status?: string | null }).publish_status;
+        return !status || status === "published";
+      });
+      allProducts = normalizeProducts(publishedOnly);
     }
 
     // Apply Filters in memory (ultra-fast < 1ms)
@@ -105,7 +94,6 @@ export async function GET(request: Request) {
       filtered = filtered.slice(0, limit);
     }
 
-    // Set aggressive browser & CDN edge caching headers for sub-second page loads
     return NextResponse.json(
       {
         success: true,
@@ -116,7 +104,7 @@ export async function GET(request: Request) {
       {
         status: 200,
         headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
+          "Cache-Control": "no-store, must-revalidate",
         },
       }
     );
