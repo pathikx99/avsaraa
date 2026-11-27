@@ -3,9 +3,18 @@ import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { rateLimitCouponValidation } from "@/lib/rateLimit";
 import { validateCouponEngine } from "@/lib/couponManager";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function POST(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { valid: false, message: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const headerList = await headers();
     const forwardedFor = headerList.get("x-forwarded-for");
     const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
@@ -66,7 +75,7 @@ export async function POST(request: Request) {
       coupon: result.coupon,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return NextResponse.json({ valid: false, message }, { status: 500 });
+    console.error("Coupon validation error:", err);
+    return NextResponse.json({ valid: false, message: "Unable to validate promotion code right now." }, { status: 500 });
   }
 }

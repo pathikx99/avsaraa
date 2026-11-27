@@ -3,7 +3,6 @@ import crypto from "crypto";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { Order, OrderItem, OrderStatus, PaymentStatus } from "@/types/order";
-import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import {
   isValidIndianPincode,
   isValidGujaratPincode,
@@ -16,15 +15,7 @@ import {
   validateOrderContacts,
   isContactProofTokenConsumed,
 } from "@/lib/contactVerification";
-
-function generateOrderNumber(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const randomSuffix = crypto.randomBytes(4).toString("hex").toUpperCase();
-  return `AVS-${year}${month}${day}-${randomSuffix}`;
-}
+import { generateSequentialOrderNumber, formatOrderNumber, extractTrailingSequence } from "@/lib/idGenerator";
 
 export async function POST(request: Request) {
   try {
@@ -170,9 +161,14 @@ export async function POST(request: Request) {
 
     // 1. Verify product pricing & stock server-side strictly against canonical database or seed catalog
     const adminClient = getAdminSupabaseClient();
-    const productIds = items
-      .map((i: { product_id: string }) => i.product_id)
-      .filter((id): id is string => Boolean(id));
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const productIds = Array.from(
+      new Set(
+        items
+          .map((i: { product_id: string }) => i.product_id)
+          .filter((id): id is string => typeof id === "string" && UUID_REGEX.test(id.trim()))
+      )
+    );
 
     const priceMap = new Map<string, { price: number; name: string; inDb: boolean; stockCount: number | null }>();
 
@@ -195,18 +191,6 @@ export async function POST(request: Request) {
         }
       } catch (dbErr) {
         console.warn("Notice: Canonical price query warning:", dbErr);
-      }
-    }
-
-    // Populate missing items from static verified seed catalog
-    for (const seed of SEED_CATALOG_PRODUCTS) {
-      if (!priceMap.has(seed.id)) {
-        priceMap.set(seed.id, {
-          price: seed.price,
-          name: seed.name,
-          inDb: false,
-          stockCount: seed.stock_count ?? null,
-        });
       }
     }
 
@@ -338,7 +322,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const orderNumber = generateOrderNumber();
+    let orderNumber = await generateSequentialOrderNumber(adminClient);
     const orderStatus: OrderStatus = "Pending";
     const paymentStatus: PaymentStatus = "Pending";
 
@@ -351,14 +335,13 @@ export async function POST(request: Request) {
     const estDelivery = new Date();
     estDelivery.setDate(estDelivery.getDate() + 3);
 
-    const orderPayload = {
+    const baseOrderPayload = {
       user_id: currentUserId,
       shipping_address_id: sanitizedAddressId,
       shipping_address_snapshot: {
         ...shipping_address_snapshot,
         verification_tokens: body.verification_tokens || null,
       },
-      order_number: orderNumber,
       subtotal: financials.subtotal,
       discount_amount: financials.discountAmount,
       shipping_fee: financials.shippingFee,
@@ -381,17 +364,30 @@ export async function POST(request: Request) {
     let createdItems: OrderItem[] = [];
 
     try {
-      const { data: dbOrder, error: orderErr } = await adminClient
-        .from("orders")
-        .insert(orderPayload)
-        .select()
-        .single();
+      let dbOrder: Record<string, unknown> | null = null;
+      let orderErr: { code?: string; message?: string } | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const insertAttempt = await adminClient
+          .from("orders")
+          .insert({ ...baseOrderPayload, order_number: orderNumber })
+          .select()
+          .single();
+        dbOrder = insertAttempt.data as Record<string, unknown> | null;
+        orderErr = insertAttempt.error;
+        if (!orderErr && dbOrder) break;
+        if (orderErr?.code === "23505" && orderErr.message?.includes("order_number")) {
+          orderNumber = formatOrderNumber(extractTrailingSequence(orderNumber) + 1);
+          continue;
+        }
+        break;
+      }
 
       if (!orderErr && dbOrder) {
-        createdOrder = dbOrder as Order;
+        const dbOrderId = String(dbOrder.id);
+        createdOrder = dbOrder as unknown as Order;
 
         const itemsToInsert = sanitizedItems.map((item) => ({
-          order_id: dbOrder.id,
+          order_id: dbOrderId,
           product_id: item.product_id,
           product_name: item.product_name,
           image_url: item.image_url,
@@ -410,7 +406,7 @@ export async function POST(request: Request) {
 
         if (itemsErr || !dbItems || dbItems.length === 0) {
           console.error("Razorpay create-order order_items insert error:", itemsErr?.message);
-          await adminClient.from("orders").delete().eq("id", dbOrder.id);
+          await adminClient.from("orders").delete().eq("id", dbOrderId);
           createdOrder = null;
         } else {
           createdItems = dbItems as OrderItem[];

@@ -7,14 +7,15 @@ import { getSupabaseUrl, getSupabasePublishableKey } from "@/lib/env";
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const rawNext = requestUrl.searchParams.get("next") ?? "/account";
+  const rawNext = (requestUrl.searchParams.get("next") ?? "/account").trim();
 
   // Security: Prevent open redirect vulnerability - next must be a safe internal relative path
   const isSafeRelativePath =
     rawNext.startsWith("/") &&
     !rawNext.startsWith("//") &&
     !rawNext.startsWith("/\\") &&
-    !rawNext.includes("://");
+    !rawNext.includes("://") &&
+    !/[\r\n\t\\]/.test(rawNext);
   const next = isSafeRelativePath ? rawNext : "/account";
 
   if (code) {

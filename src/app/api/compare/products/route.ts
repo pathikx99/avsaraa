@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,7 +12,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, products: [] });
     }
 
-    const ids = idsParam.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 10);
+    const ids = Array.from(
+      new Set(
+        idsParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter((id) => UUID_REGEX.test(id))
+      )
+    ).slice(0, 10);
+
     if (ids.length === 0) {
       return NextResponse.json({ success: true, products: [] });
     }
@@ -25,9 +35,14 @@ export async function GET(request: Request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, products: products || [] });
+    const publishedOnly = (products || []).filter((p) => {
+      const status = (p as { publish_status?: string | null }).publish_status;
+      return !status || status === "published";
+    });
+
+    return NextResponse.json({ success: true, products: publishedOnly });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return NextResponse.json({ success: false, message, products: [] }, { status: 500 });
+    console.error("Compare products fetch error:", err);
+    return NextResponse.json({ success: false, message: "Unable to load comparison products.", products: [] }, { status: 500 });
   }
 }

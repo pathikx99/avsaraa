@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "crypto";
 import {
@@ -32,7 +32,14 @@ try {
       const content = fs.readFileSync(envPath, "utf-8");
       for (const line of content.split("\n")) {
         const trimmed = line.trim();
-        if (trimmed.startsWith("OTP_PROOF_SECRET=") || trimmed.startsWith("RAZORPAY_KEY_SECRET=")) {
+        if (
+          trimmed.startsWith("OTP_PROOF_SECRET=") ||
+          trimmed.startsWith("RAZORPAY_KEY_SECRET=") ||
+          trimmed.startsWith("SUPABASE_URL=") ||
+          trimmed.startsWith("SUPABASE_SECRET_KEY=") ||
+          trimmed.startsWith("ADMIN_EMAIL=") ||
+          trimmed.startsWith("ADMIN_PASSWORD=")
+        ) {
           const [k, ...vParts] = trimmed.split("=");
           const key = k.trim();
           const val = vParts.join("=").trim().replace(/^["']|["']$/g, "");
@@ -283,6 +290,57 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
         : false,
     },
     () => {
+    let ephemeralProductId = "";
+    let adminCookie = "";
+    let createdTestOrderId = "";
+    let createdRazorpayOrderId = "";
+
+    before(async () => {
+      const authRes = await fetch(`${BASE_URL}/api/admin/auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: BASE_URL },
+        body: JSON.stringify({
+          email: process.env.ADMIN_EMAIL || "web.avsaraa@gmail.com",
+          password: process.env.ADMIN_PASSWORD || "V@12345678",
+        }),
+      });
+      adminCookie = (authRes.headers.get("set-cookie") || "").split(";")[0];
+
+      const prodRes = await fetch(`${BASE_URL}/api/admin/products`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: adminCookie, Origin: BASE_URL },
+        body: JSON.stringify({
+          name: `Test Integration Saree ${Date.now()}`,
+          category: "Sarees",
+          price: 14999,
+          image_url: "/images/saree_model_hero.jpg",
+          stock_count: 10,
+        }),
+      });
+      const prodData = await prodRes.json().catch(() => null);
+      ephemeralProductId = prodData?.data?.id || prodData?.product?.id || "";
+      assert.match(String(prodData?.data?.specifications?.sku || ""), /^AVS-SAR-\d{4}-\d{4,}$/);
+    });
+
+    after(async () => {
+      if (createdTestOrderId && process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY) {
+        try {
+          const { createClient } = await import("@supabase/supabase-js");
+          const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
+          await sb.from("order_items").delete().eq("order_id", createdTestOrderId);
+          await sb.from("orders").delete().eq("id", createdTestOrderId);
+        } catch {
+          // ignore cleanup notice
+        }
+      }
+      if (ephemeralProductId && adminCookie) {
+        await fetch(`${BASE_URL}/api/admin/products?id=${encodeURIComponent(ephemeralProductId)}`, {
+          method: "DELETE",
+          headers: { Cookie: adminCookie, Origin: BASE_URL },
+        }).catch(() => {});
+      }
+    });
+
     it("POST /api/razorpay/create-order rejects missing address snapshot with 400", async () => {
       const res = await fetch(`${BASE_URL}/api/razorpay/create-order`, {
         method: "POST",
@@ -305,7 +363,7 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
             phone_number: "9876543210",
             postal_code: "12345", // Invalid 5-digit PIN
           },
-          items: [{ product_id: "e0000000-0000-0000-0000-000000000001", quantity: 1 }],
+          items: [{ product_id: ephemeralProductId || "00000000-0000-0000-0000-000000000000", quantity: 1 }],
         }),
       });
 
@@ -314,10 +372,8 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
       assert.match(data.message, /Invalid postal code/i);
     });
 
-    let createdTestOrderId = "";
-    let createdRazorpayOrderId = "";
-
     it("POST /api/razorpay/create-order creates order with valid Pan-India pincode", async () => {
+      assert.ok(ephemeralProductId, "Ephemeral test product ID must be created");
       const phone = "+919876543210";
       const email = "rohan@example.com";
       const phoneToken = issueContactProofToken(phone, "order_phone");
@@ -342,8 +398,8 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
           },
           items: [
             {
-              product_id: "e0000000-0000-0000-0000-000000000001",
-              product_name: "Virasat Pure Katan Silk",
+              product_id: ephemeralProductId,
+              product_name: "Test Integration Saree",
               quantity: 1,
               unit_price: 14999,
             },
@@ -358,6 +414,7 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
       assert.ok(data.amount > 0);
       assert.equal(data.currency, "INR");
       assert.ok(data.order_id);
+      assert.match(String(data.order_number || ""), /^AVS-\d{8}-\d{5,}$/);
       createdTestOrderId = data.order_id;
       createdRazorpayOrderId = data.razorpay_order_id;
     });

@@ -74,7 +74,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const [zoomOffset, setZoomOffset] = useState({ x: 0, y: 0 });
   const [isDraggingZoom, setIsDraggingZoom] = useState(false);
   const zoomDragStartRef = useRef<{ x: number; y: number; origX: number; origY: number } | null>(null);
-  const [isVideoOpen, setIsVideoOpen] = useState(false);
   const [isWriteReviewOpen, setIsWriteReviewOpen] = useState(false);
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
 
@@ -173,8 +172,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     }
   }, [product]);
 
-  // Promotional coupon applied state
-  const [isCouponApplied, setIsCouponApplied] = useState(false);
   const [shareFeedback, setShareFeedback] = useState(false);
 
   // Accordion state
@@ -218,19 +215,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const currentPrice = product.price;
   const savingsAmount = product.mrp > currentPrice ? product.mrp - currentPrice : 0;
 
-  // Load saved coupon state
-  useEffect(() => {
-    try {
-      const savedCoupon = localStorage.getItem("avsaraa_applied_coupon");
-      if (savedCoupon === "AVSARAA10") {
-        const timer = setTimeout(() => {
-          setIsCouponApplied(true);
-        }, 0);
-        return () => clearTimeout(timer);
-      }
-    } catch {}
-  }, []);
-
   // Load related products & reviews
   useEffect(() => {
     let isMounted = true;
@@ -242,49 +226,14 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return;
-        if (data.success && Array.isArray(data.reviews) && data.reviews.length > 0) {
+        if (data.success && Array.isArray(data.reviews)) {
           setReviews(data.reviews);
         } else {
-          // Curated authentic reviews fallback for atelier products
-          setReviews([
-            {
-              id: "rev-1",
-              product_id: product.id,
-              customer_name: "Ananya Singhania",
-              customer_city: "New Delhi",
-              rating: 5,
-              title: "Breathtaking Handloom Finish & Authentic Royal Drape",
-              comment:
-                "Received this piece in signature packaging within 48 hours. The gold zari luster and fabric softness are beyond anything available in typical retail. Truly an exquisite piece.",
-              photos: [
-                "https://images.unsplash.com/photo-1756483509177-bbabd67a3234?auto=format&fit=crop&w=600&q=80",
-                "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=600&q=80"
-              ],
-              verified_purchase: true,
-              helpful_count: 28,
-              status: "published",
-              created_at: "2026-10-24T12:00:00Z",
-            },
-            {
-              id: "rev-2",
-              product_id: product.id,
-              customer_name: "Radhika Kulkarni",
-              customer_city: "Mumbai",
-              rating: 5,
-              title: "Fit and Fall are Flawless — Endless Compliments",
-              comment:
-                "Wore this to a family wedding reception. The silhouette feels light yet majestic. The measurement guide helped me choose the ideal fit effortlessly.",
-              photos: ["https://images.unsplash.com/photo-1679006831648-7c9ea12e5807?auto=format&fit=crop&w=600&q=80"],
-              verified_purchase: true,
-              helpful_count: 19,
-              status: "published",
-              created_at: "2026-10-28T14:30:00Z",
-            },
-          ]);
+          setReviews([]);
         }
       })
       .catch(() => {
-        // graceful fallback
+        if (isMounted) setReviews([]);
       })
       .finally(() => {
         if (isMounted) setReviewsLoading(false);
@@ -374,7 +323,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   useEffect(() => {
     const anyModalOpen =
-      isSizeGuideOpen || isZoomOpen || isVideoOpen || isWriteReviewOpen || Boolean(viewingPhotoUrl);
+      isSizeGuideOpen || isZoomOpen || isWriteReviewOpen || Boolean(viewingPhotoUrl);
     if (!anyModalOpen) return;
 
     const prevOverflow = document.body.style.overflow;
@@ -384,7 +333,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       if (e.key === "Escape") {
         setIsSizeGuideOpen(false);
         setIsZoomOpen(false);
-        setIsVideoOpen(false);
         setIsWriteReviewOpen(false);
         setViewingPhotoUrl(null);
       }
@@ -394,7 +342,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [isSizeGuideOpen, isZoomOpen, isVideoOpen, isWriteReviewOpen, viewingPhotoUrl]);
+  }, [isSizeGuideOpen, isZoomOpen, isWriteReviewOpen, viewingPhotoUrl]);
 
   const activeGalleryImages = useMemo(() => {
     if (activeColorVariant?.gallery_images && activeColorVariant.gallery_images.length > 0) {
@@ -579,24 +527,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   const handleCheckPin = (e: React.FormEvent) => {
     e.preventDefault();
     checkPinValue(pinCode);
-  };
-
-  // Apply / Unapply promotional coupon code
-  const handleToggleCoupon = () => {
-    if (isCouponApplied) {
-      try {
-        localStorage.removeItem("avsaraa_applied_coupon");
-      } catch {}
-      setIsCouponApplied(false);
-    } else {
-      try {
-        localStorage.setItem("avsaraa_applied_coupon", "AVSARAA10");
-      } catch {}
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText("AVSARAA10").catch(() => {});
-      }
-      setIsCouponApplied(true);
-    }
   };
 
   // Share product
@@ -967,59 +897,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   />
                 </button>
               ))}
-
-              {/* Video Thumbnail Card (shown only when product has an attached video link) */}
-              {Boolean(product.video_url?.trim()) && (
-                <button
-                  type="button"
-                  onClick={() => setIsVideoOpen(true)}
-                  aria-label="Play Product Drape Video"
-                  style={{
-                    position: "relative",
-                    width: "66px",
-                    height: "70px",
-                    flexShrink: 0,
-                    borderRadius: "10px",
-                    overflow: "hidden",
-                    border: "1px solid #D8CABE",
-                    backgroundColor: "#261B13",
-                    padding: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Image
-                    src={currentGalleryImg}
-                    alt="Drape video preview"
-                    fill
-                    sizes="66px"
-                    style={{ objectFit: "cover", objectPosition: "center 20%", filter: "brightness(0.75) blur(0.6px)" }}
-                  />
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      position: "relative",
-                      zIndex: 2,
-                      width: "30px",
-                      height: "30px",
-                      borderRadius: "50%",
-                      border: "1.5px solid rgba(255, 255, 255, 0.92)",
-                      backgroundColor: "rgba(38, 27, 19, 0.45)",
-                      backdropFilter: "blur(4px)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#FFFFFF",
-                    }}
-                  >
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                      <polygon points="7 4 20 12 7 20 7 4" />
-                    </svg>
-                  </span>
-                </button>
-              )}
             </div>
           </section>
 
@@ -1031,22 +908,37 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             style={{ padding: "0 18px 8px 18px" }}
             aria-label="Product Information"
           >
-            {/* Category Crest & Relocated Modern Share Button */}
+            {/* Category Crest & SKU + Relocated Modern Share Button */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "8px" }}>
-              <span
-                style={{
-                  fontSize: "10.5px",
-                  fontWeight: 600,
-                  letterSpacing: "0.13em",
-                  textTransform: "uppercase",
-                  color: "#866951",
-                  padding: "4px 10px",
-                  borderRadius: "999px",
-                  backgroundColor: "#F2EBE3",
-                }}
-              >
-                {product.category}
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <span
+                  style={{
+                    fontSize: "10.5px",
+                    fontWeight: 600,
+                    letterSpacing: "0.13em",
+                    textTransform: "uppercase",
+                    color: "#866951",
+                    padding: "4px 10px",
+                    borderRadius: "999px",
+                    backgroundColor: "#F2EBE3",
+                  }}
+                >
+                  {product.category}
+                </span>
+                {product.sku && (
+                  <span
+                    style={{
+                      fontSize: "10.5px",
+                      fontWeight: 600,
+                      letterSpacing: "0.06em",
+                      fontFamily: "monospace",
+                      color: "#6E5B4E",
+                    }}
+                  >
+                    SKU: {product.sku}
+                  </span>
+                )}
+              </div>
 
               <button
                 type="button"
@@ -1376,67 +1268,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   );
                 })}
               </div>
-            </div>
-
-            {/* =========================================================================
-                7. FIRST ORDER OFFER (Promotional Coupon Banner)
-               ========================================================================= */}
-            <div
-              className="product-offer-banner"
-              style={{
-                backgroundColor: isCouponApplied ? "#F2F8F4" : "#F7F2EE",
-                border: isCouponApplied ? "1px solid #1E5E3A" : "1px dashed #C5A059",
-                borderRadius: "14px",
-                padding: "14px 16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "12px",
-                marginBottom: "24px",
-                transition: "all 0.25s ease",
-              }}
-            >
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: isCouponApplied ? "#1E5E3A" : "#8A181A", textTransform: "uppercase" }}>
-                    ✦ First Order Privilege ✦
-                  </span>
-                </div>
-                <div style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
-                  Get 10% OFF on Your First Order
-                </div>
-                <div style={{ fontSize: "11.5px", color: isCouponApplied ? "#1E5E3A" : "#6E5B4E", marginTop: "2px", fontWeight: isCouponApplied ? 600 : 400 }}>
-                  {isCouponApplied ? (
-                    <>Code <strong style={{ color: "#1E5E3A" }}>AVSARAA10</strong> applied to checkout</>
-                  ) : (
-                    <>Use code: <strong style={{ color: "#261B13" }}>AVSARAA10</strong> at checkout</>
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleToggleCoupon}
-                aria-label={isCouponApplied ? "Promocode AVSARAA10 applied" : "Apply promocode AVSARAA10"}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "6px",
-                  backgroundColor: isCouponApplied ? "#1E5E3A" : "#261B13",
-                  color: "#FAF7F2",
-                  border: "none",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  letterSpacing: "0.06em",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: "background-color 0.2s ease",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
-              >
-                {isCouponApplied ? "APPLIED ✓" : "APPLY"}
-              </button>
             </div>
 
             {/* =========================================================================
@@ -2526,15 +2357,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   const avgScore =
                     totalRev > 0
                       ? (reviews.reduce((sum, r) => sum + (Number(r.rating) || 5), 0) / totalRev).toFixed(1)
-                      : "4.9";
+                      : "0.0";
                   const pct = (stars: number) =>
                     totalRev > 0
                       ? Math.round((reviews.filter((r) => Math.round(Number(r.rating)) === stars).length / totalRev) * 100)
-                      : stars === 5
-                        ? 92
-                        : stars === 4
-                          ? 8
-                          : 0;
+                      : 0;
                   const fivePct = pct(5);
                   const fourPct = pct(4);
                   const threePct = pct(3);
@@ -2585,6 +2412,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               </div>
 
               {/* Customer Uploaded Photographs Strip (Requirement 16) */}
+              {reviews.some((r) => r.photos && r.photos.length > 0) && (
               <div style={{ marginBottom: "20px" }}>
                 <span style={{ fontSize: "12px", fontWeight: 600, color: "#261B13", display: "block", marginBottom: "8px" }}>
                   Customer Photographs ({reviews.flatMap((r) => r.photos || []).length})
@@ -2616,8 +2444,24 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     ))}
                 </div>
               </div>
+              )}
 
               {/* Review Cards List */}
+              {!reviewsLoading && reviews.length === 0 ? (
+                <div
+                  style={{
+                    padding: "20px",
+                    borderRadius: "12px",
+                    backgroundColor: "#FAF7F2",
+                    border: "1px dashed #D8CABE",
+                    textAlign: "center",
+                    fontSize: "13px",
+                    color: "#6E5B4E",
+                  }}
+                >
+                  No customer reviews yet.
+                </div>
+              ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 {reviews.map((rev) => (
                   <div
@@ -2705,6 +2549,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   </div>
                 ))}
               </div>
+              )}
             </section>
           </section>
         </div>
@@ -3124,7 +2969,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               </div>
             )}
 
-            {/* "How to Measure Yourself for the Perfect Fit" Video Section (Requirement 6) */}
+            {/* "How to Measure Yourself for the Perfect Fit" Guide Section */}
             <div
               style={{
                 backgroundColor: "#FFFFFF",
@@ -3146,7 +2991,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 How to Measure Yourself for the Perfect Fit
               </h4>
               <p style={{ fontSize: "12px", color: "#6E5B4E", margin: "0 0 12px 0", lineHeight: 1.45 }}>
-                Not sure about your size? Watch our easy measurement guide and find your perfect fit.
+                Not sure about your size? Follow our tailored measurement guide to find your ideal fit.
               </p>
 
               {/* Atelier Visual Measurement Guide Card */}
@@ -3365,81 +3210,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 transform: `translate(${zoomOffset.x}px, ${zoomOffset.y}px) scale(${zoomScale})`,
                 transition: isDraggingZoom ? "none" : "transform 0.25s ease",
               }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          PRODUCT VIDEO MODAL (Shown only when video link is attached)
-         ========================================================================= */}
-      {Boolean(product.video_url?.trim()) && isVideoOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 110,
-            backgroundColor: "rgba(0,0,0,0.9)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-          }}
-          onClick={() => setIsVideoOpen(false)}
-        >
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              maxWidth: "640px",
-              aspectRatio: "16 / 9",
-              borderRadius: "14px",
-              overflow: "hidden",
-              backgroundColor: "#000000",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setIsVideoOpen(false)}
-              aria-label="Close Video"
-              style={{
-                position: "absolute",
-                top: "12px",
-                right: "12px",
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                backgroundColor: "rgba(0,0,0,0.6)",
-                color: "#FFFFFF",
-                border: "none",
-                fontSize: "16px",
-                cursor: "pointer",
-                zIndex: 20,
-              }}
-            >
-              ✕
-            </button>
-            <iframe
-              src={(() => {
-                const raw = (product.video_url || "").trim();
-                if (raw.includes("youtube.com/embed/")) {
-                  return `${raw}${raw.includes("?") ? "&" : "?"}autoplay=1&rel=0`;
-                }
-                if (raw.includes("youtu.be/")) {
-                  const vidId = raw.split("youtu.be/")[1]?.split(/[?#]/)[0];
-                  if (vidId) return `https://www.youtube.com/embed/${vidId}?autoplay=1&rel=0`;
-                }
-                if (raw.includes("watch?v=")) {
-                  const vidId = raw.split("watch?v=")[1]?.split("&")[0];
-                  if (vidId) return `https://www.youtube.com/embed/${vidId}?autoplay=1&rel=0`;
-                }
-                return raw;
-              })()}
-              title={`${product.name} - Drape & Movement Video`}
-              style={{ width: "100%", height: "100%", border: "none" }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
             />
           </div>
         </div>

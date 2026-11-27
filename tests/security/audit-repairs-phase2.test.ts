@@ -192,9 +192,10 @@ describe("Audit Phase 2 Security & Integrity Regression Suite", () => {
             "Content-Type": "application/json",
             Origin: baseUrl,
           },
-          body: JSON.stringify({ code: "AVSARAA10", subtotal: 5000 }),
+          body: JSON.stringify({ code: "TEST_NONEXISTENT", subtotal: 5000 }),
         });
-        assert.equal(res.status, 200);
+        assert.notEqual(res.status, 403);
+        assert.ok([200, 400].includes(res.status));
       }
     );
 
@@ -286,5 +287,98 @@ describe("Audit Phase 2 Security & Integrity Regression Suite", () => {
         assert.equal(res.status, 400);
       }
     );
+
+    test(
+      "GET /api/compare/products ignores malformed non-UUID IDs without 500 crash",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const res = await fetch(`${baseUrl}/api/compare/products?ids=not-a-uuid,invalid-id`);
+        assert.equal(res.status, 200);
+        const data = await res.json();
+        assert.equal(data.success, true);
+        assert.deepEqual(data.products, []);
+      }
+    );
+
+    test(
+      "Cross-origin CSRF blocked on coupons/validate, auth/validate-phone, and auth/register-check",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        for (const path of [
+          "/api/coupons/validate",
+          "/api/auth/validate-phone",
+          "/api/auth/register-check",
+        ]) {
+          const res = await fetch(`${baseUrl}${path}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Origin: "https://evil-attacker.example",
+            },
+            body: JSON.stringify({ code: "TEST", subtotal: 1000 }),
+          });
+          assert.equal(res.status, 403, `Expected 403 CSRF block on POST ${path}`);
+        }
+      }
+    );
+
+    test(
+      "POST /api/reviews/upload rejects corrupted non-image binary payload cleanly",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const form = new FormData();
+        form.append("file", new Blob(["not a real image payload"], { type: "image/png" }), "fake.png");
+        const res = await fetch(`${baseUrl}/api/reviews/upload`, {
+          method: "POST",
+          body: form,
+        });
+        assert.equal(res.status, 400);
+      }
+    );
+
+    test(
+      "Admin CSV template exports only schema-valid product categories",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const loginRes = await fetch(`${baseUrl}/api/admin/auth`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Origin: baseUrl },
+          body: JSON.stringify({
+            email: process.env.ADMIN_EMAIL || "web.avsaraa@gmail.com",
+            password: process.env.ADMIN_PASSWORD || "V@12345678",
+          }),
+        });
+        assert.equal(loginRes.status, 200);
+        const cookie = (loginRes.headers.get("set-cookie") || "").split(";")[0];
+
+        const csvRes = await fetch(`${baseUrl}/api/admin/products/template`, {
+          headers: { Cookie: cookie },
+        });
+        assert.equal(csvRes.status, 200);
+        const csvText = await csvRes.text();
+        assert.equal(csvText.includes('"Kurtas"'), false);
+        assert.match(csvText, /"Sarees"/);
+        assert.match(csvText, /"Dresses"/);
+        assert.match(csvText, /"Men's Wear"/);
+      }
+    );
+
+    test("Open redirect sanitizer blocks external protocol-relative and off-origin URLs", () => {
+      const safe = (raw: string | null | undefined): string => {
+        if (!raw || typeof raw !== "string") return "/account";
+        const t = raw.trim();
+        if (!t.startsWith("/") || t.startsWith("//") || t.startsWith("/\\") || t.includes("://") || /[\r\n\t\\]/.test(t)) {
+          return "/account";
+        }
+        return t;
+      };
+
+      assert.equal(safe("/wishlist"), "/wishlist");
+      assert.equal(safe("/checkout?step=2"), "/checkout?step=2");
+      assert.equal(safe("//evil.example/phish"), "/account");
+      assert.equal(safe("https://evil.example/phish"), "/account");
+      assert.equal(safe("/\\evil.example"), "/account");
+      assert.equal(safe("/account\r\nLocation: evil"), "/account");
+    });
   });
 });

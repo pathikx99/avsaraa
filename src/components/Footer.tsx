@@ -49,9 +49,11 @@ export default function Footer() {
 
     try {
       const cleanEmail = email.trim().toLowerCase();
-      const { error } = await supabase.from("newsletter_subscribers").insert([
+      const { error } = await supabase.from("subscriptions").insert([
         {
+          subscription_type: "newsletter",
           email: cleanEmail,
+          status: "Subscribed",
           source: "Website Footer",
         },
       ]);

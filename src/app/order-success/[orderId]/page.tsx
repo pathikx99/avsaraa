@@ -457,7 +457,7 @@ function OrderSuccessContent() {
 
               {order?.discount_amount ? (
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#28a745" }}>
-                  <span>Promotional Discount ({order.coupon_code || "AVSARAA10"})</span>
+                  <span>Promotional Discount{order.coupon_code ? ` (${order.coupon_code})` : ""}</span>
                   <span>-{formatINR(order.discount_amount)}</span>
                 </div>
               ) : null}
@@ -732,7 +732,7 @@ function OrderSuccessContent() {
                   TAX INVOICE / CASH MEMO
                 </span>
                 <p style={{ margin: "4px 0 0", fontSize: "13px", fontWeight: 700 }}>
-                  INV-{order.created_at ? new Date(order.created_at).getFullYear() : 2026}-{(order.order_number || orderId).replace(/[^A-Za-z0-9]/g, "").slice(-6)}
+                  INV-{order.created_at ? new Date(order.created_at).getFullYear() : 2026}-{(order.order_number || orderId).match(/-(\d+)$/)?.[1] || (order.order_number || orderId).replace(/[^A-Za-z0-9]/g, "").slice(-5)}
                 </p>
                 <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#555" }}>
                   Order Ref: <strong>#{order.order_number}</strong>

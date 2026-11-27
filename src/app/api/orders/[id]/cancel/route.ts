@@ -69,14 +69,27 @@ export async function POST(
 
     const nowIso = new Date().toISOString();
     const cancelNote = `\n[Cancelled on ${new Date().toLocaleDateString("en-IN")}] Reason: ${reason || "Customer requested cancellation"}`;
+    const nextPaymentStatus = order.payment_status === "Paid" ? "Refunded" : order.payment_status;
+    const existingHistory = Array.isArray((order as { edit_history?: unknown[] }).edit_history)
+      ? ((order as { edit_history?: unknown[] }).edit_history as unknown[])
+      : [];
+    const editEntry = {
+      edited_by: user.id,
+      edit_type: "cancel",
+      before_snapshot: { order_status: order.order_status, payment_status: order.payment_status },
+      after_snapshot: { order_status: "Cancelled", payment_status: nextPaymentStatus },
+      reason: reason || "Customer requested cancellation",
+      created_at: nowIso,
+    };
 
     // Atomic conditional transition prevents concurrent double cancellation / duplicate stock restoration
     const { data: updatedOrder, error: updateErr } = await adminClient
       .from("orders")
       .update({
         order_status: "Cancelled",
-        payment_status: order.payment_status === "Paid" ? "Refunded" : order.payment_status,
+        payment_status: nextPaymentStatus,
         notes: order.notes ? `${order.notes}${cancelNote}` : cancelNote.trim(),
+        edit_history: [...existingHistory, editEntry],
         updated_at: nowIso,
       })
       .eq("id", order.id)
@@ -107,16 +120,6 @@ export async function POST(
         }
       }
     } catch {}
-
-    // Audit edit record
-    await adminClient.from("order_edits").insert({
-      order_id: order.id,
-      edited_by: user.id,
-      edit_type: "cancel",
-      before_snapshot: { order_status: order.order_status, payment_status: order.payment_status },
-      after_snapshot: { order_status: "Cancelled", payment_status: updatedOrder.payment_status },
-      reason: reason || "Customer requested cancellation",
-    });
 
     return NextResponse.json({
       success: true,

@@ -1166,31 +1166,6 @@ a {
   background: rgba(236, 200, 128, 0.7);
 }
 
-.hero-mobile-pause-btn {
-  position: relative;
-  pointer-events: auto;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(20, 13, 8, 0.48);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(236, 200, 128, 0.34);
-  color: #FAF7F2;
-  cursor: pointer;
-  touch-action: manipulation;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
-}
-
-.hero-mobile-pause-btn::after {
-  content: "";
-  position: absolute;
-  inset: -5px;
-}
-
 .hero-mobile-track {
   display: flex;
   overflow-x: auto;

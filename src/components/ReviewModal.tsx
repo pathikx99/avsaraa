@@ -17,8 +17,8 @@ export default function ReviewModal({
   isOpen,
   onClose,
   onReviewSubmitted,
-  productId = "prod-1",
-  productName = "Royal Banarasi Katan Silk Saree",
+  productId = "",
+  productName = "",
 }: ReviewModalProps) {
   const { showToast } = useCart();
   const [rating, setRating] = useState(5);

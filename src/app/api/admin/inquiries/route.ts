@@ -19,8 +19,9 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     const { data: subscribers, error: subErr } = await supabaseAdmin
-      .from("newsletter_subscribers")
+      .from("subscriptions")
       .select("*")
+      .eq("subscription_type", "newsletter")
       .order("created_at", { ascending: false });
 
     return NextResponse.json({
@@ -129,7 +130,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: "Record ID is required." }, { status: 400 });
     }
 
-    const tableName = target === "subscriber" ? "newsletter_subscribers" : "contact_inquiries";
+    const tableName = target === "subscriber" ? "subscriptions" : "contact_inquiries";
     const { error } = await supabaseAdmin.from(tableName).delete().eq("id", id);
 
     if (error) {

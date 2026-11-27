@@ -7,7 +7,6 @@ export interface DetailedProduct extends Product {
   mrp: number;
   discount_percent: number;
   gallery_images: string[];
-  video_url?: string;
   cluster_origin?: string;
   artisan_hours?: number;
   fall_pico_included?: boolean;
@@ -37,247 +36,7 @@ export interface DetailedProduct extends Product {
   wash_care_bullets: string[];
 }
 
-/**
- * Seeded catalog fallback products to ensure instant, reliable loading
- * even if Supabase is initializing, cold-starting, or database grants are being refreshed.
- */
-export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [
-  {
-    id: "e0000000-0000-0000-0000-000000000001",
-    name: "Royal Banarasi Katan Silk Saree",
-    category: "Sarees",
-    price: 24999,
-    mrp: 32500,
-    discount_percent: 23,
-    image_url: "/images/saree_model_hero.jpg",
-    gallery_images: [
-      "/images/saree_model_hero.jpg",
-      "/images/occasion_traditional.jpg",
-      "/images/occasion_wedding.jpg",
-    ],
-    video_url: "https://www.youtube.com/embed/5mGUdDq42iI",
-    description: "Pure mulberry Katan silk handwoven on traditional Varanasi handlooms with intricate real zari kadhwa floral jaal and a regal gold brocade pallu.",
-    color_variants: [
-      { name: "Crimson Red", hex: "#8A181A", image_url: "/images/saree_model_hero.jpg" },
-      { name: "Royal Emerald", hex: "#1C4D35", image_url: "/images/occasion_traditional.jpg" },
-      { name: "Rani Pink", hex: "#B8255F", image_url: "/images/occasion_wedding.jpg" },
-    ],
-    highlights: [
-      { icon: "loom", title: "Pure Handloom Weave", description: "100% Certified Katan Silk" },
-      { icon: "needle", title: "Real Zari Kadhwa", description: "Intricate Antique Gold Weft" },
-      { icon: "dress", title: "Regal 6-Yard Drape", description: "Sculpted Heirloom Weight" },
-    ],
-    available_sizes: ["Free Size (5.5m + 0.8m Blouse)"],
-    stock_status: "in_stock",
-    stock_count: 4,
-    dispatch_time: "Dispatched within 24–48 hours from Avsaraa Atelier",
-    specifications: {
-      fabric: "Pure Mulberry Katan Silk (Handloom Certified)",
-      work: "Intricate Antique Gold Zari Kadhwa Weave & Handwoven Floral Jaal",
-      pattern: "Traditional Royal Floral Boota & Ornate Brocade Border",
-      fit: "Classic 6-Yard Drape with Sculpted Fall",
-      occasion: "Bridal Receptions, Weddings, Traditional Ceremonies",
-      set_includes: "1 Saree (5.5 Meters) + 1 Unstitched Matching Blouse Piece (0.8 Meters)",
-      product_length: "Saree: 5.5 Meters | Blouse: 0.8 Meters | Width: 45 Inches",
-      care_instructions: "Dry clean only. Iron on low heat on reverse side. Store wrapped in pure muslin.",
-    },
-    wash_care_bullets: [
-      "Dry clean strictly recommended to preserve genuine zari thread shine.",
-      "Never spray perfumes or deodorants directly onto gold zari borders.",
-      "Store wrapped in breathable cotton or muslin cloth in a dry wardrobe.",
-      "Air out the drape once every six months in indirect shade.",
-    ],
-    occasion_tags: ["Traditional & Ceremonial Wear", "Wedding Guest", "Festive Edit"],
-    sales_count: 320,
-    product_type: "standalone",
-  },
-  {
-    id: "e0000000-0000-0000-0000-000000000004",
-    name: "Festive Chanderi Foil Print Dress",
-    category: "Dresses",
-    price: 12500,
-    mrp: 16900,
-    discount_percent: 26,
-    image_url: "/images/occasion_festive.jpg",
-    gallery_images: [
-      "/images/occasion_festive.jpg",
-      "/images/occasion_party.jpg",
-      "/images/botanical_flowers.jpg",
-    ],
-    description: "Contemporary silhouette crafted from lightweight Chanderi weave featuring artisanal metallic foil accents, soft inner lining, and a flowing flared hem.",
-    color_variants: [
-      { name: "Festive Gold", hex: "#D4AF37", image_url: "/images/occasion_festive.jpg" },
-      { name: "Deep Ruby", hex: "#7B1113", image_url: "/images/occasion_party.jpg" },
-      { name: "Ivory Pearl", hex: "#F3ECE1", image_url: "/images/botanical_flowers.jpg" },
-    ],
-    highlights: [
-      { icon: "loom", title: "Pure Chanderi Silk", description: "Weightless Breathable Sheen" },
-      { icon: "needle", title: "Hand-Applied Foil", description: "Artisanal Metallic Accents" },
-      { icon: "dress", title: "Flared Kalidar Cut", description: "All-Day Tailored Comfort" },
-    ],
-    available_sizes: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"],
-    stock_status: "in_stock",
-    stock_count: 7,
-    dispatch_time: "Dispatched within 24 hours from Avsaraa Atelier",
-    specifications: {
-      fabric: "Pure Chanderi Silk Blend with Soft Butter Crepe Lining",
-      work: "Artisanal Metallic Gold Foil Print & Micro-Sequin Yoke",
-      pattern: "Contemporary Kalidar Flared Motif",
-      fit: "Flared Anarkali Silhouette with Cinched Waist",
-      occasion: "Festive Soirées, Diwali Celebrations, Evening Gatherings",
-      set_includes: "1 Flared Long Dress with Inbuilt Lining",
-      product_length: "Dress Length: 49 Inches | Sleeve Length: 18 Inches",
-      care_instructions: "Dry clean recommended for first two washes. Hand wash cold separately.",
-    },
-    wash_care_bullets: [
-      "Dry clean recommended for initial cleaning to preserve foil sheen.",
-      "Subsequent washes: Gentle hand wash in cold water with mild detergent.",
-      "Do not wring or rub the foil-printed surfaces.",
-      "Always iron inside out on low to medium heat.",
-    ],
-    occasion_tags: ["Festive Edit", "Haldi & Mehendi", "Party & Special Occasions"],
-    sales_count: 215,
-    product_type: "top",
-  },
-  {
-    id: "e0000000-0000-0000-0000-000000000002",
-    name: "Emerald Organza Embroidered Saree",
-    category: "Sarees",
-    price: 18450,
-    mrp: 23900,
-    discount_percent: 23,
-    image_url: "/images/occasion_traditional.jpg",
-    gallery_images: [
-      "/images/occasion_traditional.jpg",
-      "/images/occasion_party.jpg",
-      "/images/saree_model_hero.jpg",
-    ],
-    description: "Whisper-light handloom organza saree in deep emerald adorned with scalloped hand-cut resham embroidery and delicate badla zari accents.",
-    color_variants: [
-      { name: "Deep Emerald", hex: "#0E4731", image_url: "/images/occasion_traditional.jpg" },
-      { name: "Powder Blue", hex: "#8DA7B8", image_url: "/images/occasion_party.jpg" },
-    ],
-    highlights: [
-      { icon: "loom", title: "Handloom Sheer Organza", description: "Weightless Sculptural Drape" },
-      { icon: "needle", title: "Scalloped Cutwork", description: "Intricate Badla & Resham" },
-      { icon: "dress", title: "Cocktail Silhouette", description: "Graceful Fluid Movement" },
-    ],
-    available_sizes: ["Free Size (5.5m + 0.8m Blouse)"],
-    stock_status: "in_stock",
-    stock_count: 3,
-    dispatch_time: "Dispatched within 24–48 hours from Avsaraa Atelier",
-    specifications: {
-      fabric: "Pure Sheer Handloom Organza Silk",
-      work: "Hand-cut Scalloped Resham Border with Micro-Zari Highlights",
-      pattern: "Minimalist Scattered Floral Motifs",
-      fit: "Lightweight Sculptural Drape",
-      occasion: "Cocktail Dinners, Wedding Guest, Evening Receptions",
-      set_includes: "1 Saree (5.5 Meters) + 1 Heavy Embroidered Blouse Piece (0.8 Meters)",
-      product_length: "Saree: 5.5 Meters | Blouse: 0.8 Meters | Width: 44 Inches",
-      care_instructions: "Dry clean only. Roll-press recommended for organza pleats.",
-    },
-    wash_care_bullets: [
-      "Dry clean only. Store on wide padded hangers.",
-      "Do not spray perfume directly onto delicate organza sheer.",
-      "Steam iron or roll-press on low temperature.",
-    ],
-    occasion_tags: ["Traditional & Ceremonial Wear", "Party & Special Occasions"],
-    sales_count: 190,
-    product_type: "standalone",
-  },
-  {
-    id: "e1000000-0000-0000-0000-000000000003",
-    name: "Indigo Floral Handblock Printed Suit Set",
-    category: "Dresses",
-    price: 1299,
-    mrp: 1899,
-    discount_percent: 32,
-    image_url: "/images/occasion_everyday.jpg",
-    gallery_images: [
-      "/images/occasion_everyday.jpg",
-      "/images/occasion_festive.jpg",
-      "/images/botanical_flowers.jpg",
-    ],
-    description: "Breathable pure cotton slub suit set in deep indigo blue, featuring traditional handblock botanical motifs, comfortable straight-fit trousers, and matching lightweight stole.",
-    color_variants: [
-      { name: "Indigo Blue", hex: "#233D60", image_url: "/images/occasion_everyday.jpg" },
-      { name: "Earthy Sage", hex: "#6A7B69", image_url: "/images/occasion_festive.jpg" },
-    ],
-    highlights: [
-      { icon: "loom", title: "100% Breathable Cotton", description: "Skin-Friendly Cotton Slub" },
-      { icon: "needle", title: "Artisan Handblock", description: "Natural Fast Dyes" },
-      { icon: "dress", title: "All-Day Comfort Fit", description: "Easy Care & Versatile" },
-    ],
-    available_sizes: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"],
-    stock_status: "in_stock",
-    stock_count: 12,
-    dispatch_time: "Dispatched within 24 hours from Avsaraa Atelier",
-    specifications: {
-      fabric: "100% Breathable Pure Cotton Slub",
-      work: "Authentic Bagru Handblock Botanical Print",
-      pattern: "Traditional Indigo Floral Motif",
-      fit: "Straight Cut Kurta with Relaxed Comfort Trousers",
-      occasion: "Everyday Workwear, Daytime Gatherings, Casual Outings",
-      set_includes: "1 Kurta + 1 Pair of Trousers + 1 Cotton Mul Stole",
-      product_length: "Kurta Length: 44 Inches | Trouser Length: 38 Inches",
-      care_instructions: "Gentle machine wash cold. Wash dark colors separately. Line dry in shade.",
-    },
-    wash_care_bullets: [
-      "Machine wash cold on gentle cycle or hand wash.",
-      "Wash dark shades separately for initial washes.",
-      "Use mild liquid detergent; avoid bleach or harsh scrubbers.",
-      "Warm iron on reverse side.",
-    ],
-    occasion_tags: ["Everyday Essentials", "Festive Edit"],
-    sales_count: 210,
-    product_type: "set",
-  },
-  {
-    id: "e1000000-0000-0000-0000-000000000009",
-    name: "Sage Minimalist Linen Everyday Kurta",
-    category: "Dresses",
-    price: 1250,
-    mrp: 1750,
-    discount_percent: 29,
-    image_url: "/images/occasion_everyday.jpg",
-    gallery_images: [
-      "/images/occasion_everyday.jpg",
-      "/images/occasion_party.jpg",
-    ],
-    description: "Minimalist hand-spun linen kurta in soothing sage green. Tailored with a relaxed silhouette, side slits, and mother-of-pearl button detailing for effortless everyday elegance.",
-    color_variants: [
-      { name: "Sage Green", hex: "#7E8C78", image_url: "/images/occasion_everyday.jpg" },
-      { name: "Natural Ivory", hex: "#EBE3D5", image_url: "/images/botanical_flowers.jpg" },
-    ],
-    highlights: [
-      { icon: "loom", title: "Pure Handloom Linen", description: "Naturally Breathable Fiber" },
-      { icon: "needle", title: "Minimalist Detailing", description: "Mother-of-Pearl Buttons" },
-      { icon: "dress", title: "Effortless Comfort", description: "Easy Drape Everyday Fit" },
-    ],
-    available_sizes: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"],
-    stock_status: "in_stock",
-    stock_count: 9,
-    dispatch_time: "Dispatched within 24 hours from Avsaraa Atelier",
-    specifications: {
-      fabric: "Pure Handloom Linen & Breathable Cotton Blend",
-      work: "Minimalist Stitch Detailing & Mother-of-Pearl Accents",
-      pattern: "Solid Organic Slub Texture",
-      fit: "Relaxed Straight Cut with Side Slits",
-      occasion: "Daily Wear, Office Meetings, Casual Brunches",
-      set_includes: "1 Handcrafted Everyday Kurta",
-      product_length: "Kurta Length: 43 Inches | Sleeve Length: 17 Inches",
-      care_instructions: "Gentle hand wash or gentle machine wash cold. Warm iron while slightly damp.",
-    },
-    wash_care_bullets: [
-      "Machine wash cold with mild detergent.",
-      "Dry flat in shade to retain linen fiber crispness.",
-      "Iron while slightly damp on medium-high heat.",
-    ],
-    occasion_tags: ["Everyday Essentials"],
-    sales_count: 88,
-    product_type: "top",
-  },
-];
+export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [];
 
 /**
  * Enriches a standard Product record with all luxury e-commerce specifications.
@@ -467,15 +226,12 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
           { name: "Original Edition", hex: "#261B13", image_url: primaryImg },
         ];
 
-  const video_url = product.video_url?.trim() || undefined;
-
   return {
     ...product,
     image_url: primaryImg,
     mrp,
     discount_percent,
     gallery_images: uniqueGallery,
-    video_url,
     cluster_origin,
     artisan_hours,
     fall_pico_included: isSaree,
@@ -508,6 +264,7 @@ export async function fetchProductById(id: string): Promise<DetailedProduct | nu
       const cachedMatch = catalog.find((p) =>
         p.id === id ||
         p.slug === id ||
+        (p.sku && p.sku.toLowerCase() === normalizedKey) ||
         p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") === normalizedKey
       );
       if (cachedMatch) {
@@ -521,11 +278,22 @@ export async function fetchProductById(id: string): Promise<DetailedProduct | nu
   // 2. Query Supabase (primary source of truth if not in memory)
   try {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isSkuCode = /^AVS-[A-Z]{3}-\d{4}-\d{4,}$/i.test(id.trim());
     if (isUuid) {
       const { data, error } = await supabase
         .from("products")
         .select("*")
         .eq("id", id)
+        .maybeSingle();
+
+      if (data && !error) {
+        return enrichProductToDetailed(data as Product);
+      }
+    } else if (isSkuCode) {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("specifications->>sku", id.trim().toUpperCase())
         .maybeSingle();
 
       if (data && !error) {
@@ -546,22 +314,6 @@ export async function fetchProductById(id: string): Promise<DetailedProduct | nu
   } catch (err) {
     console.warn("fetchProductById Supabase lookup notice:", err);
   }
-
-  // 3. Check exact match in SEED_CATALOG_PRODUCTS fallback
-  const seedMatch = SEED_CATALOG_PRODUCTS.find((p) =>
-    p.id === id ||
-    p.slug === id ||
-    p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") === normalizedKey
-  );
-  if (seedMatch) return seedMatch;
-
-  // 4. Fallback: match by partial ID or name keyword
-  const partialMatch = SEED_CATALOG_PRODUCTS.find((p) =>
-    p.id.includes(id) ||
-    id.includes(p.id) ||
-    p.name.toLowerCase().includes(normalizedKey.replace(/-/g, " "))
-  );
-  if (partialMatch) return partialMatch;
 
   return null;
 }
@@ -602,7 +354,6 @@ export async function fetchRelatedProducts(
     console.warn("fetchRelatedProducts notice:", err);
   }
 
-  // Fallback to seed catalog
-  return SEED_CATALOG_PRODUCTS.filter((p) => p.id !== currentId).slice(0, limit);
+  return [];
 }
 

@@ -8,6 +8,7 @@ interface RateLimitRecord {
   resetAt: number;
 }
 
+const MAX_RATE_LIMIT_ENTRIES = 10_000;
 const rateLimitStore = new Map<string, RateLimitRecord>();
 
 // Clean up expired entries periodically
@@ -42,6 +43,10 @@ export function checkRateLimit(
   const record = rateLimitStore.get(identifier);
 
   if (!record || now > record.resetAt) {
+    if (!record && rateLimitStore.size >= MAX_RATE_LIMIT_ENTRIES) {
+      const oldestKey = rateLimitStore.keys().next().value;
+      if (oldestKey) rateLimitStore.delete(oldestKey);
+    }
     rateLimitStore.set(identifier, {
       count: 1,
       resetAt: now + windowMs,

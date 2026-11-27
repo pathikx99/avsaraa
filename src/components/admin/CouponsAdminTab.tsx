@@ -290,7 +290,7 @@ export default function CouponsAdminTab({
             }}
           >
             <TagIcon size={20} color="#E2BE72" />
-            Dynamic Promotional Coupons & Offers
+            Promo Codes &amp; Discounts
           </h2>
           <p
             style={{
@@ -300,7 +300,7 @@ export default function CouponsAdminTab({
               fontFamily: "'Plus Jakarta Sans', sans-serif",
             }}
           >
-            Configure cart percentage savings, fixed rupee discounts, and minimum cart thresholds for AVSARAA patrons.
+            Create discount codes and free shipping offers for shoppers.
           </p>
         </div>
 
@@ -344,13 +344,13 @@ export default function CouponsAdminTab({
           }}
         >
           <div style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "#8E8782", fontWeight: 600 }}>
-            Active Offers
+            Active Codes
           </div>
           <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#2E7D32", marginTop: 4 }}>
             {activeCouponsCount}
           </div>
           <div style={{ fontSize: "0.75rem", color: "#7D7571", marginTop: 2 }}>
-            Currently redeemable at checkout
+            Working at checkout now
           </div>
         </div>
 
@@ -363,13 +363,13 @@ export default function CouponsAdminTab({
           }}
         >
           <div style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "#8E8782", fontWeight: 600 }}>
-            Lifetime Redemptions
+            Times Used
           </div>
           <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#261B13", marginTop: 4 }}>
             {totalRedemptions}
           </div>
           <div style={{ fontSize: "0.75rem", color: "#7D7571", marginTop: 2 }}>
-            Across all patron orders
+            Across all customer orders
           </div>
         </div>
 
@@ -382,13 +382,13 @@ export default function CouponsAdminTab({
           }}
         >
           <div style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "#8E8782", fontWeight: 600 }}>
-            Percentage Codes
+            % Discount Codes
           </div>
           <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#B37A2C", marginTop: 4 }}>
             {percentageCount}
           </div>
           <div style={{ fontSize: "0.75rem", color: "#7D7571", marginTop: 2 }}>
-            Proportional value incentives
+            Percent-off offers
           </div>
         </div>
 
@@ -401,13 +401,13 @@ export default function CouponsAdminTab({
           }}
         >
           <div style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "#8E8782", fontWeight: 600 }}>
-            Total Configured
+            Total Codes
           </div>
           <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#261B13", marginTop: 4 }}>
             {coupons.length}
           </div>
           <div style={{ fontSize: "0.75rem", color: "#7D7571", marginTop: 2 }}>
-            Promo campaign entries
+            All saved promo codes
           </div>
         </div>
       </div>
@@ -443,7 +443,7 @@ export default function CouponsAdminTab({
           <SearchIcon size={16} color="#8E8782" />
           <input
             type="text"
-            placeholder="Search promo code (e.g. AVSARAA10)..."
+            placeholder="Search promo code..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -557,10 +557,10 @@ export default function CouponsAdminTab({
                   }}
                 >
                   <th style={{ padding: "14px 20px" }}>Promo Code</th>
-                  <th style={{ padding: "14px 16px" }}>Discount Benefit</th>
-                  <th style={{ padding: "14px 16px" }}>Thresholds</th>
-                  <th style={{ padding: "14px 16px" }}>Redemptions</th>
-                  <th style={{ padding: "14px 16px" }}>Validity</th>
+                  <th style={{ padding: "14px 16px" }}>Discount</th>
+                  <th style={{ padding: "14px 16px" }}>Min Order &amp; Limit</th>
+                  <th style={{ padding: "14px 16px" }}>Used</th>
+                  <th style={{ padding: "14px 16px" }}>Expiry Date</th>
                   <th style={{ padding: "14px 16px" }}>Status</th>
                   <th style={{ padding: "14px 20px", textAlign: "right" }}>Actions</th>
                 </tr>
@@ -796,10 +796,10 @@ export default function CouponsAdminTab({
                     color: "#261B13",
                   }}
                 >
-                  Create New Promotion Code
+                  New Promo Code
                 </h3>
                 <p style={{ margin: "2px 0 0", fontSize: "0.8rem", color: "#8E8782" }}>
-                  Publish an immediate luxury incentive for your cart shoppers.
+                  Add a discount or free delivery code for checkout.
                 </p>
               </div>
               <button
@@ -965,7 +965,7 @@ export default function CouponsAdminTab({
                         marginBottom: 6,
                       }}
                     >
-                      Min Cart Subtotal (₹)
+                      Minimum Order (₹)
                     </label>
                     <input
                       type="number"
@@ -996,7 +996,7 @@ export default function CouponsAdminTab({
                         marginBottom: 6,
                       }}
                     >
-                      Max Discount Cap (₹)
+                      Max Discount Limit (₹)
                     </label>
                     <input
                       type="number"
@@ -1030,7 +1030,7 @@ export default function CouponsAdminTab({
                         marginBottom: 6,
                       }}
                     >
-                      Total Redemptions
+                      Total Uses Allowed
                     </label>
                     <input
                       type="number"
@@ -1061,7 +1061,7 @@ export default function CouponsAdminTab({
                         marginBottom: 6,
                       }}
                     >
-                      Per-Customer Limit
+                      Uses Per Customer
                     </label>
                     <input
                       type="number"
@@ -1092,7 +1092,7 @@ export default function CouponsAdminTab({
                         marginBottom: 6,
                       }}
                     >
-                      Valid Until (Expiry)
+                      Expiry Date
                     </label>
                     <input
                       type="date"

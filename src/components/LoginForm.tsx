@@ -23,13 +23,31 @@ interface LoginFormProps {
   isStandalone?: boolean;
 }
 
+export function sanitizeRedirectPath(raw: string | null | undefined, fallback = "/account"): string {
+  if (!raw || typeof raw !== "string") return fallback;
+  const trimmed = raw.trim();
+  if (
+    !trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    trimmed.startsWith("/\\") ||
+    trimmed.includes("://") ||
+    /[\r\n\t\\]/.test(trimmed)
+  ) {
+    return fallback;
+  }
+  return trimmed;
+}
+
 export default function LoginForm({
   onNavigateToRegister,
   onBack,
 }: LoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams?.get("redirectTo") || searchParams?.get("redirect") || "/account";
+  const redirectTo = sanitizeRedirectPath(
+    searchParams?.get("redirectTo") || searchParams?.get("redirect"),
+    "/account"
+  );
   const urlError = searchParams?.get("error");
 
   const [email, setEmail] = useState("");

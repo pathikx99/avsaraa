@@ -2339,23 +2339,6 @@ export default function CheckoutPage() {
                   <span style={{ fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5A4535" }}>
                     Promo Code
                   </span>
-                  {!appliedCoupon && (
-                    <button
-                      type="button"
-                      onClick={() => handleApplyCoupon("AVSARAA10")}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#A97C50",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                      }}
-                    >
-                      Apply &quot;AVSARAA10&quot;
-                    </button>
-                  )}
                 </div>
 
                 {appliedCoupon ? (

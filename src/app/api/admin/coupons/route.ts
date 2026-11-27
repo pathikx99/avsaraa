@@ -7,7 +7,6 @@ import {
   enrichCoupon,
   saveCouponMetadata,
   removeCouponMetadata,
-  FALLBACK_COUPONS,
 } from "@/lib/couponManager";
 
 export async function GET() {
@@ -26,27 +25,25 @@ export async function GET() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.warn("Coupons query error (falling back to default templates):", error.message);
+        console.warn("Coupons query error:", error.message);
         return NextResponse.json({
           success: true,
-          coupons: FALLBACK_COUPONS.map(enrichCoupon),
-          notice: "Using local promo cache as remote coupons table is being initialized.",
+          coupons: [],
+          notice: error.message,
         });
       }
 
-      const couponList = (coupons && coupons.length > 0 ? coupons : FALLBACK_COUPONS).map(
-        (c) => enrichCoupon(c as Coupon)
-      );
+      const couponList = (coupons || []).map((c) => enrichCoupon(c as Coupon));
 
       return NextResponse.json({
         success: true,
         coupons: couponList,
       });
     } catch (err: unknown) {
-      console.warn("Coupons query exception, returning default coupons:", err);
+      console.warn("Coupons query exception:", err);
       return NextResponse.json({
         success: true,
-        coupons: FALLBACK_COUPONS.map(enrichCoupon),
+        coupons: [],
       });
     }
   } catch (err: unknown) {

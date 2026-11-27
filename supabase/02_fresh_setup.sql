@@ -6,10 +6,9 @@
 -- (after running 01_delete_full_database.sql).
 -- It creates:
 --   - Storage buckets ('items', 'avatars') with public CDN access
---   - 16 active durable tables: admin_users, profiles, addresses, products,
---     contact_inquiries, newsletter_subscribers, wishlists, product_reviews,
---     coupons, orders, order_items, payments, user_carts, processed_webhooks,
---     back_in_stock_subscriptions, order_edits
+--   - 13 active durable tables: admin_users, profiles, addresses, products,
+--     contact_inquiries, subscriptions, wishlists, product_reviews,
+--     coupons, orders, order_items, payments, processed_webhooks
 --   - Row Level Security (RLS) policies & Super Admin authority model
 --   - Atomic stock deduction & restoration RPCs (OTPs & rate limits use Upstash Redis)
 -- ==============================================================================
@@ -151,6 +150,8 @@ CREATE TABLE public.profiles (
     reward_points INTEGER DEFAULT 0 CHECK (reward_points >= 0),
     preferred_currency TEXT DEFAULT 'INR',
     concierge_notes TEXT,
+    cart_items JSONB DEFAULT '[]'::jsonb NOT NULL,
+    cart_updated_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
@@ -352,6 +353,7 @@ CREATE POLICY "Users can delete their own addresses"
 -- ------------------------------------------------------------------------------
 CREATE TABLE public.products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sku TEXT UNIQUE,
     name TEXT NOT NULL,
     category TEXT NOT NULL CHECK (category IN ('Sarees', 'Dresses', 'Co-ords', 'Men''s Wear', 'New Arrivals', 'Occasion Wear')),
     price NUMERIC(10, 2) NOT NULL CHECK (price >= 0),
@@ -440,28 +442,43 @@ CREATE POLICY "Super admin can delete contact inquiries"
     USING (public.is_admin());
 
 -- ------------------------------------------------------------------------------
--- 8. NEWSLETTER SUBSCRIBERS
+-- 8. SUBSCRIPTIONS (Newsletter & Back-in-Stock Restock Alerts)
 -- ------------------------------------------------------------------------------
-CREATE TABLE public.newsletter_subscribers (
+CREATE TABLE public.subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email TEXT UNIQUE NOT NULL,
-    status TEXT DEFAULT 'Subscribed' CHECK (status IN ('Subscribed', 'Unsubscribed')),
+    subscription_type TEXT NOT NULL CHECK (subscription_type IN ('newsletter', 'back_in_stock')),
+    email TEXT NOT NULL,
+    phone_number TEXT,
+    product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    variant_name TEXT,
+    size TEXT,
+    status TEXT DEFAULT 'Subscribed' CHECK (status IN ('Subscribed', 'Unsubscribed', 'Notified')),
     source TEXT DEFAULT 'Website Footer',
+    notified BOOLEAN DEFAULT false,
+    notified_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
 
-ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
+CREATE UNIQUE INDEX idx_subscriptions_newsletter_email_unique
+    ON public.subscriptions (LOWER(email))
+    WHERE subscription_type = 'newsletter';
 
-CREATE POLICY "Anyone can subscribe to the newsletter" 
-    ON public.newsletter_subscribers FOR INSERT 
+CREATE INDEX idx_subscriptions_type_product
+    ON public.subscriptions (subscription_type, product_id);
+
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can subscribe"
+    ON public.subscriptions FOR INSERT
     WITH CHECK (true);
 
-CREATE POLICY "Super admin can view subscribers" 
-    ON public.newsletter_subscribers FOR SELECT 
-    USING (public.is_admin());
+CREATE POLICY "Users can view own subscriptions or admin views all"
+    ON public.subscriptions FOR SELECT
+    USING (auth.uid() = user_id OR public.is_admin());
 
-CREATE POLICY "Super admin can delete subscribers" 
-    ON public.newsletter_subscribers FOR DELETE 
+CREATE POLICY "Super admin manages subscriptions"
+    ON public.subscriptions FOR ALL
     USING (public.is_admin());
 
 -- ------------------------------------------------------------------------------
@@ -619,6 +636,7 @@ CREATE TABLE public.orders (
     tracking_number TEXT,
     courier_partner TEXT,
     estimated_delivery TIMESTAMPTZ,
+    edit_history JSONB DEFAULT '[]'::jsonb NOT NULL,
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
@@ -701,20 +719,8 @@ CREATE POLICY "Super admin can manage payments"
     USING (public.is_admin());
 
 -- ------------------------------------------------------------------------------
--- 13. USER CARTS & WEBHOOK DEDUPLICATION
+-- 13. WEBHOOK DEDUPLICATION
 -- ------------------------------------------------------------------------------
-CREATE TABLE public.user_carts (
-    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    items JSONB DEFAULT '[]'::jsonb NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.user_carts ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can manage their own cart" 
-    ON public.user_carts FOR ALL 
-    USING (auth.uid() = user_id OR public.is_admin());
-
 CREATE TABLE public.processed_webhooks (
     webhook_id TEXT PRIMARY KEY,
     source TEXT NOT NULL,
@@ -734,6 +740,7 @@ CREATE POLICY "Service role and admin can manage webhooks"
 CREATE INDEX idx_admin_users_email ON public.admin_users(email);
 CREATE INDEX idx_addresses_user ON public.addresses(user_id);
 CREATE INDEX idx_inquiries_email ON public.contact_inquiries(email);
+CREATE INDEX idx_products_sku ON public.products(sku);
 CREATE INDEX idx_products_category ON public.products(category);
 CREATE INDEX idx_products_category_created ON public.products(category, created_at DESC);
 CREATE INDEX idx_products_price ON public.products(price);
@@ -754,28 +761,7 @@ CREATE INDEX idx_coupons_code ON public.coupons(code);
 CREATE INDEX idx_processed_webhooks_processed_at ON public.processed_webhooks(processed_at DESC);
 
 -- ------------------------------------------------------------------------------
--- 15. BACK-IN-STOCK SUBSCRIPTIONS
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.back_in_stock_subscriptions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    email TEXT NOT NULL,
-    phone_number TEXT,
-    variant_name TEXT,
-    size TEXT,
-    notified BOOLEAN DEFAULT false,
-    notified_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.back_in_stock_subscriptions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can subscribe to back-in-stock" ON public.back_in_stock_subscriptions FOR INSERT WITH CHECK (true);
-CREATE POLICY "Users can view own subscriptions" ON public.back_in_stock_subscriptions FOR SELECT USING (auth.uid() = user_id OR public.is_admin());
-CREATE POLICY "Super admin manages subscriptions" ON public.back_in_stock_subscriptions FOR ALL USING (public.is_admin());
-
--- ------------------------------------------------------------------------------
--- 16. ORDER EXTENSIONS: gift wrap, gift message, exchange tracking
+-- 15. ORDER EXTENSIONS: gift wrap, gift message, exchange tracking
 -- ------------------------------------------------------------------------------
 ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS gift_wrap BOOLEAN DEFAULT false,
@@ -787,27 +773,7 @@ ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS exchange_replacement_order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL;
 
 -- ------------------------------------------------------------------------------
--- 17. ORDER CANCELLATION & EDITING AUDIT
--- ------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.order_edits (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
-    edited_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    edit_type TEXT NOT NULL CHECK (edit_type IN ('cancel', 'address_change', 'item_add', 'item_remove', 'quantity_change', 'note_change')),
-    before_snapshot JSONB DEFAULT '{}'::jsonb,
-    after_snapshot JSONB DEFAULT '{}'::jsonb,
-    reason TEXT,
-    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
-ALTER TABLE public.order_edits ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Order edits viewable by owner or admin" ON public.order_edits FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.orders WHERE orders.id = order_edits.order_id AND (orders.user_id = auth.uid() OR public.is_admin()))
-);
-CREATE POLICY "Super admin manages order edits" ON public.order_edits FOR ALL USING (public.is_admin());
-
--- ------------------------------------------------------------------------------
--- 18. INVENTORY RESTORE RPC (used when cancelling orders)
+-- 16. INVENTORY RESTORE RPC (used when cancelling orders)
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.increment_stock(
     p_id UUID,
@@ -862,6 +828,94 @@ BEGIN
     RETURN TRUE;
 END;
 $$;
+
+-- ------------------------------------------------------------------------------
+-- 29b. SYSTEMATIC, SEQUENTIAL & CHRONOLOGICAL ORDER NUMBERS & PRODUCT SKUS
+-- ------------------------------------------------------------------------------
+CREATE SEQUENCE IF NOT EXISTS public.order_number_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS public.product_sku_seq START 1;
+
+CREATE OR REPLACE FUNCTION public.next_order_number()
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_seq BIGINT;
+    v_date TEXT;
+BEGIN
+    v_seq := nextval('public.order_number_seq');
+    v_date := TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYYYMMDD');
+    RETURN 'AVS-' || v_date || '-' || LPAD(v_seq::TEXT, 5, '0');
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.next_product_sku(p_category TEXT DEFAULT 'Products')
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_seq BIGINT;
+    v_yymm TEXT;
+    v_cat TEXT;
+BEGIN
+    v_seq := nextval('public.product_sku_seq');
+    v_yymm := TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYMM');
+    v_cat := CASE p_category
+        WHEN 'Sarees' THEN 'SAR'
+        WHEN 'Dresses' THEN 'DRS'
+        WHEN 'Co-ords' THEN 'CRD'
+        WHEN 'Men''s Wear' THEN 'MEN'
+        WHEN 'New Arrivals' THEN 'NEW'
+        WHEN 'Occasion Wear' THEN 'OCC'
+        ELSE 'PRD'
+    END;
+    RETURN 'AVS-' || v_cat || '-' || v_yymm || '-' || LPAD(v_seq::TEXT, 4, '0');
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.assign_order_number()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    IF NEW.order_number IS NULL OR BTRIM(NEW.order_number) = '' THEN
+        NEW.order_number := public.next_order_number();
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER assign_order_number_trigger
+    BEFORE INSERT ON public.orders
+    FOR EACH ROW EXECUTE FUNCTION public.assign_order_number();
+
+CREATE OR REPLACE FUNCTION public.assign_product_sku()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    IF NEW.sku IS NULL OR BTRIM(NEW.sku) = '' THEN
+        NEW.sku := COALESCE(
+            NULLIF(BTRIM(NEW.specifications->>'sku'), ''),
+            public.next_product_sku(NEW.category)
+        );
+    END IF;
+    NEW.specifications := COALESCE(NEW.specifications, '{}'::jsonb) || jsonb_build_object('sku', NEW.sku);
+    RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER assign_product_sku_trigger
+    BEFORE INSERT ON public.products
+    FOR EACH ROW EXECUTE FUNCTION public.assign_product_sku();
 
 -- ------------------------------------------------------------------------------
 -- 30. GUEST CHECKOUT PATRON SEED (satisfies FK constraints for guest orders)
@@ -932,6 +986,8 @@ REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.check_phone_exists(TEXT, UUID) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.check_email_exists(TEXT, UUID) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.next_order_number() TO service_role;
+GRANT EXECUTE ON FUNCTION public.next_product_sku(TEXT) TO service_role;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;

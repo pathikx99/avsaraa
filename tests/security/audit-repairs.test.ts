@@ -4,25 +4,13 @@ import crypto from "crypto";
 import { checkRateLimit, resetRateLimit } from "../../src/lib/rateLimit.ts";
 
 describe("Audit Defect & Security Patch Regression Tests", () => {
-  test("Product route pre-check strictly filters non-UUID and non-seed IDs", () => {
+  test("Product route pre-check strictly rejects non-UUID paths", () => {
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const SEED_PRODUCT_IDS = new Set([
-      "e0000000-0000-0000-0000-000000000001",
-      "e0000000-0000-0000-0000-000000000002",
-      "e0000000-0000-0000-0000-000000000003",
-      "e0000000-0000-0000-0000-000000000004",
-      "e0000000-0000-0000-0000-000000000005",
-    ]);
 
     function isPotentiallyValidProductPath(rawId: string): boolean {
       if (!rawId) return false;
-      if (SEED_PRODUCT_IDS.has(rawId)) return true;
       return UUID_REGEX.test(rawId);
     }
-
-    // Authentic seed IDs
-    assert.strictEqual(isPotentiallyValidProductPath("e0000000-0000-0000-0000-000000000001"), true);
-    assert.strictEqual(isPotentiallyValidProductPath("e0000000-0000-0000-0000-000000000004"), true);
 
     // Dynamic valid PostgreSQL UUIDs
     assert.strictEqual(isPotentiallyValidProductPath("a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d"), true);

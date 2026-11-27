@@ -5,7 +5,6 @@ import { Product } from "@/types/product";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 import { useCart } from "@/context/CartContext";
-import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 
 interface WishlistContextType {
   wishlist: Product[];
@@ -101,9 +100,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
               } else if (productObj && productObj.id) {
                 dbProducts.push(productObj);
               } else {
-                const cached =
-                  existingWishlist.find((p) => p.id === row.product_id) ||
-                  SEED_CATALOG_PRODUCTS.find((p) => p.id === row.product_id);
+                const cached = existingWishlist.find((p) => p.id === row.product_id);
                 if (cached) {
                   dbProducts.push(cached);
                 }

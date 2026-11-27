@@ -3,11 +3,20 @@ import { headers } from "next/headers";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { normalizePhoneNumber, maskEmail } from "@/lib/phoneUtils";
 import { checkDbRateLimit } from "@/lib/dbRateLimit";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const headerList = await headers();
     const forwardedFor = headerList.get("x-forwarded-for");
     const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";

@@ -36,11 +36,11 @@ import { ADMIN_EMAIL, isSuperAdminUser } from "@/lib/adminConstants";
 // Single Super Admin Default
 const DEFAULT_SUPER_ADMIN: AdminUser = {
   id: "adm-001",
-  full_name: "Kratos Lord",
+  full_name: "Avsaraa Admin",
   email: ADMIN_EMAIL,
   role: "Super Admin",
   department: "Executive Leadership",
-  phone_number: "+91 98765 43210",
+  phone_number: "",
   status: "Active",
   permissions: [
     "all:super_admin",
@@ -50,9 +50,9 @@ const DEFAULT_SUPER_ADMIN: AdminUser = {
     "database:governance",
     "system:admin",
   ],
-  notes: "Sole Master Super Administrator with complete, unrestricted system authority.",
+  notes: "Master Super Administrator account.",
   last_active: new Date().toISOString(),
-  created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+  created_at: new Date().toISOString(),
 };
 
 export default function AdminDashboardPage() {
@@ -155,7 +155,6 @@ export default function AdminDashboardPage() {
     description: string;
     fabric: string;
     weave: string;
-    video_url: string;
     sku: string;
     hsn_code: string;
     cluster_origin: string;
@@ -175,7 +174,6 @@ export default function AdminDashboardPage() {
     description: "",
     fabric: "",
     weave: "",
-    video_url: "",
     sku: "",
     hsn_code: "",
     cluster_origin: "",
@@ -254,7 +252,7 @@ export default function AdminDashboardPage() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast("✨ Catalog Showcase Order updated & published live!");
+        showToast("Product order saved!");
       } else {
         showToast(`Error: ${data.error || "Failed to save order"}`, "error");
       }
@@ -383,7 +381,7 @@ export default function AdminDashboardPage() {
     setIsRefreshing(true);
     try {
       await fetchData();
-      showToast("Live dashboard synchronized with database!", "success");
+      showToast("Data refreshed!", "success");
     } catch {
       showToast("Failed to refresh dashboard data", "error");
     } finally {
@@ -506,7 +504,7 @@ export default function AdminDashboardPage() {
 
       setSessionUser(mockAdminUser);
       setIsAuthorizedAdmin(true);
-      showToast("Master Password Verified. Admin Console Unlocked.");
+      showToast("Signed in to Admin!");
       void fetchData();
 
       // Background attempt to sync client-side Supabase auth session
@@ -540,7 +538,7 @@ export default function AdminDashboardPage() {
     setSessionUser(null);
     setIsAuthorizedAdmin(false);
     setAuthGatePassword("");
-    showToast("Super Admin signed out securely.", "info");
+    showToast("Signed out.", "info");
   };
 
   // ---------------------------------------------------------------------------
@@ -588,7 +586,7 @@ export default function AdminDashboardPage() {
       });
 
       setShowEditSuperAdminModal(false);
-      showToast("Super Admin profile updated successfully.");
+      showToast("Admin details updated.");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Update failed.";
       showToast(message, "error");
@@ -618,7 +616,6 @@ export default function AdminDashboardPage() {
       description: "",
       fabric: "",
       weave: "",
-      video_url: "",
       sku: "",
       hsn_code: "",
       cluster_origin: "",
@@ -683,7 +680,6 @@ export default function AdminDashboardPage() {
       description: product.description || "",
       fabric: product.fabric || (typeof product.specifications?.fabric === "string" ? product.specifications.fabric : ""),
       weave: product.weave || (typeof product.specifications?.work === "string" ? product.specifications.work : ""),
-      video_url: product.video_url || "",
       sku: product.sku || (typeof product.specifications?.sku === "string" ? product.specifications.sku : ""),
       hsn_code: product.hsn_code || (typeof product.specifications?.hsn_code === "string" ? product.specifications.hsn_code : ""),
       cluster_origin: product.cluster_origin || (typeof product.specifications?.cluster_origin === "string" ? product.specifications.cluster_origin : ""),
@@ -702,7 +698,7 @@ export default function AdminDashboardPage() {
       sku: prev.sku ? `${prev.sku}-COPY` : "",
     }));
     setShowAddProductModal(true);
-    showToast(`Garment "${product.name}" duplicated into creation form.`);
+    showToast(`Copied "${product.name}" into new product form.`);
   };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
@@ -759,7 +755,6 @@ export default function AdminDashboardPage() {
         description: productForm.description,
         fabric: productForm.fabric?.trim() || undefined,
         weave: productForm.weave?.trim() || undefined,
-        video_url: productForm.video_url?.trim() || undefined,
         sku: productForm.sku?.trim() || undefined,
         hsn_code: productForm.hsn_code?.trim() || undefined,
         cluster_origin: productForm.cluster_origin?.trim() || undefined,
@@ -849,7 +844,6 @@ export default function AdminDashboardPage() {
         description: productForm.description,
         fabric: productForm.fabric?.trim() || undefined,
         weave: productForm.weave?.trim() || undefined,
-        video_url: productForm.video_url?.trim() || undefined,
         sku: productForm.sku?.trim() || undefined,
         hsn_code: productForm.hsn_code?.trim() || undefined,
         cluster_origin: productForm.cluster_origin?.trim() || undefined,
@@ -938,7 +932,7 @@ export default function AdminDashboardPage() {
       setProductPhotoUploadNotice(
         `✓ Organized to Cloudflare: ${sizeKb} KB WebP (${data.path || "compressed"}).`
       );
-      showToast(`Hero photo organized to Cloudflare (${sizeKb} KB WebP)!`);
+      showToast(`Main photo uploaded (${sizeKb} KB WebP)!`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Upload error";
       showToast(msg, "error");
@@ -987,7 +981,7 @@ export default function AdminDashboardPage() {
           gallery_images: [...(prev.gallery_images || []), ...newUrls],
         }));
         setGalleryUploadNotice(`✓ Added ${uploadCount} gallery image(s) organized in Cloudflare.`);
-        showToast(`${uploadCount} gallery image(s) organized to Cloudflare!`);
+        showToast(`${uploadCount} extra photo(s) uploaded!`);
       } else {
         throw new Error("Failed to upload gallery images");
       }
@@ -1192,7 +1186,7 @@ export default function AdminDashboardPage() {
         )
       );
       setViewingCustomer((prev) => (prev ? { ...prev, concierge_notes: updatedNotes } : null));
-      showToast("Patron concierge notes saved.");
+      showToast("Customer notes saved.");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to save notes";
       showToast(message, "error");
@@ -1232,7 +1226,7 @@ export default function AdminDashboardPage() {
         )
       );
       setViewingCustomer((prev) => (prev ? { ...prev, ...newProfile, is_guest: false } : null));
-      showToast(`Guest account converted to registered patron.`);
+      showToast("Guest converted to registered customer.");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to convert guest";
       showToast(message, "error");
@@ -1381,12 +1375,12 @@ export default function AdminDashboardPage() {
       });
       const json = await res.json();
       if (res.ok && json.success) {
-        showToast(`Acknowledgement email dispatched to ${inq.email} from support@avsaraa.in`, "success");
+        showToast(`Reply email sent to ${inq.email} from support@avsaraa.in`, "success");
       } else {
-        showToast(json.error || "Failed to send acknowledgement email", "error");
+        showToast(json.error || "Failed to send reply email", "error");
       }
     } catch {
-      showToast("Error sending acknowledgement email", "error");
+      showToast("Error sending reply email", "error");
     } finally {
       setSendingAckId(null);
     }
@@ -1658,7 +1652,7 @@ export default function AdminDashboardPage() {
         <AvsaraaLogo size="md" width={140} />
         <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "#866951", fontSize: "13.5px" }}>
           <SpinnerIcon size={18} color="#866951" />
-          <span>Verifying administrative authorization...</span>
+          <span>Checking admin login...</span>
         </div>
       </div>
     );
@@ -1720,10 +1714,10 @@ export default function AdminDashboardPage() {
               marginBottom: "8px",
             }}
           >
-            Admin Console Access
+            Admin Login
           </h2>
           <p style={{ fontSize: "13px", color: "#866951", lineHeight: "1.5", marginBottom: "22px" }}>
-            Restricted Master Access. Please enter the master password to unlock the Avsaraa Admin Console.
+            Enter your admin password to open the Avsaraa dashboard.
           </p>
 
           {sessionUser && sessionUser.email && sessionUser.id !== "admin-master" && sessionUser.id !== "admin-env-user" && (
@@ -1740,8 +1734,8 @@ export default function AdminDashboardPage() {
                 lineHeight: "1.5",
               }}
             >
-              <div style={{ fontWeight: 700, marginBottom: "2px" }}>Customer Session Active</div>
-              Signed in as <strong>{sessionUser.email}</strong>. Enter master password below to unlock admin privileges.
+              <div style={{ fontWeight: 700, marginBottom: "2px" }}>Logged in as customer</div>
+              Signed in as <strong>{sessionUser.email}</strong>. Enter the admin password below for admin access.
             </div>
           )}
 
@@ -1776,7 +1770,7 @@ export default function AdminDashboardPage() {
                   marginBottom: "6px",
                 }}
               >
-                Master Password
+                Admin Password
               </label>
               <div style={{ position: "relative" }}>
                 <input
@@ -1844,7 +1838,7 @@ export default function AdminDashboardPage() {
               }}
             >
               {isLoggingIn ? <SpinnerIcon size={16} color="#FFFFFF" /> : <ShieldCheckIcon size={16} color="#C4AB94" />}
-              <span>{isLoggingIn ? "Verifying..." : "Unlock Admin Console"}</span>
+              <span>{isLoggingIn ? "Signing in..." : "Sign In"}</span>
             </button>
           </form>
 
@@ -1867,7 +1861,7 @@ export default function AdminDashboardPage() {
                 textDecoration: "underline",
               }}
             >
-              ← Return to Boutique Storefront
+              ← Back to Website
             </Link>
             {sessionUser && (
               <button
@@ -1975,7 +1969,7 @@ export default function AdminDashboardPage() {
                 }}
               >
                 <ShieldCheckIcon size={12} color="#6F42C1" />
-                SUPER ADMIN CONSOLE
+                ADMIN PANEL
               </span>
               <div
                 style={{
@@ -1990,7 +1984,7 @@ export default function AdminDashboardPage() {
                   fontWeight: 600,
                   color: "#0F7A50",
                 }}
-                title="Storefront and admin APIs are healthy and responsive"
+                title="Website and admin APIs are online"
               >
                 <span
                   style={{
@@ -2002,7 +1996,7 @@ export default function AdminDashboardPage() {
                     boxShadow: "0 0 0 2px rgba(16, 185, 129, 0.25)",
                   }}
                 />
-                <span>Store Operational</span>
+                <span>Store Online</span>
               </div>
             </div>
           </div>
@@ -2013,7 +2007,7 @@ export default function AdminDashboardPage() {
             <button
               onClick={handleRefreshData}
               disabled={isRefreshing || isLoading}
-              title="Synchronize live dashboard data with database"
+              title="Reload latest data"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -2032,7 +2026,7 @@ export default function AdminDashboardPage() {
               <span style={{ display: "inline-flex", alignItems: "center" }}>
                 {isRefreshing ? <SpinnerIcon size={14} color="#866951" /> : <RefreshIcon size={14} color="#866951" />}
               </span>
-              <span>{isRefreshing ? "Syncing..." : "Sync Live Data"}</span>
+              <span>{isRefreshing ? "Refreshing..." : "Refresh Data"}</span>
             </button>
 
             {/* Storefront Link */}
@@ -2053,9 +2047,9 @@ export default function AdminDashboardPage() {
                 textDecoration: "none",
                 transition: "all 0.15s ease",
               }}
-              title="Open customer storefront in a new tab"
+              title="Open website in a new tab"
             >
-              <span>View Storefront</span>
+              <span>Open Website</span>
               <span style={{ fontSize: "11px", color: "#866951" }}>↗</span>
             </Link>
 
@@ -2146,13 +2140,13 @@ export default function AdminDashboardPage() {
           >
             <div>
               <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
-                Gross Revenue
+                Total Sales
               </span>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 ₹{orderStats.totalRevenue.toLocaleString("en-IN")}
               </div>
               <span style={{ fontSize: "11px", color: "#0F7A50", fontWeight: 600 }}>
-                {orderStats.paidOrdersCount} Paid Orders · ₹{orderStats.avgOrderValue} AOV
+                {orderStats.paidOrdersCount} Paid Orders · ₹{orderStats.avgOrderValue} Avg Order
               </span>
             </div>
             <div
@@ -2193,7 +2187,7 @@ export default function AdminDashboardPage() {
           >
             <div>
               <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
-                Orders &amp; Logistics
+                Orders
               </span>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 {adminOrders.length}
@@ -2242,7 +2236,7 @@ export default function AdminDashboardPage() {
           >
             <div>
               <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
-                Catalog &amp; Stock
+                Products &amp; Stock
               </span>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 {products.length} Items
@@ -2291,7 +2285,7 @@ export default function AdminDashboardPage() {
           >
             <div>
               <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
-                Patrons &amp; CRM
+                Customers
               </span>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 {customerProfiles.length}
@@ -2338,13 +2332,13 @@ export default function AdminDashboardPage() {
           >
             <div>
               <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
-                Concierge Inquiries
+                Messages &amp; Subscribers
               </span>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 {inquiries.length + subscribers.length}
               </div>
               <span style={{ fontSize: "11px", color: inquiryStats.unreadCount > 0 ? "#B91C1C" : "#866951", fontWeight: 600 }}>
-                {inquiryStats.unreadCount > 0 ? `${inquiryStats.unreadCount} Unread Messages` : "All Inquiries Replied"}
+                {inquiryStats.unreadCount > 0 ? `${inquiryStats.unreadCount} Unread Messages` : "All Replies Sent"}
               </span>
             </div>
             <div
@@ -2392,13 +2386,13 @@ export default function AdminDashboardPage() {
             }}
           >
             {[
-              { id: "orders", label: "Orders & Logistics", count: adminOrders.length, icon: <DeliveryVanIcon size={16} /> },
-              { id: "products", label: "Products & Catalog", count: products.length, icon: <ShoppingBagIcon size={16} /> },
-              { id: "customers", label: "Customer CRM", count: customerProfiles.length, icon: <UserIcon size={16} /> },
-              { id: "coupons", label: "Promotions & Offers", icon: <TagIcon size={16} /> },
-              { id: "inquiries", label: "Concierge Inquiries", count: inquiries.length, icon: <MailIcon size={16} /> },
-              { id: "reviews", label: "Patron Reviews", count: reviews.length, icon: <StarIcon size={16} /> },
-              { id: "super_admin", label: "Authority & Security", icon: <ShieldCheckIcon size={16} /> },
+              { id: "orders", label: "Orders", count: adminOrders.length, icon: <DeliveryVanIcon size={16} /> },
+              { id: "products", label: "Products", count: products.length, icon: <ShoppingBagIcon size={16} /> },
+              { id: "customers", label: "Customers", count: customerProfiles.length, icon: <UserIcon size={16} /> },
+              { id: "coupons", label: "Promo Codes", icon: <TagIcon size={16} /> },
+              { id: "inquiries", label: "Messages", count: inquiries.length, icon: <MailIcon size={16} /> },
+              { id: "reviews", label: "Reviews", count: reviews.length, icon: <StarIcon size={16} /> },
+              { id: "super_admin", label: "Admin Settings", icon: <ShieldCheckIcon size={16} /> },
             ].map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -2473,9 +2467,9 @@ export default function AdminDashboardPage() {
                     border: "1px solid #C5A059",
                     cursor: isReorderingShowcase ? "not-allowed" : "pointer",
                   }}
-                  title="Save and publish current showcase sequence"
+                  title="Save current product order"
                 >
-                  <span>{isReorderingShowcase ? "⏳ Saving..." : "✦ Save Showcase Order"}</span>
+                  <span>{isReorderingShowcase ? "⏳ Saving..." : "✦ Save Product Order"}</span>
                 </button>
 
                 <a
@@ -2565,7 +2559,7 @@ export default function AdminDashboardPage() {
                 }}
               >
                 <PlusIcon size={15} color="#C5A059" />
-                <span>+ Add Customer Account</span>
+                <span>+ Add Customer</span>
               </button>
             )}
 
@@ -2585,7 +2579,7 @@ export default function AdminDashboardPage() {
                 }}
               >
                 <CameraIcon size={14} color="#866951" />
-                <span>{reviews.reduce((acc, r) => acc + (r.photos?.length || 0), 0)} Patron Photos</span>
+                <span>{reviews.reduce((acc, r) => acc + (r.photos?.length || 0), 0)} Customer Photos</span>
               </div>
             )}
 
@@ -2608,7 +2602,7 @@ export default function AdminDashboardPage() {
                 }}
               >
                 <EditIcon size={15} color="#FFFFFF" />
-                <span>Edit Super Admin Details</span>
+                <span>Edit Admin Details</span>
               </button>
             )}
           </div>
@@ -2649,7 +2643,7 @@ export default function AdminDashboardPage() {
                   type="text"
                   placeholder={
                     activeTab === "products"
-                      ? "Search catalog by name, zari craft, description..."
+                      ? "Search products by name, fabric, description..."
                       : activeTab === "customers"
                       ? "Search customers by name, phone, email, city..."
                       : "Search inquiries by sender, subject, message..."
@@ -2725,12 +2719,12 @@ export default function AdminDashboardPage() {
                       color: "#261B13",
                     }}
                   >
-                    <option value="ALL">All Segments ({customerProfiles.length})</option>
-                    <option value="VIP Atelier">👑 VIP Atelier Patrons</option>
-                    <option value="Repeat Patron">🔁 Repeat Patrons</option>
-                    <option value="Active Patron">🛍️ Active Patrons</option>
-                    <option value="Guest Buyer">👤 Guest Buyers</option>
-                    <option value="Prospective Lead">✉️ Prospective Leads</option>
+                    <option value="ALL">All Customers ({customerProfiles.length})</option>
+                    <option value="VIP Atelier">👑 VIP Customers</option>
+                    <option value="Repeat Patron">🔁 Repeat Buyers</option>
+                    <option value="Active Patron">🛍️ Regular Buyers</option>
+                    <option value="Guest Buyer">👤 Guests</option>
+                    <option value="Prospective Lead">✉️ Leads</option>
                     <option value="REGISTERED">Registered Accounts Only</option>
                     <option value="GUEST">Guest Orders Only</option>
                   </select>
@@ -2853,17 +2847,17 @@ export default function AdminDashboardPage() {
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "14px" }}>✦</span>
                 <span>
-                  <strong>Drag-and-Drop Showcase Ordering:</strong> Drag rows using the <strong>⋮⋮ handle</strong> (or use ▲ / ▼) to arrange how drapes appear in the storefront catalog. Changes publish live automatically.
+                  <strong>Product Order:</strong> Drag rows using the <strong>⋮⋮ handle</strong> (or click ▲ / ▼) to change the order shown on the website. Changes save right away.
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 {isReorderingShowcase && (
                   <span style={{ fontSize: "11px", color: "#C5A059", fontWeight: 700 }}>
-                    ⚡ Saving Sequence...
+                    ⚡ Saving Order...
                   </span>
                 )}
                 <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600 }}>
-                  {products.length} Drapes in Catalog
+                  {products.length} Products
                 </span>
               </div>
             </div>
@@ -2873,10 +2867,10 @@ export default function AdminDashboardPage() {
                 <thead>
                   <tr style={{ backgroundColor: "#FAF7F2", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
                     <th style={{ padding: "14px 12px", fontWeight: 700, width: "70px", textAlign: "center" }}>⋮⋮ Order</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Item</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Category & Promo</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Price & Discount</th>
-                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Inventory</th>
+                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Product</th>
+                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Category &amp; Offer</th>
+                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Price &amp; Discount</th>
+                    <th style={{ padding: "14px 18px", fontWeight: 700 }}>Stock</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700 }}>Description</th>
                     <th style={{ padding: "14px 18px", fontWeight: 700, textAlign: "right" }}>Actions</th>
                   </tr>
@@ -2891,7 +2885,7 @@ export default function AdminDashboardPage() {
                           </div>
                           <div style={{ fontSize: "15px", fontWeight: 600, color: "#261B13" }}>No products found</div>
                           <p style={{ fontSize: "12.5px", color: "#866951", lineHeight: "1.4" }}>
-                            No items match your search or filter criteria. Try clearing filters or adding a new drape to your catalog.
+                            No products match your search or filters. Clear your filters or add a new product.
                           </p>
                           <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
                             {(searchQuery || categoryFilter !== "ALL") && (
@@ -3071,8 +3065,13 @@ export default function AdminDashboardPage() {
                             </div>
                             <div>
                               <div style={{ fontWeight: 600, color: "#261B13" }}>{product.name}</div>
-                              <div style={{ fontSize: "11px", color: "#866951", marginTop: "2px" }}>
-                                Added: {product.created_at ? new Date(product.created_at).toLocaleDateString() : "Catalog Item"}
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", fontSize: "11px", color: "#866951", marginTop: "2px" }}>
+                                {(product.sku || (typeof product.specifications?.sku === "string" && product.specifications.sku)) && (
+                                  <span style={{ fontFamily: "monospace", fontWeight: 700, color: "#543E2E", backgroundColor: "#FAF7F2", padding: "1px 6px", borderRadius: "4px", border: "1px solid #E8DED3" }}>
+                                    {product.sku || String(product.specifications?.sku)}
+                                  </span>
+                                )}
+                                <span>Added: {product.created_at ? new Date(product.created_at).toLocaleDateString() : "Catalog Item"}</span>
                               </div>
 
                               {/* Mini Swatches Preview */}
@@ -3353,13 +3352,13 @@ export default function AdminDashboardPage() {
                 }}
               >
                 <div style={{ fontSize: "11px", fontWeight: 700, color: "#B78103", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  VIP Atelier Patrons
+                  VIP Customers
                 </div>
                 <div style={{ fontSize: "24px", fontWeight: 700, color: "#B78103", marginTop: "4px" }}>
                   {crmMetrics.vipCount}
                 </div>
                 <div style={{ fontSize: "11.5px", color: "#866951", marginTop: "2px" }}>
-                  VIP & Atelier Circle Members
+                  VIP &amp; Gold Members
                 </div>
               </div>
 
@@ -3373,13 +3372,13 @@ export default function AdminDashboardPage() {
                 }}
               >
                 <div style={{ fontSize: "11px", fontWeight: 700, color: "#6F42C1", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  Repeat Patrons
+                  Repeat Buyers
                 </div>
                 <div style={{ fontSize: "24px", fontWeight: 700, color: "#6F42C1", marginTop: "4px" }}>
                   {crmMetrics.repeatBuyers}
                 </div>
                 <div style={{ fontSize: "11.5px", color: "#866951", marginTop: "2px" }}>
-                  High-Retention Repeat Buyers
+                  Customers with 2+ orders
                 </div>
               </div>
             </div>
@@ -3387,15 +3386,15 @@ export default function AdminDashboardPage() {
             {/* Segment Quick Filter Pills */}
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontSize: "12px", fontWeight: 700, color: "#866951", marginRight: "4px" }}>
-                Filter Segment:
+                Filter:
               </span>
               {[
-                { key: "ALL", label: `All Patrons (${customerProfiles.length})` },
-                { key: "VIP Atelier", label: "👑 VIP Atelier" },
-                { key: "Repeat Patron", label: "🔁 Repeat Patrons" },
-                { key: "Active Patron", label: "🛍️ Active Patrons" },
-                { key: "Guest Buyer", label: "👤 Guest Buyers" },
-                { key: "Prospective Lead", label: "✉️ Prospective Leads" },
+                { key: "ALL", label: `All Customers (${customerProfiles.length})` },
+                { key: "VIP Atelier", label: "👑 VIP" },
+                { key: "Repeat Patron", label: "🔁 Repeat Buyers" },
+                { key: "Active Patron", label: "🛍️ Regular Buyers" },
+                { key: "Guest Buyer", label: "👤 Guests" },
+                { key: "Prospective Lead", label: "✉️ Leads" },
               ].map((seg) => {
                 const isSelected = customerSegmentFilter === seg.key;
                 return (
@@ -3434,10 +3433,10 @@ export default function AdminDashboardPage() {
                 <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
                   <thead>
                     <tr style={{ backgroundColor: "#FAF7F2", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
-                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Customer / Patron</th>
-                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Contact & City</th>
-                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Segment & Tier</th>
-                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Lifetime Spend</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Customer</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Contact &amp; City</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Type &amp; Tier</th>
+                      <th style={{ padding: "14px 18px", fontWeight: 700 }}>Total Spent</th>
                       <th style={{ padding: "14px 18px", fontWeight: 700 }}>Orders</th>
                       <th style={{ padding: "14px 18px", fontWeight: 700 }}>Reward Points</th>
                       <th style={{ padding: "14px 18px", fontWeight: 700 }}>Status</th>
@@ -3555,7 +3554,7 @@ export default function AdminDashboardPage() {
                                     color: segStyle.text,
                                   }}
                                 >
-                                  {customer.rfm_segment || "Active Patron"}
+                                  {({ "VIP Atelier": "VIP", "Repeat Patron": "Repeat Buyer", "Active Patron": "Regular Buyer", "Guest Buyer": "Guest", "Prospective Lead": "Lead" } as Record<string, string>)[customer.rfm_segment || "Active Patron"] || customer.rfm_segment || "Regular Buyer"}
                                 </span>
                                 <span
                                   style={{
@@ -3569,7 +3568,7 @@ export default function AdminDashboardPage() {
                                     border: `1px solid ${colors.border}`,
                                   }}
                                 >
-                                  ★ {customer.membership_tier}
+                                  ★ {customer.membership_tier === "Atelier Circle" ? "Gold Tier" : customer.membership_tier}
                                 </span>
                               </div>
                             </td>
@@ -3706,10 +3705,10 @@ export default function AdminDashboardPage() {
                 }}
               >
                 <h3 style={{ fontSize: "16px", fontWeight: 600, color: "#261B13" }}>
-                  Customer Inquiries & Concierge Messages ({inquiries.length})
+                  Customer Messages ({inquiries.length})
                 </h3>
                 <span style={{ fontSize: "12px", color: "#866951" }}>
-                  Direct messages submitted from the boutique Contact page
+                  Messages sent from the Contact page
                 </span>
               </div>
 
@@ -3856,7 +3855,7 @@ export default function AdminDashboardPage() {
                   Newsletter Subscribers ({subscribers.length})
                 </h3>
                 <span style={{ fontSize: "12px", color: "#866951" }}>
-                  Subscribed via boutique footer for seasonal drape updates
+                  Signed up via the website footer
                 </span>
               </div>
 
@@ -4029,7 +4028,7 @@ export default function AdminDashboardPage() {
                   }}
                 >
                   <StarIcon size={13} color="#C5A059" />
-                  <span>5-Star Heirlooms ({reviews.filter((r) => r.rating === 5).length})</span>
+                  <span>5-Star Reviews ({reviews.filter((r) => r.rating === 5).length})</span>
                 </button>
                 <button
                   type="button"
@@ -4066,7 +4065,7 @@ export default function AdminDashboardPage() {
                 }}
               >
                 <ShieldCheckIcon size={14} color="#6F42C1" />
-                <span>Super Admin Review Moderation & Deletion Authority</span>
+                <span>Manage &amp; Remove Reviews</span>
               </div>
             </div>
 
@@ -4084,10 +4083,10 @@ export default function AdminDashboardPage() {
               >
                 <div style={{ fontSize: "36px", marginBottom: "12px" }}>✦</div>
                 <h3 style={{ fontSize: "16px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
-                  No Patron Reviews Found
+                  No Reviews Found
                 </h3>
                 <p style={{ fontSize: "13px" }}>
-                  No customer reviews match your active filter. Change filter criteria or reset search.
+                  No reviews match your filter. Try a different filter or clear search.
                 </p>
               </div>
             ) : (
@@ -4157,7 +4156,7 @@ export default function AdminDashboardPage() {
                                 }}
                               >
                                 <CheckIcon size={10} color="#0F7A50" />
-                                Verified Patron
+                                Verified Buyer
                               </span>
                             )}
                             <span
@@ -4303,7 +4302,7 @@ export default function AdminDashboardPage() {
                           }}
                         >
                           <CameraIcon size={13} color="#866951" />
-                          <span>Patron Photos ({review.photos.length})</span>
+                          <span>Customer Photos ({review.photos.length})</span>
                         </div>
                         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                           {review.photos.map((photoUrl, photoIdx) => (
@@ -4399,7 +4398,7 @@ export default function AdminDashboardPage() {
                       }}
                     >
                       <ShieldCheckIcon size={12} color="#6F42C1" />
-                      SOLE SUPER ADMIN
+                      MAIN ADMIN
                     </span>
                   </div>
                 </div>
@@ -4482,19 +4481,19 @@ export default function AdminDashboardPage() {
               }}
             >
               <h3 style={{ fontSize: "18px", fontWeight: 600, color: "#261B13", marginBottom: "8px" }}>
-                Super Admin Absolute Privileges
+                Admin Permissions
               </h3>
               <p style={{ fontSize: "12.5px", color: "#866951", lineHeight: "1.5", marginBottom: "18px" }}>
-                Avsaraa runs under a unified single-administrator model. The Super Admin holds absolute authority over all store functions.
+                Avsaraa uses a single admin login that controls all store settings.
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 {[
-                  { title: "Catalog & Product Governance", desc: "Unrestricted authority to add, edit, price, and delete all luxury garments." },
-                  { title: "Customer Account Administration", desc: "Full control over registered member profiles, VIP tier upgrades, and points." },
-                  { title: "Concierge Inquiries & Messaging", desc: "Oversee and resolve customer inquiries and manage newsletter mailing lists." },
-                  { title: "Row Level Security & Database Master", desc: "Cryptographically authenticated bypass policies and schema governance." },
-                  { title: "Single Admin Lockdown", desc: "Multi-staff delegation is disabled. No secondary administrators can be created." },
+                  { title: "Products & Pricing", desc: "Add, edit, price, and remove any product in the store." },
+                  { title: "Customers & Loyalty", desc: "View and update customer profiles, tiers, and reward points." },
+                  { title: "Messages & Newsletter", desc: "Read customer messages, send replies, and manage email subscribers." },
+                  { title: "Full Database Access", desc: "Protected server-side access for orders, payments, and catalog updates." },
+                  { title: "Single Admin Only", desc: "Extra staff accounts are turned off for tighter security." },
                 ].map((priv, idx) => (
                   <div
                     key={idx}
@@ -4555,7 +4554,7 @@ export default function AdminDashboardPage() {
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
               <h3 style={{ fontSize: "18px", fontWeight: 600, color: "#261B13" }}>
-                Edit Super Admin Profile
+                Edit Admin Profile
               </h3>
               <button onClick={() => setShowEditSuperAdminModal(false)} style={{ padding: "6px", color: "#866951" }}>
                 <CloseIcon size={18} />
@@ -4628,7 +4627,7 @@ export default function AdminDashboardPage() {
 
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#866951", marginBottom: "6px" }}>
-                    Governance Notes
+                    Admin Notes
                   </label>
                   <textarea
                     rows={3}
@@ -4721,7 +4720,7 @@ export default function AdminDashboardPage() {
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
               <h3 style={{ fontSize: "20px", fontWeight: 600, color: "#261B13" }}>
-                {editingProduct ? "Edit Luxury Garment" : "Add Luxury Garment"}
+                {editingProduct ? "Edit Product" : "Add Product"}
               </h3>
               <button
                 onClick={() => {
@@ -4934,7 +4933,7 @@ export default function AdminDashboardPage() {
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                     <label style={{ fontSize: "12px", fontWeight: 600, color: "#866951" }}>
-                      Garment Imagery URL *
+                      Main Photo Link *
                     </label>
                     <label
                       style={{
@@ -5716,7 +5715,7 @@ export default function AdminDashboardPage() {
                                       fontWeight: 500,
                                     }}
                                   >
-                                    📋 Copy Garment Sizes
+                                    📋 Copy Product Sizes
                                   </button>
                                 )}
                                 <button
@@ -5751,7 +5750,7 @@ export default function AdminDashboardPage() {
 
                             {(!variant.sizes || variant.sizes.length === 0) ? (
                               <div style={{ fontSize: "11px", color: "#866951", fontStyle: "italic", padding: "6px 0" }}>
-                                No specific size stock set for this shade. Click &quot;📋 Copy Garment Sizes&quot; or &quot;+ Add Size&quot;.
+                                No specific size stock set for this shade. Click &quot;📋 Copy Product Sizes&quot; or &quot;+ Add Size&quot;.
                               </div>
                             ) : (
                               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
@@ -5869,7 +5868,7 @@ export default function AdminDashboardPage() {
 
                 <div style={{ padding: "14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px solid #E8DED3" }}>
                   <span style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase", marginBottom: "10px", letterSpacing: "0.06em" }}>
-                    ✦ Atelier Craftsmanship, Drape Video & Compliance
+                    ✦ Fabric, Origin &amp; Tax Details
                   </span>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "10px" }}>
                     <div>
@@ -5914,7 +5913,7 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "10px" }}>
+                  <div style={{ marginBottom: "10px" }}>
                     <div>
                       <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
                         Craft Cluster / Origin
@@ -5935,38 +5934,18 @@ export default function AdminDashboardPage() {
                         }}
                       />
                     </div>
-                    <div>
-                      <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                        YouTube Drape Video Link (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        value={productForm.video_url}
-                        onChange={(e) => setProductForm({ ...productForm, video_url: e.target.value })}
-                        placeholder="Optional: https://www.youtube.com/watch?v=..."
-                        style={{
-                          width: "100%",
-                          padding: "8px 10px",
-                          borderRadius: "6px",
-                          border: "1px solid #CFBEAD",
-                          backgroundColor: "#FFFFFF",
-                          fontSize: "13px",
-                          color: "#261B13",
-                        }}
-                      />
-                    </div>
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                     <div>
                       <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#866951", marginBottom: "4px" }}>
-                        SKU Identifier (Inventory Code)
+                        SKU Code
                       </label>
                       <input
                         type="text"
                         value={productForm.sku}
                         onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                        placeholder="e.g. AVS-SAR-KAT-RED"
+                        placeholder="Auto-generated (e.g. AVS-SAR-2611-0001)"
                         style={{
                           width: "100%",
                           padding: "8px 10px",
@@ -6004,13 +5983,13 @@ export default function AdminDashboardPage() {
 
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#866951", marginBottom: "6px" }}>
-                    Drape Craft & Description
+                    Product Description
                   </label>
                   <textarea
                     rows={4}
                     value={productForm.description}
                     onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                    placeholder="Weave specifications, zari highlights, silk grade, bespoke tailoring notes..."
+                    placeholder="Fabric details, weave style, fit, and care highlights..."
                     style={{
                       width: "100%",
                       padding: "10px 14px",
@@ -6056,7 +6035,7 @@ export default function AdminDashboardPage() {
                     fontWeight: 600,
                   }}
                 >
-                  {isSubmitting ? "Processing..." : editingProduct ? "Update Garment" : "Add to Catalog"}
+                  {isSubmitting ? "Saving..." : editingProduct ? "Update Product" : "Add Product"}
                 </button>
               </div>
             </form>
@@ -6099,13 +6078,13 @@ export default function AdminDashboardPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px" }}>
               <div>
                 <span style={{ fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase" }}>
-                  Catalog Scaling Utility
+                  Bulk Upload
                 </span>
                 <h3 style={{ fontSize: "20px", fontWeight: 700, color: "#261B13", marginTop: "2px" }}>
-                  Bulk Import Products via CSV
+                  Import Products (CSV)
                 </h3>
                 <p style={{ fontSize: "12.5px", color: "#6E5B4E", marginTop: "4px" }}>
-                  Draft hundreds of products in your favorite spreadsheet and ingest them in one batch.
+                  Upload a CSV file from Excel or Google Sheets to add multiple products at once.
                 </p>
               </div>
               <button
@@ -6746,7 +6725,7 @@ export default function AdminDashboardPage() {
 
                   <div>
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#866951", marginBottom: "6px" }}>
-                      Club Tier
+                      Customer Tier
                     </label>
                     <select
                       value={customerForm.membership_tier}
@@ -6763,7 +6742,7 @@ export default function AdminDashboardPage() {
                     >
                       <option value="Standard">Standard</option>
                       <option value="Privilege">Privilege</option>
-                      <option value="Atelier Circle">Atelier Circle</option>
+                      <option value="Atelier Circle">Gold Tier</option>
                       <option value="VIP">VIP</option>
                     </select>
                   </div>
@@ -6791,11 +6770,11 @@ export default function AdminDashboardPage() {
 
                   <div style={{ gridColumn: "1 / -1" }}>
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#866951", marginBottom: "6px" }}>
-                      Private Concierge Notes / CRM Observations
+                      Staff Notes (Private)
                     </label>
                     <textarea
                       rows={3}
-                      placeholder="Special size preferences, personal styling requests, bespoke sizing notes..."
+                      placeholder="Size notes, fabric likes, special requests..."
                       value={customerForm.concierge_notes}
                       onChange={(e) => setCustomerForm({ ...customerForm, concierge_notes: e.target.value })}
                       style={{
@@ -6950,7 +6929,7 @@ export default function AdminDashboardPage() {
                           border: "1px solid rgba(0,0,0,0.06)",
                         }}
                       >
-                        {viewingCustomer.rfm_segment}
+                        {({ "VIP Atelier": "VIP", "Repeat Patron": "Repeat Buyer", "Active Patron": "Regular Buyer", "Guest Buyer": "Guest", "Prospective Lead": "Lead" } as Record<string, string>)[viewingCustomer.rfm_segment] || viewingCustomer.rfm_segment}
                       </span>
                     )}
                     <span
@@ -7005,7 +6984,7 @@ export default function AdminDashboardPage() {
                       cursor: "pointer",
                     }}
                   >
-                    {isConvertingGuest ? "Converting..." : "✨ Convert to Registered Patron"}
+                    {isConvertingGuest ? "Converting..." : "✨ Convert to Customer Account"}
                   </button>
                 )}
                 <button
@@ -7394,14 +7373,14 @@ export default function AdminDashboardPage() {
                       lineHeight: "1.5",
                     }}
                   >
-                    💡 <strong>Atelier Concierge Notes:</strong> Internal notes visible only to administrative staff. Use this space for bespoke sizing observations, personal stylist feedback, preferred fabric textures, gifting schedules, and VIP preferences.
+                    💡 <strong>Private Staff Notes:</strong> Only visible to admins. Save sizing notes, preferences, or special requests here.
                   </div>
 
                   <textarea
                     rows={8}
                     value={crmNoteDraft}
                     onChange={(e) => setCrmNoteDraft(e.target.value)}
-                    placeholder="Enter private concierge notes regarding styling preferences, bespoke alterations, or customer history..."
+                    placeholder="Write private notes about this customer's sizes, preferences, or order history..."
                     style={{
                       width: "100%",
                       padding: "14px",
@@ -7435,7 +7414,7 @@ export default function AdminDashboardPage() {
                         gap: "8px",
                       }}
                     >
-                      {isSavingCrmNote ? "Saving Notes..." : "💾 Save Concierge Note"}
+                      {isSavingCrmNote ? "Saving Notes..." : "💾 Save Note"}
                     </button>
                   </div>
                 </div>
@@ -7700,7 +7679,7 @@ export default function AdminDashboardPage() {
                     opacity: sendingAckId === viewingInquiry.id ? 0.7 : 1,
                   }}
                 >
-                  {sendingAckId === viewingInquiry.id ? "Sending..." : "✉️ Send Ack (support@avsaraa.in)"}
+                  {sendingAckId === viewingInquiry.id ? "Sending..." : "✉️ Send Reply Email (support@avsaraa.in)"}
                 </button>
               </div>
 

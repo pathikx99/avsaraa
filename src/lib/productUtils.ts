@@ -114,6 +114,11 @@ export function normalizeProduct(raw: Product): Product {
     color_variants,
     sales_count,
     product_type,
+    sku:
+      raw.sku ||
+      (typeof (raw.specifications as Record<string, unknown> | undefined)?.sku === "string"
+        ? String((raw.specifications as Record<string, unknown>).sku).trim()
+        : undefined),
     display_order:
       typeof raw.display_order === "number"
         ? raw.display_order

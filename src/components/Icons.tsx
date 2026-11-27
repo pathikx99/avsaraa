@@ -349,15 +349,6 @@ export function DatabaseIcon({ size = 18, color = "currentColor" }: { size?: num
   );
 }
 
-export function VideoCameraIcon({ size = 18, color = "currentColor" }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m22 8-6 4 6 4V8Z" />
-      <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
-    </svg>
-  );
-}
-
 export function CameraIcon({ size = 18, color = "currentColor" }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

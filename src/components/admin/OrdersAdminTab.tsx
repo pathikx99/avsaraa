@@ -125,7 +125,7 @@ export default function OrdersAdminTab({
       });
       const json = await res.json();
       if (res.ok && json.success) {
-        showToast("Logistics partner and AWB tracking updated successfully.", "success");
+        showToast("Shipping partner and tracking number saved.", "success");
         setEditingCourierOrder(null);
         await onRefresh();
       } else {
@@ -165,7 +165,7 @@ export default function OrdersAdminTab({
             {orders.length}
           </div>
           <span style={{ fontSize: "12px", color: "#28a745", fontWeight: 600 }}>
-            {formatINR(totalRevenue)} Settled GMV
+            {formatINR(totalRevenue)} Total Sales
           </span>
         </div>
 
@@ -179,13 +179,13 @@ export default function OrdersAdminTab({
           }}
         >
           <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 600 }}>
-            Awaiting Dispatch
+            Ready to Ship
           </span>
           <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
             {awaitingDispatchCount}
           </div>
           <span style={{ fontSize: "11px", color: "#866951" }}>
-            Confirmed / Atelier Tailoring
+            Confirmed / Packing
           </span>
         </div>
 
@@ -199,13 +199,13 @@ export default function OrdersAdminTab({
           }}
         >
           <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 600 }}>
-            In Logistics Transit
+            In Transit
           </span>
           <div style={{ fontSize: "24px", fontWeight: 700, color: "#0070f3", marginTop: "4px" }}>
             {inTransitCount}
           </div>
           <span style={{ fontSize: "11px", color: "#866951" }}>
-            With Blue Dart / Insured Courier
+            With Delivery Partner
           </span>
         </div>
 
@@ -225,7 +225,7 @@ export default function OrdersAdminTab({
             {exchangeRequestsCount}
           </div>
           <span style={{ fontSize: "11px", color: "#92400e" }}>
-            Patron Re-tailoring Requests
+            Customer Exchange Requests
           </span>
         </div>
       </div>
@@ -341,11 +341,11 @@ export default function OrdersAdminTab({
               <thead>
                 <tr style={{ backgroundColor: "#FAF7F2", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
                   <th style={{ padding: "14px 18px", fontWeight: 700 }}>Order # & Date</th>
-                  <th style={{ padding: "14px 18px", fontWeight: 700 }}>Customer Destination</th>
+                  <th style={{ padding: "14px 18px", fontWeight: 700 }}>Customer &amp; Address</th>
                   <th style={{ padding: "14px 18px", fontWeight: 700 }}>Items</th>
                   <th style={{ padding: "14px 18px", fontWeight: 700 }}>Amount & Payment</th>
-                  <th style={{ padding: "14px 18px", fontWeight: 700 }}>Logistics & AWB</th>
-                  <th style={{ padding: "14px 18px", fontWeight: 700 }}>Status Lifecycle</th>
+                  <th style={{ padding: "14px 18px", fontWeight: 700 }}>Courier &amp; Tracking</th>
+                  <th style={{ padding: "14px 18px", fontWeight: 700 }}>Order Status</th>
                   <th style={{ padding: "14px 18px", fontWeight: 700, textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
@@ -399,7 +399,7 @@ export default function OrdersAdminTab({
                       {/* Customer & Destination */}
                       <td style={{ padding: "14px 18px", verticalAlign: "top" }}>
                         <span style={{ fontWeight: 600, color: "#261B13", display: "block" }}>
-                          {ord.shipping_address_snapshot?.recipient_name || "Patron"}
+                          {ord.shipping_address_snapshot?.recipient_name || "Customer"}
                         </span>
                         <span style={{ fontSize: "12px", color: "#5A4535", display: "block" }}>
                           {ord.shipping_address_snapshot?.city}, {ord.shipping_address_snapshot?.state}
@@ -602,7 +602,7 @@ export default function OrdersAdminTab({
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <DeliveryVanIcon size={20} color="#866951" />
                 <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#261B13" }}>
-                  Logistics & AWB Tracking
+                  Courier &amp; Tracking Details
                 </h3>
               </div>
               <button
@@ -615,7 +615,7 @@ export default function OrdersAdminTab({
             </div>
 
             <p style={{ fontSize: "13px", color: "#6E5B4E", margin: "0 0 20px" }}>
-              Order <strong>{editingCourierOrder.order_number}</strong> · Destination:{" "}
+              Order <strong>{editingCourierOrder.order_number}</strong> · Deliver to:{" "}
               {editingCourierOrder.shipping_address_snapshot?.city},{" "}
               {editingCourierOrder.shipping_address_snapshot?.state}.
             </p>
@@ -623,7 +623,7 @@ export default function OrdersAdminTab({
             <form onSubmit={handleSaveCourierFulfillment} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
-                  Designated Courier Partner
+                  Courier Company
                 </label>
                 <select
                   value={courierPartnerInput}
@@ -649,7 +649,7 @@ export default function OrdersAdminTab({
 
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
-                  Airway Bill (AWB) Tracking Number
+                  Tracking Number (AWB)
                 </label>
                 <input
                   type="text"
@@ -671,7 +671,7 @@ export default function OrdersAdminTab({
 
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>
-                  Fulfillment Notes (Internal / Courier Notes)
+                  Order &amp; Delivery Notes
                 </label>
                 <textarea
                   rows={2}
@@ -756,7 +756,7 @@ export default function OrdersAdminTab({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px" }}>
               <div>
                 <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", color: "#866951", textTransform: "uppercase" }}>
-                  TRANSACTION AUDIT
+                  ORDER SUMMARY
                 </span>
                 <h3 style={{ margin: "2px 0 0", fontSize: "20px", fontWeight: 700, color: "#261B13" }}>
                   Order {selectedOrderDetails.order_number}
@@ -804,7 +804,7 @@ export default function OrdersAdminTab({
               <div style={{ width: "1px", height: "28px", backgroundColor: "#E8DED3" }} />
               <div>
                 <span style={{ fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", display: "block" }}>
-                  Total GMV
+                  Total Paid
                 </span>
                 <span style={{ fontSize: "13px", fontWeight: 700, color: "#28a745" }}>
                   {formatINR(selectedOrderDetails.total_amount)}
@@ -814,7 +814,7 @@ export default function OrdersAdminTab({
 
             {/* Purchased Items List */}
             <h4 style={{ fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", margin: "0 0 10px" }}>
-              Purchased Pieces ({(selectedOrderDetails.order_items || []).length})
+              Items Ordered ({(selectedOrderDetails.order_items || []).length})
             </h4>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
               {(selectedOrderDetails.order_items || []).map((item, idx) => (
@@ -866,7 +866,7 @@ export default function OrdersAdminTab({
 
             {/* Shipping Destination Snapshot */}
             <h4 style={{ fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", margin: "0 0 10px" }}>
-              Patron Delivery Destination
+              Delivery Address
             </h4>
             <div style={{ padding: "14px", backgroundColor: "#FAF7F2", borderRadius: "10px", border: "1px solid #EFE6DC", fontSize: "13px", color: "#5A4535", marginBottom: "20px" }}>
               <p style={{ margin: 0, fontWeight: 700, color: "#261B13" }}>

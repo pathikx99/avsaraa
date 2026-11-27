@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { normalizeProducts } from "@/lib/productUtils";
 import { Product } from "@/types/product";
-import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import { sortProductsByShowcase } from "@/lib/showcaseOrderManager";
 
 // In-Memory Server Cache for Ultra-Fast Product Fetching
@@ -42,15 +41,15 @@ export async function GET(request: Request) {
 
       if (error || !data || data.length === 0) {
         if (error) {
-          console.warn("Products API Supabase note, serving verified fallback catalog:", error.message || error);
+          console.warn("Products API Supabase note:", error.message || error);
         }
-        allProducts = normalizeProducts(SEED_CATALOG_PRODUCTS);
+        allProducts = [];
       } else {
         const publishedOnly = data.filter((p) => {
           const status = (p as { publish_status?: string | null }).publish_status;
           return !status || status === "published";
         });
-        allProducts = normalizeProducts(publishedOnly.length > 0 ? publishedOnly : SEED_CATALOG_PRODUCTS);
+        allProducts = normalizeProducts(publishedOnly);
       }
 
       cachedCatalog = {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { checkDbRateLimit } from "@/lib/dbRateLimit";
 
 export async function POST(request: Request) {
   try {
@@ -23,6 +24,14 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: "Authentication required to claim an order" },
         { status: 401 }
+      );
+    }
+
+    const rateCheck = await checkDbRateLimit(`claim-order:${user.id}`, 10, 300);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `Too many attempts. Please retry in ${rateCheck.resetSeconds} seconds.` },
+        { status: 429 }
       );
     }
 

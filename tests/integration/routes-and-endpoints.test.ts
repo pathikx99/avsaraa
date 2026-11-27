@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 
 async function resolveAvsaraaBaseUrl(): Promise<{ baseUrl: string; isOnline: boolean }> {
@@ -75,10 +75,20 @@ describe(
   });
 
   describe("2. Dynamic Product & Order Success Routes", () => {
-    it("Renders valid PDP with HTTP 200", async () => {
-      const validId = "e0000000-0000-0000-0000-000000000001";
-      const res = await fetch(`${BASE_URL}/products/${validId}`);
+    it("Returns empty/live catalog cleanly without seeded fallback defaults", async () => {
+      const res = await fetch(`${BASE_URL}/api/products?fresh=true`);
       assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.equal(data.success, true);
+      assert.ok(Array.isArray(data.products));
+
+      if (data.products.length > 0) {
+        const pdpRes = await fetch(`${BASE_URL}/products/${data.products[0].id}`);
+        assert.equal(pdpRes.status, 200);
+      } else {
+        const removedSeedRes = await fetch(`${BASE_URL}/products/e0000000-0000-0000-0000-000000000001`);
+        assert.equal(removedSeedRes.status, 404);
+      }
     });
 
     it("Returns 404 for non-existent product ID", async () => {
@@ -145,23 +155,77 @@ describe(
   });
 
   describe("4. Promotional Engine & Coupon Validation", () => {
-    it("Correctly computes percentage discount for AVSARAA10", async () => {
+    let couponAdminCookie = "";
+    const createdCouponIds: string[] = [];
+    const suffix = Date.now().toString().slice(-6);
+    const pctCode = `TESTPCT_${suffix}`;
+    const minCode = `TESTMIN_${suffix}`;
+    const freeCode = `TESTFREE_${suffix}`;
+
+    before(async () => {
+      const authRes = await fetch(`${BASE_URL}/api/admin/auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: BASE_URL },
+        body: JSON.stringify({
+          email: process.env.ADMIN_EMAIL || "web.avsaraa@gmail.com",
+          password: process.env.ADMIN_PASSWORD || "V@12345678",
+        }),
+      });
+      couponAdminCookie = (authRes.headers.get("set-cookie") || "").split(";")[0];
+
+      const specs = [
+        { code: pctCode, discount_type: "percentage", discount_value: 10, min_order_amount: 0 },
+        { code: minCode, discount_type: "fixed", discount_value: 500, min_order_amount: 2999 },
+        { code: freeCode, discount_type: "free_shipping", discount_value: 0, min_order_amount: 0 },
+      ];
+      for (const spec of specs) {
+        const cRes = await fetch(`${BASE_URL}/api/admin/coupons`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: couponAdminCookie, Origin: BASE_URL },
+          body: JSON.stringify(spec),
+        });
+        const cData = await cRes.json().catch(() => null);
+        if (cData?.coupon?.id) createdCouponIds.push(cData.coupon.id);
+      }
+    });
+
+    after(async () => {
+      for (const id of createdCouponIds) {
+        await fetch(`${BASE_URL}/api/admin/coupons?id=${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          headers: { Cookie: couponAdminCookie, Origin: BASE_URL },
+        }).catch(() => {});
+      }
+    });
+
+    it("Rejects removed default coupons when none exist in database", async () => {
       const res = await fetch(`${BASE_URL}/api/coupons/validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Origin: BASE_URL },
         body: JSON.stringify({ code: "AVSARAA10", subtotal: 5000 }),
+      });
+      assert.equal(res.status, 400);
+      const data = await res.json();
+      assert.equal(data.valid, false);
+    });
+
+    it("Correctly computes percentage discount for active coupon", async () => {
+      const res = await fetch(`${BASE_URL}/api/coupons/validate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: BASE_URL },
+        body: JSON.stringify({ code: pctCode, subtotal: 5000 }),
       });
       assert.equal(res.status, 200);
       const data = await res.json();
       assert.equal(data.valid, true);
-      assert.equal(data.coupon.discount_amount, 500); // 10% of 5000
+      assert.equal(data.coupon.discount_amount, 500);
     });
 
-    it("Enforces minimum order threshold for WELCOME500", async () => {
+    it("Enforces minimum order threshold for fixed coupon", async () => {
       const res = await fetch(`${BASE_URL}/api/coupons/validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: "WELCOME500", subtotal: 1500 }),
+        headers: { "Content-Type": "application/json", Origin: BASE_URL },
+        body: JSON.stringify({ code: minCode, subtotal: 1500 }),
       });
       assert.equal(res.status, 400);
       const data = await res.json();
@@ -172,7 +236,7 @@ describe(
     it("Rejects non-existent promo codes", async () => {
       const res = await fetch(`${BASE_URL}/api/coupons/validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Origin: BASE_URL },
         body: JSON.stringify({ code: "INVALID_PROMO_99", subtotal: 5000 }),
       });
       assert.equal(res.status, 400);
@@ -180,11 +244,11 @@ describe(
       assert.equal(data.valid, false);
     });
 
-    it("Validates free delivery promocode FREEDEL", async () => {
+    it("Validates free delivery promocode", async () => {
       const res = await fetch(`${BASE_URL}/api/coupons/validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: "FREEDEL", subtotal: 350 }),
+        headers: { "Content-Type": "application/json", Origin: BASE_URL },
+        body: JSON.stringify({ code: freeCode, subtotal: 350 }),
       });
       assert.equal(res.status, 200);
       const data = await res.json();

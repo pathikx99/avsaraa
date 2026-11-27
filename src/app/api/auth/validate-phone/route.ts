@@ -3,16 +3,25 @@ import { headers } from "next/headers";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { normalizePhoneNumber, maskEmail, maskPhoneNumber } from "@/lib/phoneUtils";
-import { checkRateLimit } from "@/lib/rateLimit";
+import { checkDbRateLimit } from "@/lib/dbRateLimit";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 export async function POST(request: Request) {
   try {
+    const csrfCheck = validateCsrfOrigin(request);
+    if (!csrfCheck.allowed) {
+      return NextResponse.json(
+        { valid: false, available: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
+        { status: 403 }
+      );
+    }
+
     const headerList = await headers();
     const forwardedFor = headerList.get("x-forwarded-for");
     const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
 
     // Rate Limiting Protection (10 validations per minute per IP to prevent bulk enumeration)
-    const rateCheck = checkRateLimit(`phone-validate:${ip}`, 10, 60);
+    const rateCheck = await checkDbRateLimit(`phone-validate:${ip}`, 10, 60);
     if (!rateCheck.allowed) {
       return NextResponse.json(
         {
@@ -69,12 +78,14 @@ export async function POST(request: Request) {
       );
 
     // Security: Only allow excluding currentUserId if the caller is verified to own that session ID
+    let verifiedCurrentUserId: string | null = null;
     if (currentUserId && typeof currentUserId === "string") {
       try {
         const supabase = await createSupabaseServerClient();
         const { data: authData } = await supabase.auth.getUser();
         if (authData?.user && authData.user.id === currentUserId) {
-          query = query.neq("id", currentUserId);
+          verifiedCurrentUserId = authData.user.id;
+          query = query.neq("id", verifiedCurrentUserId);
         }
       } catch {
         // Unauthenticated - do not exclude
@@ -90,11 +101,11 @@ export async function POST(request: Request) {
       existingProfiles = queryData;
       phoneExists = queryData.length > 0;
     } else {
-      // Fallback: Query via SECURITY DEFINER RPC check_phone_exists
+      // Fallback: Query via SECURITY DEFINER RPC check_phone_exists using verified session ID only
       try {
         const { data: rpcExists, error: rpcErr } = await supabaseAdmin.rpc("check_phone_exists", {
           phone_to_check: digitsOnly,
-          current_user_id: currentUserId || null,
+          current_user_id: verifiedCurrentUserId,
         });
         if (!rpcErr) {
           phoneExists = Boolean(rpcExists);

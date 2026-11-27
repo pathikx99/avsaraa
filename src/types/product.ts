@@ -63,7 +63,6 @@ export interface Product {
   discount_percent?: number;
   fabric?: string;
   weave?: string;
-  video_url?: string;
   highlights?: Array<string | ProductHighlight>;
   sku?: string;
   hsn_code?: string;

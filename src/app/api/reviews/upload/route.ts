@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
-import { checkRateLimit } from "@/lib/rateLimit";
+import { checkDbRateLimit } from "@/lib/dbRateLimit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import crypto from "crypto";
 import sharp from "sharp";
+
+const ALLOWED_IMAGE_FORMATS = new Set(["jpeg", "png", "webp", "gif", "heif", "avif"]);
 
 export async function POST(request: Request) {
   try {
@@ -17,7 +19,7 @@ export async function POST(request: Request) {
     }
     const forwarded = request.headers.get("x-forwarded-for");
     const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
-    const rateCheck = checkRateLimit(`review-upload:${ip}`, 10, 300);
+    const rateCheck = await checkDbRateLimit(`review-upload:${ip}`, 5, 900);
     if (!rateCheck.allowed) {
       return NextResponse.json(
         {
@@ -71,6 +73,23 @@ export async function POST(request: Request) {
     }
 
     const rawBuffer = Buffer.from(await file.arrayBuffer());
+
+    // Verify actual decoded image format rather than trusting Content-Type alone
+    let metadata;
+    try {
+      metadata = await sharp(rawBuffer).metadata();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid or corrupted image file." },
+        { status: 400 }
+      );
+    }
+    if (!metadata.format || !ALLOWED_IMAGE_FORMATS.has(metadata.format)) {
+      return NextResponse.json(
+        { success: false, error: "Unsupported image format." },
+        { status: 400 }
+      );
+    }
 
     // Compress, auto-orient from EXIF, & downscale to WebP (max 1200x1600, quality 80)
     // Preserves Supabase Free Tier 1GB storage and minimizes network egress

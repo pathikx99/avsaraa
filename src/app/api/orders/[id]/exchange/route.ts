@@ -122,17 +122,25 @@ export async function POST(
         updated_at: nowIso,
       })
       .eq("id", order.id)
+      .eq("order_status", "Delivered")
       .select(`
         *,
         order_items (*)
       `)
-      .single();
+      .maybeSingle();
 
     if (updateErr) {
       console.error("Exchange update error:", updateErr);
       return NextResponse.json(
         { success: false, message: "Could not process exchange request at this time." },
         { status: 500 }
+      );
+    }
+
+    if (!updatedOrder) {
+      return NextResponse.json(
+        { success: false, message: "Exchange request was already submitted or order status changed." },
+        { status: 409 }
       );
     }
 

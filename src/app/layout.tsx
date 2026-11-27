@@ -28,9 +28,6 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://avsaraa.in"),
   title: "AVSARAA | Handcrafted Sarees, Ethnic Wear & Clothes Online | India",
   description: "Explore handcrafted sarees, ethnic dresses, and occasion wear crafted from India's finest textile traditions. Buy authentic Indian clothes online with insured Pan-India delivery.",
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 import { Suspense } from "react";

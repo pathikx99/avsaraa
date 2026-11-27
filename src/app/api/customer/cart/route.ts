@@ -20,14 +20,14 @@ export async function GET() {
 
     const adminClient = getAdminSupabaseClient();
     try {
-      const { data: cartData, error } = await adminClient
-        .from("user_carts")
-        .select("items")
-        .eq("user_id", user.id)
+      const { data: profileData, error } = await adminClient
+        .from("profiles")
+        .select("cart_items")
+        .eq("id", user.id)
         .maybeSingle();
 
-      if (!error && cartData?.items) {
-        return NextResponse.json({ success: true, items: cartData.items });
+      if (!error && profileData?.cart_items) {
+        return NextResponse.json({ success: true, items: profileData.cart_items });
       }
     } catch {
       // Fallback
@@ -68,19 +68,20 @@ export async function PUT(request: Request) {
     // Store in-memory
     fallbackUserCarts.set(user.id, items);
 
-    // Persist to user_carts in database
+    // Persist cart items directly on user profile in database
     const adminClient = getAdminSupabaseClient();
     try {
-      await adminClient.from("user_carts").upsert(
-        {
-          user_id: user.id,
-          items,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      );
+      const nowIso = new Date().toISOString();
+      await adminClient
+        .from("profiles")
+        .update({
+          cart_items: items,
+          cart_updated_at: nowIso,
+          updated_at: nowIso,
+        })
+        .eq("id", user.id);
     } catch {
-      // Table will be initialized by migrations
+      // Profile cart column will be populated once migration is applied
     }
 
     return NextResponse.json({

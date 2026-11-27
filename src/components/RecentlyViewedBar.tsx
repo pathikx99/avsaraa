@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useSyncExternalStore } from "react";
+import React, { useState, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { formatINR, resolveProductImage } from "@/lib/productUtils";
 import { EyeIcon, CloseIcon } from "./Icons";
 import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
+import { fetchCatalog } from "@/lib/useProductsCatalog";
 
 export interface RecentlyViewedItem {
   id: string;
@@ -55,6 +56,36 @@ function useRecentlyViewedItems() {
       return [];
     }
   }, [rawItems]);
+
+  // Automatically prune deleted/removed products from localStorage so visitors never see dead links
+  useEffect(() => {
+    if (items.length === 0) return;
+    let active = true;
+    fetchCatalog()
+      .then((liveProducts) => {
+        if (!active || !Array.isArray(liveProducts)) return;
+        const activeIds = new Set(liveProducts.map((p) => p.id));
+        const pruned = items.filter((item) => item && activeIds.has(item.id));
+        if (pruned.length !== items.length) {
+          try {
+            if (pruned.length === 0) {
+              localStorage.removeItem(STORAGE_KEY);
+            } else {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+            }
+            window.dispatchEvent(new Event("avsaraa:recently-viewed-updated"));
+          } catch {
+            // LocalStorage access failsafe
+          }
+        }
+      })
+      .catch(() => {
+        // Non-blocking
+      });
+    return () => {
+      active = false;
+    };
+  }, [items]);
 
   const clearHistory = () => {
     try {

@@ -1,6 +1,7 @@
 import type { Order } from "../types/order.ts";
 import { formatINR } from "./productUtils.ts";
 import { computeInclusiveGst } from "./financials.ts";
+import { formatInvoiceNumber } from "./idGenerator.ts";
 
 /**
  * Escapes unsafe characters for HTML interpolation to prevent Email Injection and XSS.
@@ -55,7 +56,7 @@ export function generateCustomerTaxInvoiceEmailHtml(order: Order): string {
     timeZone: "Asia/Kolkata",
   });
 
-  const invoiceNo = `INV-${new Date().getFullYear()}-${safeOrderNumber.replace(/[^A-Za-z0-9]/g, "").slice(-6)}`;
+  const invoiceNo = formatInvoiceNumber(safeOrderNumber, order.created_at);
 
   const isIntraState = isGujaratSupply(order);
   const netDiscounted = Math.max(0, order.subtotal - (order.discount_amount || 0));

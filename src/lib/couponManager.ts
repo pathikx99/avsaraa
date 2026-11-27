@@ -3,53 +3,7 @@ import path from "path";
 import { Coupon } from "@/types/order";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 
-export const FALLBACK_COUPONS: Coupon[] = [
-  {
-    id: "default-freedel",
-    code: "FREEDEL",
-    discount_type: "free_shipping",
-    discount_value: 0,
-    min_order_amount: 0,
-    max_discount_amount: null,
-    is_active: true,
-    usage_limit: 1000,
-    used_count: 5,
-    valid_from: new Date(Date.now() - 30 * 86400000).toISOString(),
-    valid_until: null,
-    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
-    per_user_limit: 3,
-  },
-  {
-    id: "default-avsaraa10",
-    code: "AVSARAA10",
-    discount_type: "percentage",
-    discount_value: 10,
-    min_order_amount: 0,
-    max_discount_amount: 10000,
-    is_active: true,
-    usage_limit: 1000,
-    used_count: 42,
-    valid_from: new Date(Date.now() - 30 * 86400000).toISOString(),
-    valid_until: null,
-    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
-    per_user_limit: 5,
-  },
-  {
-    id: "default-welcome500",
-    code: "WELCOME500",
-    discount_type: "fixed",
-    discount_value: 500,
-    min_order_amount: 2999,
-    max_discount_amount: 500,
-    is_active: true,
-    usage_limit: 500,
-    used_count: 18,
-    valid_from: new Date(Date.now() - 30 * 86400000).toISOString(),
-    valid_until: null,
-    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
-    per_user_limit: 1,
-  },
-];
+export const FALLBACK_COUPONS: Coupon[] = [];
 
 interface CouponsMetadata {
   [code: string]: {
@@ -188,7 +142,6 @@ export async function validateCouponEngine({
 
   const supabase = getAdminSupabaseClient();
   let couponData: Coupon | null = null;
-  let dbLookupSucceeded = false;
 
   try {
     const { data, error } = await supabase
@@ -197,42 +150,17 @@ export async function validateCouponEngine({
       .ilike("code", rawCode)
       .maybeSingle();
 
-    if (!error) {
-      dbLookupSucceeded = true;
-      if (data) {
-        if (!data.is_active) {
-          return {
-            valid: false,
-            message: `Promotion code "${rawCode}" is inactive or expired.`,
-          };
-        }
-        couponData = enrichCoupon(data as Coupon);
+    if (!error && data) {
+      if (!data.is_active) {
+        return {
+          valid: false,
+          message: `Promotion code "${rawCode}" is inactive or expired.`,
+        };
       }
+      couponData = enrichCoupon(data as Coupon);
     }
   } catch (err) {
     console.error("Coupon lookup error:", err);
-  }
-
-  if (!couponData && !dbLookupSucceeded) {
-    const fallbackMatch = FALLBACK_COUPONS.find(
-      (c) => c.code.toUpperCase() === rawCode && c.is_active
-    );
-    if (fallbackMatch) {
-      couponData = enrichCoupon(fallbackMatch);
-    }
-  } else if (!couponData) {
-    // Allow static fallback only for seed promo codes when coupons table hasn't been seeded at all
-    const fallbackMatch = FALLBACK_COUPONS.find(
-      (c) => c.code.toUpperCase() === rawCode && c.is_active
-    );
-    if (fallbackMatch) {
-      const { count } = await supabase
-        .from("coupons")
-        .select("id", { count: "exact", head: true });
-      if (count === 0) {
-        couponData = enrichCoupon(fallbackMatch);
-      }
-    }
   }
 
   if (!couponData) {

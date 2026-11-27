@@ -206,7 +206,7 @@ export default function HeroBanner() {
           {/* Hairline Inner Champagne Frame */}
           <div className="hero-mobile-inner-keyline" aria-hidden="true" />
 
-          {/* Top Floating Atelier Controls: Slide Tag & Pause/Play */}
+          {/* Top Floating Atelier Edition Tag */}
           <div className="hero-mobile-top-hud">
             <div className="hero-mobile-edition-pill">
               <span className="hero-mobile-edition-index">
@@ -215,24 +215,6 @@ export default function HeroBanner() {
               <span className="hero-mobile-edition-sep" aria-hidden="true" />
               <span>{HERO_SLIDES[heroSlide].atelierTag}</span>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setIsPaused((p) => !p)}
-              className="hero-mobile-pause-btn"
-              aria-label={isPaused ? "Resume hero slideshow" : "Pause hero slideshow"}
-            >
-              {isPaused ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <polygon points="6 4 20 12 6 20 6 4" />
-                </svg>
-              ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <rect x="6" y="4" width="4" height="16" />
-                  <rect x="14" y="4" width="4" height="16" />
-                </svg>
-              )}
-            </button>
           </div>
 
           {/* Native Snap-Scroll Editorial Track */}
@@ -461,27 +443,8 @@ export default function HeroBanner() {
             </div>
           </div>
 
-          {/* Editorial Prev / Pause / Next Buttons */}
+          {/* Editorial Prev / Next Buttons */}
           <div className="hero-slide-controls">
-            <button
-              type="button"
-              onClick={() => setIsPaused((p) => !p)}
-              className="hero-arrow-btn"
-              aria-label={isPaused ? "Resume hero slideshow" : "Pause hero slideshow"}
-              title={isPaused ? "Resume slideshow" : "Pause slideshow"}
-            >
-              {isPaused ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                  <polygon points="6 4 20 12 6 20 6 4" />
-                </svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="6" y="4" width="4" height="16" />
-                  <rect x="14" y="4" width="4" height="16" />
-                </svg>
-              )}
-            </button>
-
             <button
               type="button"
               onClick={() =>

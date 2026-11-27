@@ -12,6 +12,7 @@ export interface DbRateLimitResult {
   resetSeconds: number;
 }
 
+const MAX_FALLBACK_ENTRIES = 10_000;
 const devRateLimitFallback = new Map<string, { count: number; resetAt: number }>();
 
 function checkInMemoryRateLimit(
@@ -23,6 +24,10 @@ function checkInMemoryRateLimit(
   const existing = devRateLimitFallback.get(identifier);
 
   if (!existing || now > existing.resetAt) {
+    if (!existing && devRateLimitFallback.size >= MAX_FALLBACK_ENTRIES) {
+      const oldestKey = devRateLimitFallback.keys().next().value;
+      if (oldestKey) devRateLimitFallback.delete(oldestKey);
+    }
     devRateLimitFallback.set(identifier, {
       count: 1,
       resetAt: now + windowSeconds * 1000,

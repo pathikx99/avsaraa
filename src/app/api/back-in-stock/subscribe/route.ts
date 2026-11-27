@@ -65,12 +65,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if already subscribed (same user/email + product + variant)
+    // Check if already subscribed (same email + product)
     const { data: existing } = await adminClient
-      .from("back_in_stock_subscriptions")
+      .from("subscriptions")
       .select("id")
+      .eq("subscription_type", "back_in_stock")
       .eq("product_id", productId)
-      .eq("email", email.toLowerCase().trim())
+      .eq("email", cleanEmail)
       .eq("notified", false)
       .maybeSingle();
 
@@ -83,14 +84,17 @@ export async function POST(request: Request) {
     }
 
     const { data: subscription, error } = await adminClient
-      .from("back_in_stock_subscriptions")
+      .from("subscriptions")
       .insert({
+        subscription_type: "back_in_stock",
         product_id: productId,
         user_id: user?.id ?? null,
-        email: email.toLowerCase().trim(),
+        email: cleanEmail,
         phone_number: phoneNumber?.trim() || null,
         variant_name: variantName?.trim() || null,
         size: size?.trim() || null,
+        status: "Subscribed",
+        source: "Back in Stock Alert",
         notified: false,
       })
       .select()

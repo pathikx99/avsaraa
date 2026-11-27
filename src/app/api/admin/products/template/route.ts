@@ -9,9 +9,9 @@ export async function GET() {
 
   const csvContent = [
     "name,category,price,mrp,stock_count,fabric,weave,available_sizes,image_url,description",
-    '"Virasat Pure Katan Silk Saree","Sarees",18999,24999,8,"Pure Katan Silk","Handloom Banarasi Kadhwa","Free Size (5.5m + 0.8m Blouse)","https://aqpkagsbaecavoznnrlj.supabase.co/storage/v1/object/public/items/products/e2000000-0000-0000-0000-000000000001/hero.webp","Heirloom hand-spun Banarasi silk draped in antique gold zari with artisanal border highlights."',
-    '"Gulmohar Chanderi Anarkali Set","Dresses",7499,9999,12,"Pure Chanderi Silk","Zari Weft & Handblock","S, M, L, XL","https://aqpkagsbaecavoznnrlj.supabase.co/storage/v1/object/public/items/products/e2000000-0000-0000-0000-000000000003/hero.webp","Regal 4.5m flared Anarkali ensemble with handcrafted organza dupatta and scalloped borders."',
-    '"Noor Hand-spun Linen Kurta","Kurtas",1199,1799,15,"Pure Handloom Linen","Relaxed Kalidar","38 (S), 40 (M), 42 (L), 44 (XL)","https://aqpkagsbaecavoznnrlj.supabase.co/storage/v1/object/public/items/products/e2000000-0000-0000-0000-000000000002/hero.webp","Lightweight daily wear linen kurta featuring natural mother-of-pearl buttons and breathable silhouette."',
+    '"Pure Katan Silk Saree","Sarees",18999,24999,8,"Pure Katan Silk","Handloom Kadhwa","Free Size (5.5m + 0.8m Blouse)","/images/saree_model_hero.jpg","Handloom silk saree draped in gold zari motifs."',
+    '"Chanderi Anarkali Dress","Dresses",7499,9999,12,"Pure Chanderi Silk","Zari Weft & Handblock","S, M, L, XL","/images/occasion_festive.jpg","Flared Anarkali dress with handcrafted dupatta."',
+    '"Hand-spun Linen Kurta Set","Men\'s Wear",2499,3299,15,"Pure Handloom Linen","Relaxed Kalidar","38 (S), 40 (M), 42 (L), 44 (XL)","/images/occasion_everyday.jpg","Lightweight linen kurta set with breathable silhouette."',
   ].join("\n");
 
   return new NextResponse(csvContent, {

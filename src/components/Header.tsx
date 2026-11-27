@@ -45,7 +45,8 @@ interface HeaderProps {
 
 function HeaderInner({ showBackOnMobile = false }: HeaderProps) {
   const router = useRouter();
-  const pathname = usePathname();
+  const rawPathname = usePathname() || "/";
+  const pathname = rawPathname === "/index" ? "/" : rawPathname;
   const searchParams = useSearchParams();
   const currentCategory = searchParams ? searchParams.get("category") : null;
 

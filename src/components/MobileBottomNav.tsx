@@ -12,7 +12,8 @@ import type { User } from "@supabase/supabase-js";
 const emptySubscribe = () => () => {};
 
 export default function MobileBottomNav() {
-  const pathname = usePathname();
+  const rawPathname = usePathname() || "/";
+  const pathname = rawPathname === "/index" ? "/" : rawPathname;
   const { totalItems, openCart } = useCart();
   const { totalWishlist } = useWishlist();
   const [user, setUser] = useState<User | null>(null);

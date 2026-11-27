@@ -3,9 +3,10 @@ import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { authenticateAdminRequest } from "@/lib/adminAuth";
 import { ensureColorwayImagesForProduct } from "@/lib/colorwayGenerator";
 import { invalidateProductsCache } from "@/app/api/products/route";
-import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import { sortProductsByShowcase, saveShowcaseOrderedIds } from "@/lib/showcaseOrderManager";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { generateSequentialProductSkus } from "@/lib/idGenerator";
+import { normalizeProducts } from "@/lib/productUtils";
 
 const VALID_CATEGORIES = [
   "Sarees",
@@ -32,20 +33,20 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error || !data || data.length === 0) {
-      console.warn("Products admin query notice (falling back to seed catalog):", error?.message);
-      const sortedSeed = sortProductsByShowcase(SEED_CATALOG_PRODUCTS);
+      if (error) {
+        console.warn("Products admin query notice:", error.message);
+      }
       return NextResponse.json({
         success: true,
-        products: sortedSeed,
-        count: sortedSeed.length,
-        notice: "Using local verified catalog as remote products table is initializing.",
+        products: [],
+        count: 0,
       });
     }
 
     const sortedData = sortProductsByShowcase(data);
     return NextResponse.json({
       success: true,
-      products: sortedData,
+      products: normalizeProducts(sortedData),
       count: sortedData.length,
     });
   } catch (err: unknown) {
@@ -87,6 +88,14 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    const skuBatch = await generateSequentialProductSkus(
+      supabaseAdmin,
+      rawItems.map((item) => ({
+        category: String(item.category || "").trim(),
+        explicitSku: typeof item.sku === "string" ? item.sku : null,
+      }))
+    );
 
     const validatedPayloads: Record<string, unknown>[] = [];
     for (let i = 0; i < rawItems.length; i++) {
@@ -178,7 +187,7 @@ export async function POST(request: Request) {
       if (item.size_inventory && typeof item.size_inventory === "object") {
         specs.size_inventory = item.size_inventory;
       }
-      if (item.sku) specs.sku = String(item.sku).trim();
+      specs.sku = skuBatch[i] || (item.sku ? String(item.sku).trim() : undefined);
       if (item.hsn_code) specs.hsn_code = String(item.hsn_code).trim();
       if (item.cluster_origin) specs.cluster_origin = String(item.cluster_origin).trim();
       if (Object.keys(specs).length > 0) {
@@ -189,12 +198,6 @@ export async function POST(request: Request) {
       }
       if (item.mrp !== undefined) insertPayload.mrp = Number(item.mrp) || numericPrice;
       if (item.discount_percent !== undefined) insertPayload.discount_percent = Number(item.discount_percent);
-      if (item.video_url) {
-        const cleanVideo = String(item.video_url).trim();
-        if (SAFE_URL_REGEX.test(cleanVideo)) {
-          insertPayload.video_url = cleanVideo;
-        }
-      }
       if (Array.isArray(item.highlights)) insertPayload.highlights = item.highlights;
 
       validatedPayloads.push(insertPayload);
@@ -388,16 +391,6 @@ export async function PUT(request: Request) {
     }
     if (body.fabric !== undefined) updatePayload.fabric = body.fabric ? String(body.fabric).trim() : null;
     if (body.weave !== undefined) updatePayload.weave = body.weave ? String(body.weave).trim() : null;
-    if (body.video_url !== undefined) {
-      const cleanPutVideo = body.video_url ? String(body.video_url).trim() : null;
-      if (cleanPutVideo && !SAFE_URL_REGEX.test(cleanPutVideo)) {
-        return NextResponse.json(
-          { success: false, error: "Video URL must be a valid HTTPS URL or local asset path." },
-          { status: 400 }
-        );
-      }
-      updatePayload.video_url = cleanPutVideo;
-    }
     if (Array.isArray(body.highlights)) updatePayload.highlights = body.highlights;
 
     const { data, error } = await supabaseAdmin

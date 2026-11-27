@@ -3,7 +3,6 @@ import crypto from "crypto";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { Order, OrderItem, CreateOrderPayload, PaymentStatus, OrderStatus } from "@/types/order";
-import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import {
   isValidIndianPincode,
   isValidGujaratPincode,
@@ -13,20 +12,14 @@ import { validateCouponEngine, incrementCouponUsage } from "@/lib/couponManager"
 import { dispatchOrderSuccessEmails } from "@/lib/emailService";
 import { deductInventory } from "@/lib/inventory";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { checkDbRateLimit } from "@/lib/dbRateLimit";
+import { generateSequentialOrderNumber, formatOrderNumber, extractTrailingSequence } from "@/lib/idGenerator";
+import { headers } from "next/headers";
 import {
   validateOrderContacts,
   isContactProofTokenConsumed,
   consumeContactProofTokens,
 } from "@/lib/contactVerification";
-
-function generateOrderNumber(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const randomSuffix = crypto.randomBytes(4).toString("hex").toUpperCase();
-  return `AVS-${year}${month}${day}-${randomSuffix}`;
-}
 
 export async function POST(request: Request) {
   try {
@@ -36,6 +29,17 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
         { status: 403 }
+      );
+    }
+
+    const headerList = await headers();
+    const forwardedFor = headerList.get("x-forwarded-for");
+    const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
+    const rateCheck = await checkDbRateLimit(`order-place:${ip}`, 10, 300);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, message: `Too many order attempts. Please retry in ${rateCheck.resetSeconds} seconds.` },
+        { status: 429 }
       );
     }
 
@@ -195,9 +199,14 @@ export async function POST(request: Request) {
 
     // 4. Compute Financials & Validate Items with Canonical Database Prices
     const adminClient = getAdminSupabaseClient();
-    const productIds = items
-      .map((item) => item.product_id)
-      .filter((id): id is string => Boolean(id));
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const productIds = Array.from(
+      new Set(
+        items
+          .map((item) => item.product_id)
+          .filter((id): id is string => typeof id === "string" && UUID_REGEX.test(id.trim()))
+      )
+    );
 
     // Fetch verified prices & stock from database
     const priceMap = new Map<string, { price: number; inDb: boolean; stockCount: number | null }>();
@@ -219,17 +228,6 @@ export async function POST(request: Request) {
         }
       } catch (err) {
         console.warn("Notice: Canonical price query notice:", err);
-      }
-    }
-
-    // Populate missing from seed catalog
-    for (const seed of SEED_CATALOG_PRODUCTS) {
-      if (!priceMap.has(seed.id)) {
-        priceMap.set(seed.id, {
-          price: seed.price,
-          inDb: false,
-          stockCount: seed.stock_count ?? null,
-        });
       }
     }
 
@@ -350,7 +348,7 @@ export async function POST(request: Request) {
     const isCOD = resolvedPaymentMethod === "COD";
     const orderStatus: OrderStatus = isCOD ? "Confirmed" : "Pending";
     const paymentStatus: PaymentStatus = "Pending";
-    const orderNumber = generateOrderNumber();
+    let orderNumber = await generateSequentialOrderNumber(adminClient);
 
     const estDelivery = new Date();
     estDelivery.setDate(estDelivery.getDate() + 3);
@@ -360,11 +358,10 @@ export async function POST(request: Request) {
       ? shipping_address_id
       : null;
 
-    const orderPayload = {
+    const baseOrderPayload = {
       user_id: currentUserId,
       shipping_address_id: sanitizedAddressId,
       shipping_address_snapshot: shipping_address_snapshot,
-      order_number: orderNumber,
       subtotal: financials.subtotal,
       discount_amount: financials.discountAmount,
       shipping_fee: financials.shippingFee + financials.codSurcharge, // Total logistics fee
@@ -386,11 +383,23 @@ export async function POST(request: Request) {
     let createdOrder: Order | null = null;
     let createdItems: OrderItem[] = [];
 
-    const { data: dbOrder, error: orderErr } = await adminClient
-      .from("orders")
-      .insert(orderPayload)
-      .select()
-      .single();
+    let dbOrder: Record<string, unknown> | null = null;
+    let orderErr: { code?: string; message?: string } | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const insertAttempt = await adminClient
+        .from("orders")
+        .insert({ ...baseOrderPayload, order_number: orderNumber })
+        .select()
+        .single();
+      dbOrder = insertAttempt.data as Record<string, unknown> | null;
+      orderErr = insertAttempt.error;
+      if (!orderErr && dbOrder) break;
+      if (orderErr?.code === "23505" && orderErr.message?.includes("order_number")) {
+        orderNumber = formatOrderNumber(extractTrailingSequence(orderNumber) + 1);
+        continue;
+      }
+      break;
+    }
 
     if (orderErr || !dbOrder) {
       throw new Error(
@@ -398,11 +407,13 @@ export async function POST(request: Request) {
       );
     }
 
-    createdOrder = dbOrder as Order;
+    createdOrder = dbOrder as unknown as Order;
+
+    const dbOrderId = String(dbOrder.id);
 
     // Insert order items (rollback order row on failure so no orphaned orders remain)
     const itemsToInsert = sanitizedItems.map((item) => ({
-      order_id: dbOrder.id,
+      order_id: dbOrderId,
       ...item,
     }));
 
@@ -412,7 +423,7 @@ export async function POST(request: Request) {
       .select();
 
     if (itemsErr || !dbItems || dbItems.length === 0) {
-      await adminClient.from("orders").delete().eq("id", dbOrder.id);
+      await adminClient.from("orders").delete().eq("id", dbOrderId);
       throw new Error(
         `Failed to create order items in database: ${itemsErr?.message || "Insert returned no order items."}`
       );

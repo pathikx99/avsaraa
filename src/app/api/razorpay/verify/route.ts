@@ -7,6 +7,8 @@ import { verifyAdminSession } from "@/lib/jwtAdmin";
 import { deductInventory } from "@/lib/inventory";
 import { incrementCouponUsage } from "@/lib/couponManager";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { checkDbRateLimit } from "@/lib/dbRateLimit";
+import { headers } from "next/headers";
 import { consumeContactProofTokens } from "@/lib/contactVerification";
 import type { Order, OrderItem } from "@/types/order";
 
@@ -24,6 +26,17 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: `CSRF validation failed: ${csrfCheck.reason}` },
         { status: 403 }
+      );
+    }
+
+    const headerList = await headers();
+    const forwardedFor = headerList.get("x-forwarded-for");
+    const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown-ip";
+    const rateCheck = await checkDbRateLimit(`razorpay-verify:${ip}`, 20, 300);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: `Too many verification requests. Please retry in ${rateCheck.resetSeconds} seconds.` },
+        { status: 429 }
       );
     }
 

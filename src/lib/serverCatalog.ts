@@ -1,12 +1,11 @@
 import { getAdminSupabaseClient } from "@/lib/supabaseAdmin";
 import { normalizeProducts } from "@/lib/productUtils";
 import { Product } from "@/types/product";
-import { SEED_CATALOG_PRODUCTS } from "@/lib/productDetailData";
 import { sortProductsByShowcase } from "@/lib/showcaseOrderManager";
 
 /**
- * Fetches published catalog products directly on the server for SSR/ISR pages,
- * falling back cleanly to SEED_CATALOG_PRODUCTS if Supabase is unavailable.
+ * Fetches published catalog products directly on the server for SSR/ISR pages.
+ * Returns [] when the store catalog has no published products or is unreachable.
  */
 export async function getPublishedCatalog(): Promise<Product[]> {
   try {
@@ -17,7 +16,7 @@ export async function getPublishedCatalog(): Promise<Product[]> {
       .order("created_at", { ascending: false });
 
     if (error || !data || data.length === 0) {
-      return normalizeProducts(SEED_CATALOG_PRODUCTS);
+      return [];
     }
 
     const publishedOnly = data.filter((p) => {
@@ -25,9 +24,9 @@ export async function getPublishedCatalog(): Promise<Product[]> {
       return !status || status === "published";
     });
 
-    return normalizeProducts(publishedOnly.length > 0 ? publishedOnly : SEED_CATALOG_PRODUCTS);
+    return normalizeProducts(publishedOnly);
   } catch {
-    return normalizeProducts(SEED_CATALOG_PRODUCTS);
+    return [];
   }
 }
 

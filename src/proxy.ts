@@ -4,6 +4,14 @@ import { isSuperAdminUser } from "@/lib/adminConstants";
 import { getSupabaseUrl, getSupabasePublishableKey } from "@/lib/env";
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Fast-path: /api/* routes handle their own session/JWT/webhook auth without redundant Supabase Auth latency.
+  // /admin handles its own standalone Super Admin JWT Security Gate.
+  if (pathname.startsWith("/api/") || pathname.startsWith("/admin")) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabaseUrl = getSupabaseUrl();
@@ -30,15 +38,7 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-
-  // 1. /admin renders its own dedicated Super Admin Security Gate when unauthenticated,
-  // allowing direct master password authentication on /admin without redirecting away to /login.
-  if (pathname.startsWith("/admin")) {
-    return supabaseResponse;
-  }
-
-  // 2. Protected Route: /account requires an active customer session with verified email
+  // 1. Protected Route: /account requires an active customer session with verified email or WhatsApp phone
   if (pathname.startsWith("/account")) {
     if (!user) {
       const redirectUrl = request.nextUrl.clone();
@@ -81,33 +81,23 @@ export async function proxy(request: NextRequest) {
     const rawId = pathname.slice("/products/".length).split("/")[0]?.trim();
     if (rawId) {
       const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const SEED_PRODUCT_IDS = new Set([
-        "e0000000-0000-0000-0000-000000000001",
-        "e0000000-0000-0000-0000-000000000002",
-        "e0000000-0000-0000-0000-000000000003",
-        "e0000000-0000-0000-0000-000000000004",
-        "e0000000-0000-0000-0000-000000000005",
-        "e1000000-0000-0000-0000-000000000003",
-        "e1000000-0000-0000-0000-000000000009",
-      ]);
+      const SKU_REGEX = /^AVS-[A-Z]{3}-\d{4}-\d{4,}$/i;
+      const isUuid = UUID_REGEX.test(rawId);
+      const isSku = SKU_REGEX.test(rawId);
 
-      if (!SEED_PRODUCT_IDS.has(rawId)) {
-        if (!UUID_REGEX.test(rawId)) {
+      if (!isUuid && !isSku) {
+        return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
+      }
+      try {
+        const { data: product, error } = isUuid
+          ? await supabase.from("products").select("id").eq("id", rawId).maybeSingle()
+          : await supabase.from("products").select("id").eq("specifications->>sku", rawId.toUpperCase()).maybeSingle();
+
+        if (!error && !product) {
           return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
         }
-        try {
-          const { data: product, error } = await supabase
-            .from("products")
-            .select("id")
-            .eq("id", rawId)
-            .maybeSingle();
-
-          if (!error && !product) {
-            return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
-          }
-        } catch {
-          // If query fails due to network/cold-start, let the product route handle it
-        }
+      } catch {
+        // If query fails due to network/cold-start, let the product route handle it
       }
     }
   }

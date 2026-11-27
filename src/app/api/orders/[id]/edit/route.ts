@@ -41,7 +41,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { edit_type, before_snapshot, after_snapshot, reason, shipping_address_snapshot, notes } = body;
+    const { reason, shipping_address_snapshot, notes } = body;
 
     const adminClient = getAdminSupabaseClient();
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -94,7 +94,36 @@ export async function PATCH(
       }
       updateFields.shipping_address_snapshot = shipping_address_snapshot;
     }
-    if (notes !== undefined) updateFields.notes = notes;
+    if (notes !== undefined) {
+      updateFields.notes = typeof notes === "string" ? notes.trim().slice(0, 1000) : null;
+    }
+
+    const derivedEditType = shipping_address_snapshot ? "address_change" : "note_change";
+    const safeBeforeSnapshot: Record<string, unknown> = {};
+    const safeAfterSnapshot: Record<string, unknown> = {};
+    if (shipping_address_snapshot) {
+      safeBeforeSnapshot.shipping_address_snapshot = order.shipping_address_snapshot;
+      safeAfterSnapshot.shipping_address_snapshot = updateFields.shipping_address_snapshot;
+    }
+    if (notes !== undefined) {
+      safeBeforeSnapshot.notes = order.notes ?? null;
+      safeAfterSnapshot.notes = updateFields.notes;
+    }
+
+    const existingHistory = Array.isArray((order as { edit_history?: unknown[] }).edit_history)
+      ? ((order as { edit_history?: unknown[] }).edit_history as unknown[])
+      : [];
+    updateFields.edit_history = [
+      ...existingHistory,
+      {
+        edited_by: user.id,
+        edit_type: derivedEditType,
+        before_snapshot: safeBeforeSnapshot,
+        after_snapshot: safeAfterSnapshot,
+        reason: typeof reason === "string" ? reason.trim().slice(0, 500) : null,
+        created_at: nowIso,
+      },
+    ];
 
     const { data: updatedOrder, error: updateErr } = await adminClient
       .from("orders")
@@ -105,22 +134,13 @@ export async function PATCH(
 
     if (updateErr) throw updateErr;
 
-    await adminClient.from("order_edits").insert({
-      order_id: order.id,
-      edited_by: user.id,
-      edit_type: edit_type || "note_change",
-      before_snapshot: before_snapshot || {},
-      after_snapshot: after_snapshot || {},
-      reason: reason || null,
-    });
-
     return NextResponse.json({
       success: true,
       message: "Order updated successfully.",
       order: updatedOrder,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return NextResponse.json({ success: false, message }, { status: 500 });
+    console.error("Order edit exception:", err);
+    return NextResponse.json({ success: false, message: "Unable to update order right now." }, { status: 500 });
   }
 }

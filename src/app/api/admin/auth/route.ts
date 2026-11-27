@@ -131,7 +131,7 @@ export async function POST(request: Request) {
               email: configuredEmail,
               password: envPassword,
               email_confirm: true,
-              user_metadata: { role: "super_admin", full_name: "Kratos Lord" },
+              user_metadata: { role: "super_admin", full_name: "Avsaraa Admin" },
               app_metadata: { role: "super_admin" },
             });
           } catch {
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
         await supabaseAdmin.from("admin_users").upsert(
           {
             email: configuredEmail,
-            full_name: "Kratos Lord",
+            full_name: "Avsaraa Admin",
             role: "Super Admin",
             department: "Executive Leadership",
             status: "Active",
