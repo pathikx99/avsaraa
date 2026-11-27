@@ -1693,9 +1693,9 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               >
                 <ReturnBoxIcon size={20} color="#866951" />
                 <div>
-                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#261B13", letterSpacing: "0.04em" }}>7-DAY RETURN &amp; EXCHANGE</div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#261B13", letterSpacing: "0.04em" }}>7-DAY EXCHANGE ONLY</div>
                   <div style={{ fontSize: "10.5px", color: "#6A584B", marginTop: "2px", lineHeight: 1.3 }}>
-                    Easy doorstep pickup
+                    Easy doorstep pickup · No refunds
                   </div>
                 </div>
               </div>
@@ -2131,7 +2131,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   }}
                 >
                   <span style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
-                    Shipping &amp; 7-Day Return &amp; Exchange Policy
+                    Shipping &amp; 7-Day Exchange Policy
                   </span>
                   <span
                     style={{
@@ -2150,10 +2150,10 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                       At AVSARAA, we want you to love what you wear!
                     </p>
                     <ul style={{ margin: 0, paddingLeft: "18px", marginBottom: "14px" }}>
-                      <li>Return or exchange your purchase within 7 days of delivery.</li>
+                      <li>Exchange your purchase for a different size or design within 7 days of delivery (No refunds).</li>
                       <li>Exchange for any available size or choose another dress.</li>
                       <li>
-                        If the replacement product has a lower price, the difference will be credited to your AVSARAA account.
+                        If the replacement product has a lower price, the difference will be credited as store credit to your AVSARAA account for future orders.
                       </li>
                       <li>
                         If the replacement product has a higher price, you only pay the difference.
@@ -2164,14 +2164,14 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     <ul style={{ margin: 0, paddingLeft: "18px", color: "#6E5B4E" }}>
                       <li>Product must be unused and unwashed.</li>
                       <li>Original tags must be attached.</li>
-                      <li>Product must be returned in its original condition.</li>
+                      <li>Product must be sent back for exchange in its original condition.</li>
                       <li>Exchange request must be raised within 7 days of delivery.</li>
-                      <li>Exchange is subject to product availability.</li>
+                      <li>Exchange is subject to product availability (exchanges only, no refunds).</li>
                     </ul>
 
                     <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px dashed #E6DACF", display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "12px" }}>
                       <Link href="/returns" target="_blank" rel="noopener noreferrer" style={{ color: "#866951", fontWeight: 600, textDecoration: "underline" }}>
-                        View Return &amp; Exchange Policy →
+                        View Exchange Policy →
                       </Link>
                       <Link href="/shipping" target="_blank" rel="noopener noreferrer" style={{ color: "#866951", fontWeight: 600, textDecoration: "underline" }}>
                         View Shipping Policy →

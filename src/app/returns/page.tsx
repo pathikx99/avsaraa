@@ -3,15 +3,15 @@ import type { Metadata } from "next";
 import PolicyPageLayout, { TocItem } from "@/components/PolicyPageLayout";
 
 export const metadata: Metadata = {
-  title: "Return, Exchange & Refund Policy | AVSARAA",
-  description: "Official Return, Exchange & Refund Policy of AVSARAA. Learn about our size/design exchange criteria and damaged product claims.",
+  title: "Exchange Policy (No Refunds) | AVSARAA",
+  description: "Official Exchange Policy of AVSARAA. We process exchanges only (no refunds). Learn about our 7-day size/design exchange criteria and replacement process.",
 };
 
 const TOC: TocItem[] = [
   { id: "introduction", label: "Introduction" },
   { id: "when-exchange-accepted", label: "When an Exchange Is Accepted" },
-  { id: "price-difference", label: "Price Difference & Amount Adjustment" },
-  { id: "refunds-damaged-products", label: "Refunds — Damaged Products Only" },
+  { id: "price-difference", label: "Price Difference & Store Credit" },
+  { id: "exchange-only-no-refunds", label: "No Refunds — Exchange Only" },
   { id: "reporting-damaged-product", label: "Reporting a Damaged Product" },
   { id: "conditions-for-exchanges", label: "Conditions for Exchanges" },
   { id: "exchange-request-process", label: "Exchange Request Process" },
@@ -24,9 +24,9 @@ export default function ReturnsPolicyPage() {
   return (
     <PolicyPageLayout
       activePolicy="returns"
-      title="Return, Exchange & Refund Policy"
-      badge="CUSTOMER SATISFACTION"
-      description="At AVSARAA, we want you to feel confident and happy with your purchase. This policy explains the circumstances in which you may request a size change, design exchange or refund."
+      title="Exchange Policy"
+      badge="EXCHANGES ONLY · NO REFUNDS"
+      description="At AVSARAA, we want you to love what you wear. We offer exchanges only for size changes, design changes, and verified damaged items — we do not issue monetary refunds or process returns."
       tableOfContents={TOC}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "36px" }}>
@@ -39,7 +39,7 @@ export default function ReturnsPolicyPage() {
             </h2>
           </div>
           <p style={{ margin: 0, color: "#4A3B30", fontSize: "14.5px" }}>
-            At <strong>AVSARAA</strong>, we want you to feel confident and happy with your purchase. This policy explains the circumstances in which customers may request a size change, design exchange or refund. Please read it carefully before placing an order.
+            At <strong>AVSARAA</strong>, we want you to feel confident and happy with your purchase. <strong>We do not process refunds or standalone returns; we exclusively process exchanges</strong> within 7 days of delivery for size changes, design changes, or verified damaged items. Please read this policy carefully before placing an order.
           </p>
         </section>
 
@@ -96,7 +96,7 @@ export default function ReturnsPolicyPage() {
               <strong>Higher Price:</strong> If the replacement product costs more, the customer will be asked to pay the additional amount before the replacement is dispatched.
             </li>
             <li>
-              <strong>Lower Price:</strong> If the replacement product costs less, the difference will be adjusted or refunded through an appropriate payment method, as agreed with the customer and permitted by applicable law.
+              <strong>Lower Price:</strong> If the replacement product costs less, the difference will be issued as AVSARAA store credit toward your next exchange or purchase (no cash or bank refunds).
             </li>
           </ul>
           <p style={{ margin: 0, color: "#4A3B30", fontSize: "14px" }}>
@@ -104,22 +104,22 @@ export default function ReturnsPolicyPage() {
           </p>
         </section>
 
-        {/* 4. Refunds — Damaged Products Only */}
-        <section id="refunds-damaged-products" style={{ scrollMarginTop: "140px" }}>
+        {/* 4. No Refunds — Exchange Only */}
+        <section id="exchange-only-no-refunds" style={{ scrollMarginTop: "140px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
             <span style={{ fontSize: "12px", fontWeight: 700, color: "#866951", backgroundColor: "#F7F2EE", padding: "3px 8px", borderRadius: "6px" }}>04</span>
             <h2 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "22px", color: "#261B13", margin: 0 }}>
-              Refunds — Damaged Products Only
+              No Refunds — Exchange Only
             </h2>
           </div>
           <p style={{ margin: "0 0 12px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            Refunds are considered <strong>only in exceptional cases where a customer receives a product that is damaged</strong>. A refund is not the standard option for size or design preferences; customers should request an exchange in those situations.
+            <strong>AVSARAA does not offer refunds or return-for-refund orders.</strong> All eligible orders are handled exclusively through an exchange for another available size or design within 7 days of delivery.
           </p>
           <p style={{ margin: "0 0 12px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            A damaged-product claim will be reviewed after the customer provides the required details and AVSARAA verifies the issue. If the claim is approved, AVSARAA will arrange an appropriate remedy, which may include a replacement or refund, as applicable and required by law.
+            In the event you receive a damaged or defective piece, our team will review the submitted photographs and verification details and arrange an immediate <strong>direct replacement or equal-value exchange</strong> once verified.
           </p>
           <p style={{ margin: 0, color: "#6E5B4E", fontSize: "13.5px", fontStyle: "italic" }}>
-            Nothing in this policy limits any rights or remedies that customers may have under applicable consumer protection laws.
+            This policy applies to all handcrafted orders across AVSARAA.
           </p>
         </section>
 
@@ -163,7 +163,7 @@ export default function ReturnsPolicyPage() {
             <li>Original tags, labels, packaging and accessories should be intact and included.</li>
             <li>The product must not show stains, damage, alterations, perfume or signs of use.</li>
             <li>The requested replacement size or design must be available.</li>
-            <li>The customer must obtain approval and return instructions from AVSARAA before sending the product back.</li>
+            <li>The customer must obtain approval and reverse-pickup instructions from AVSARAA before sending the product back for exchange.</li>
           </ul>
           <p style={{ margin: 0, color: "#6E5B4E", fontSize: "13.5px" }}>
             Products that do not meet these conditions may not qualify for a voluntary exchange. This does not affect rights available under applicable law.
@@ -186,14 +186,14 @@ export default function ReturnsPolicyPage() {
               <strong>Verification &amp; Availability:</strong> Our team will confirm whether the requested replacement is available and share the next steps.
             </li>
             <li>
-              <strong>Reverse Logistics:</strong> After approval, follow the return or pickup instructions provided by our team.
+              <strong>Reverse Logistics:</strong> After approval, follow the exchange pickup instructions provided by our team.
             </li>
             <li>
-              <strong>Inspection &amp; Dispatch:</strong> Once the returned product is received and inspected, the approved exchange and any price adjustment will be processed.
+              <strong>Inspection &amp; Dispatch:</strong> Once the original product is received and inspected, the approved exchange item will be dispatched promptly.
             </li>
           </ol>
           <div style={{ padding: "14px 18px", backgroundColor: "#FAF7F2", borderLeft: "3px solid #866951", borderRadius: "6px", fontSize: "13.5px", color: "#5A4535" }}>
-            <strong>Important:</strong> Please do not send a product to an address without receiving return instructions from AVSARAA.
+            <strong>Important:</strong> Please do not send a product to an address without receiving exchange pickup instructions from AVSARAA.
           </div>
         </section>
 
@@ -219,7 +219,7 @@ export default function ReturnsPolicyPage() {
             </h2>
           </div>
           <p style={{ margin: 0, color: "#4A3B30", fontSize: "14.5px" }}>
-            If you wish to cancel an order, contact AVSARAA as soon as possible. Cancellation may not be possible once the order has been processed, packed or handed over to the courier. Any eligible cancellation and refund will be handled in accordance with applicable law and the circumstances of the order.
+            If you wish to cancel an order before dispatch, contact AVSARAA immediately. Cancellation is not possible once the order has been processed, packed or handed over to the courier, and delivered orders are eligible strictly for exchange only (no refunds).
           </p>
         </section>
 

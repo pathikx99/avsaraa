@@ -233,7 +233,7 @@ export default function ShippingPolicyPage() {
             If a package appears visibly damaged, tampered with or incomplete at the time of delivery, customers should contact AVSARAA promptly and, where possible, retain the packaging and take clear photographs or videos of the package and its contents.
           </p>
           <p style={{ margin: "0 0 14px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            Please contact us with your order number and relevant details so that we can review the matter and coordinate with the courier partner. Any claim will be assessed in accordance with applicable law and AVSARAA&apos;s relevant <Link href="/returns" style={{ color: "#866951", fontWeight: 600 }}>Return, Exchange &amp; Refund Policy</Link>.
+            Please contact us with your order number and relevant details so that we can review the matter and coordinate with the courier partner. Any claim will be assessed in accordance with applicable law and AVSARAA&apos;s <Link href="/returns" style={{ color: "#866951", fontWeight: 600 }}>Exchange Policy</Link>.
           </p>
         </section>
 

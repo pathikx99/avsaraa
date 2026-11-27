@@ -2574,7 +2574,7 @@ export default function CheckoutPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>
                   <ReturnBoxIcon size={16} color="#866951" />
-                  <span>7-Day Return &amp; Exchange Guarantee</span>
+                  <span>7-Day Exchange Guarantee (No Refunds)</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>
                   <ShieldCheckIcon size={16} color="#866951" />

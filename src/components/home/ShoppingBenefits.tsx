@@ -34,8 +34,8 @@ const BENEFITS = [
         <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
       </svg>
     ),
-    title: "7-Day Return & Exchange",
-    subtitle: "Hassle-free doorstep returns and exchanges within 7 days for complete peace of mind.",
+    title: "7-Day Exchange Only",
+    subtitle: "Hassle-free doorstep size and design exchanges within 7 days (No refunds).",
   },
 ];
 

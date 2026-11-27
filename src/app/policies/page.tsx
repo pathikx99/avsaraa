@@ -7,7 +7,7 @@ import { ShieldCheckIcon, DeliveryVanIcon, ReturnBoxIcon, MailIcon, LocationPinI
 
 export const metadata: Metadata = {
   title: "Policies & Legal Hub | AVSARAA",
-  description: "Browse AVSARAA's official consumer policies: Privacy Policy, Terms & Conditions, Shipping & Delivery, and Return, Exchange & Refund Policy.",
+  description: "Browse AVSARAA's official consumer policies: Privacy Policy, Terms & Conditions, Shipping & Delivery, and Exchange Policy (No Refunds).",
 };
 
 const POLICIES = [
@@ -36,12 +36,12 @@ const POLICIES = [
     features: ["Free Pan-India Prepaid Delivery ₹799+", "₹20 Cash on Delivery Charge", "Real-Time Courier Tracking"],
   },
   {
-    title: "Return, Exchange & Refund Policy",
+    title: "Exchange Policy",
     href: "/returns",
-    badge: "CUSTOMER SATISFACTION",
-    description: "Our policy on size exchanges, design changes, price differences, and refund claims strictly for verified damaged shipments.",
+    badge: "EXCHANGES ONLY · NO REFUNDS",
+    description: "Our exchange-only policy on size exchanges, design changes, price adjustments, and damaged product replacements (no refunds).",
     icon: <ReturnBoxIcon size={24} color="#866951" />,
-    features: ["Hassle-Free Size/Design Exchange", "Price Difference Adjustments", "Damaged Product Claim Protocol"],
+    features: ["7-Day Size & Design Exchange", "No Refunds Policy", "Damaged Product Replacement Protocol"],
   },
 ];
 
@@ -117,7 +117,7 @@ export default function PoliciesHubPage() {
               lineHeight: 1.65,
             }}
           >
-            Explore our policies covering customer privacy, order fulfillment, return &amp; exchange processes, and terms of service.
+            Explore our policies covering customer privacy, order fulfillment, 7-day exchange processes (no refunds), and terms of service.
           </p>
 
           <div

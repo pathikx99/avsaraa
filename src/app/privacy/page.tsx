@@ -89,7 +89,7 @@ export default function PrivacyPolicyPage() {
                 Order and Transaction Information
               </h3>
               <ul style={{ margin: 0, paddingLeft: "18px", color: "#5A4535", fontSize: "13.5px", lineHeight: 1.6 }}>
-                <li>Products purchased, order history, size or product preferences, delivery details, returns and refund information.</li>
+                <li>Products purchased, order history, size or product preferences, delivery details, and exchange information.</li>
                 <li>Payment method, transaction reference and payment status received from our payment provider.</li>
               </ul>
             </div>
@@ -120,7 +120,7 @@ export default function PrivacyPolicyPage() {
           <ul style={{ margin: 0, paddingLeft: "20px", color: "#4A3B30", fontSize: "14px", lineHeight: 1.75 }}>
             <li>Creating and managing customer accounts and verifying login requests.</li>
             <li>Accepting, processing, confirming, dispatching and delivering orders.</li>
-            <li>Processing payments, cancellations, returns and refunds.</li>
+            <li>Processing payments, pre-dispatch cancellations, and exchanges.</li>
             <li>Sending transactional messages such as OTPs, order confirmations, payment updates and delivery notifications.</li>
             <li>Responding to enquiries and providing customer support.</li>
             <li>Improving website functionality, products and customer experience.</li>
@@ -143,7 +143,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <ul style={{ margin: "0 0 14px 0", paddingLeft: "20px", color: "#4A3B30", fontSize: "14px", lineHeight: 1.75 }}>
             <li>OTP messages for account verification or login.</li>
-            <li>Order, payment, dispatch, delivery, cancellation, return and refund updates.</li>
+            <li>Order, payment, dispatch, delivery, cancellation, and exchange updates.</li>
             <li>Responses to customer enquiries and service notifications.</li>
             <li>New collection announcements, offers and other promotional messages where the required consent has been obtained.</li>
           </ul>
@@ -167,7 +167,7 @@ export default function PrivacyPolicyPage() {
             Online payments on our website are processed through <strong>Razorpay</strong>. Payment details are handled by Razorpay and the relevant banks, card networks or payment service providers in accordance with their applicable terms and privacy practices.
           </p>
           <p style={{ margin: "0 0 12px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            AVSARAA may receive limited payment-related information such as payment status, transaction reference, payment method type and refund status. <strong>We do not intend to store full card numbers, CVV values, UPI PINs or banking passwords on our systems.</strong>
+            AVSARAA may receive limited payment-related information such as payment status, transaction reference, and payment method type. <strong>We do not intend to store full card numbers, CVV values, UPI PINs or banking passwords on our systems.</strong>
           </p>
           <p style={{ margin: 0, color: "#4A3B30", fontSize: "14.5px" }}>
             For details about Razorpay&apos;s handling of payment information, please review Razorpay&apos;s own privacy policy and terms.
@@ -186,7 +186,7 @@ export default function PrivacyPolicyPage() {
             <strong>We do not sell or rent customers&apos; personal information.</strong> We may share information that is reasonably necessary with service providers and other recipients for the purposes described in this policy, including:
           </p>
           <ul style={{ margin: "0 0 14px 0", paddingLeft: "20px", color: "#4A3B30", fontSize: "14px", lineHeight: 1.75 }}>
-            <li><strong>Razorpay</strong> and other relevant payment participants for payment processing and refunds.</li>
+            <li><strong>Razorpay</strong> and other relevant payment participants for payment processing and order verification.</li>
             <li>Courier, delivery and logistics partners (such as <strong>Shiprocket</strong>) to fulfil orders.</li>
             <li>WhatsApp Business providers, email providers and communication automation services to send messages.</li>
             <li>Website hosting, maintenance, analytics, security and technology providers.</li>

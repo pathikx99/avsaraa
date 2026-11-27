@@ -315,7 +315,7 @@ export default function Footer() {
               <li><Link href="/privacy" className="luxury-nav-link">Privacy Policy</Link></li>
               <li><Link href="/terms" className="luxury-nav-link">Terms &amp; Conditions</Link></li>
               <li><Link href="/shipping" className="luxury-nav-link">Shipping &amp; Delivery</Link></li>
-              <li><Link href="/returns" className="luxury-nav-link">Returns &amp; Exchanges</Link></li>
+              <li><Link href="/returns" className="luxury-nav-link">Exchange Policy</Link></li>
             </ul>
           </div>
         </div>
@@ -349,8 +349,8 @@ export default function Footer() {
                 <ReturnBoxIcon size={20} color="#866951" />
               </div>
             </div>
-            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>7-Day Return &amp; Exchange</h4>
-            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Hassle-free 7-day returns &amp; exchanges</p>
+            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>7-Day Exchange Only</h4>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Hassle-free 7-day exchanges (No refunds)</p>
           </div>
 
           <div>
@@ -409,7 +409,7 @@ export default function Footer() {
             <span>·</span>
             <Link href="/shipping" style={{ color: "#544439", textDecoration: "none" }}>Shipping &amp; Delivery</Link>
             <span>·</span>
-            <Link href="/returns" style={{ color: "#544439", textDecoration: "none" }}>Returns &amp; Refunds</Link>
+            <Link href="/returns" style={{ color: "#544439", textDecoration: "none" }}>Exchange Policy</Link>
           </div>
         </div>
       </div>

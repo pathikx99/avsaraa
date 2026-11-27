@@ -636,7 +636,7 @@ function OrderTrackingContent() {
                   Insured White-Glove Handloom Transit
                 </span>
                 <span style={{ fontSize: "11.5px", color: "#866951" }}>
-                  Every Avsaraa dispatch includes tamper-evident sealing and 7-day return &amp; exchange support.
+                  Every Avsaraa dispatch includes tamper-evident sealing and 7-day exchange support (no refunds).
                 </span>
               </div>
             </div>

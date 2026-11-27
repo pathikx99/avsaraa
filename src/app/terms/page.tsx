@@ -17,7 +17,7 @@ const TOC: TocItem[] = [
   { id: "orders-acceptance", label: "Orders & Order Acceptance" },
   { id: "payments", label: "Payments & COD" },
   { id: "shipping-delivery", label: "Shipping & Delivery" },
-  { id: "returns-exchanges-refunds", label: "Returns, Exchanges & Refunds" },
+  { id: "exchanges-no-refunds", label: "Exchanges Only (No Refunds)" },
   { id: "customer-conduct", label: "Customer Conduct & Acceptable Use" },
   { id: "intellectual-property", label: "Intellectual Property" },
   { id: "third-party-services", label: "Third-Party Services & Links" },
@@ -49,7 +49,7 @@ export default function TermsPage() {
             Welcome to <strong>AVSARAA</strong>. These Terms &amp; Conditions govern your access to and use of the AVSARAA website and the purchase of products through it. By browsing the website, creating an account or placing an order, you agree to these Terms &amp; Conditions and the policies referred to here. If you do not agree, please do not use the website.
           </p>
           <p style={{ margin: 0, color: "#4A3B30", fontSize: "14.5px" }}>
-            These terms are intended to be read together with our <Link href="/privacy" style={{ color: "#866951", fontWeight: 600 }}>Privacy Policy</Link>, <Link href="/shipping" style={{ color: "#866951", fontWeight: 600 }}>Shipping &amp; Delivery Policy</Link> and <Link href="/returns" style={{ color: "#866951", fontWeight: 600 }}>Return, Exchange &amp; Refund Policy</Link>. If a specific policy provides additional details for a particular subject, that policy should be read with these terms. Nothing in these terms excludes rights that cannot lawfully be excluded under applicable law.
+            These terms are intended to be read together with our <Link href="/privacy" style={{ color: "#866951", fontWeight: 600 }}>Privacy Policy</Link>, <Link href="/shipping" style={{ color: "#866951", fontWeight: 600 }}>Shipping &amp; Delivery Policy</Link> and <Link href="/returns" style={{ color: "#866951", fontWeight: 600 }}>Exchange Policy</Link>. If a specific policy provides additional details for a particular subject, that policy should be read with these terms. Nothing in these terms excludes rights that cannot lawfully be excluded under applicable law.
           </p>
         </section>
 
@@ -135,7 +135,7 @@ export default function TermsPage() {
             When you place an order, you are making an offer to purchase the selected products. An order confirmation or acknowledgement does not necessarily mean that the order has been finally accepted. AVSARAA may need to verify payment, stock, delivery serviceability and order details before dispatch.
           </p>
           <p style={{ margin: "0 0 12px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            We may contact you to clarify information or verify an order. We reserve the right to decline or cancel an order where reasonably necessary, including in cases of product unavailability, suspected fraud, incorrect listing or pricing errors, payment issues, inaccurate details or delivery restrictions. If payment has already been received for an order that is cancelled, the amount paid will be handled in accordance with applicable law and the relevant refund process.
+            We may contact you to clarify information or verify an order. We reserve the right to decline or cancel an order before dispatch where reasonably necessary, including in cases of product unavailability, suspected fraud, incorrect listing or pricing errors, payment issues, inaccurate details or delivery restrictions. Where an order cannot be fulfilled, our team will coordinate an exchange/replacement option or adjustment as applicable.
           </p>
           <p style={{ margin: 0, color: "#4A3B30", fontSize: "14.5px" }}>
             Please check your order details carefully before confirming checkout. Contact us as soon as possible if you notice an error. Changes may not be possible after processing or dispatch has begun.
@@ -183,25 +183,25 @@ export default function TermsPage() {
           </p>
         </section>
 
-        {/* 9. Returns, Exchanges and Refunds */}
-        <section id="returns-exchanges-refunds" style={{ scrollMarginTop: "140px" }}>
+        {/* 9. Exchanges Only (No Refunds) */}
+        <section id="exchanges-no-refunds" style={{ scrollMarginTop: "140px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
             <span style={{ fontSize: "12px", fontWeight: 700, color: "#866951", backgroundColor: "#F7F2EE", padding: "3px 8px", borderRadius: "6px" }}>09</span>
             <h2 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "22px", color: "#261B13", margin: 0 }}>
-              Returns, Exchanges and Refunds
+              Exchanges Only (No Refunds)
             </h2>
           </div>
           <p style={{ margin: "0 0 12px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            AVSARAA&apos;s exchange and refund process is described in the separate <Link href="/returns" style={{ color: "#866951", fontWeight: 600 }}>Return, Exchange &amp; Refund Policy</Link>.
+            AVSARAA operates a strict <strong>exchange-only policy (no refunds or standalone returns)</strong>, as detailed in our <Link href="/returns" style={{ color: "#866951", fontWeight: 600 }}>Exchange Policy</Link>.
           </p>
           <p style={{ margin: "0 0 12px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            Size-change and design-change requests may be considered subject to the conditions, availability and approval process set out in that policy. Any difference in price for a replacement product will be adjusted with the customer before the exchange is completed.
+            Size-change and design-change requests within 7 days of delivery are processed subject to the conditions, availability and approval process set out in that policy. Any price difference for a replacement product will be adjusted with the customer (store credit for lower-priced items; balance payment for higher-priced items) before dispatch.
           </p>
           <p style={{ margin: "0 0 12px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            Refunds are generally considered in exceptional cases involving a product received damaged, subject to review and verification. This policy does not limit any refund, replacement or other remedy that is mandatory under applicable consumer protection law.
+            Monetary refunds are not offered; verified damaged items are replaced directly through our exchange process.
           </p>
           <p style={{ margin: 0, color: "#4A3B30", fontSize: "14.5px" }}>
-            Customers should contact AVSARAA before sending any product back and should follow the return or pickup instructions provided by our team.
+            Customers should contact AVSARAA before sending any product back and should follow the exchange pickup instructions provided by our team.
           </p>
         </section>
 

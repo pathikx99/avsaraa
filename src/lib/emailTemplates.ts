@@ -253,7 +253,7 @@ export function generateCustomerTaxInvoiceEmailHtml(order: Order): string {
           <tr>
             <td style="font-size: 11px; color: #866951; line-height: 1.5;">
               ✓ Handcrafted in India with certified silk mark authenticity.<br />
-              ✓ 7-Day Return &amp; Exchange guarantee.<br />
+              ✓ 7-Day Exchange guarantee (Exchanges only, no refunds).<br />
               <em>Computer-generated tax invoice issued in accordance with Rule 46 of CGST Rules, 2017.</em>
             </td>
             <td style="text-align: right;">

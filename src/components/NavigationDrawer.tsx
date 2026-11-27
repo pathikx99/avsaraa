@@ -394,7 +394,7 @@ export default function NavigationDrawer({
               textDecoration: "none",
             }}
           >
-            7-Day Return &amp; Exchange
+            7-Day Exchange Policy
           </Link>
         </div>
 

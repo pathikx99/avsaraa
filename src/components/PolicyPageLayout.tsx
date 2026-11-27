@@ -24,7 +24,7 @@ const POLICY_TABS = [
   { key: "privacy", label: "Privacy Policy", href: "/privacy", icon: <ShieldCheckIcon size={14} color="currentColor" /> },
   { key: "terms", label: "Terms & Conditions", href: "/terms", icon: <ShieldCheckIcon size={14} color="currentColor" /> },
   { key: "shipping", label: "Shipping & Delivery", href: "/shipping", icon: <DeliveryVanIcon size={14} color="currentColor" /> },
-  { key: "returns", label: "Return & Exchange", href: "/returns", icon: <ReturnBoxIcon size={14} color="currentColor" /> },
+  { key: "returns", label: "Exchange Policy", href: "/returns", icon: <ReturnBoxIcon size={14} color="currentColor" /> },
 ];
 
 export default function PolicyPageLayout({
