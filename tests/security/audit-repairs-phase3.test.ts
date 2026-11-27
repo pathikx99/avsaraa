@@ -52,18 +52,18 @@ describe("Audit Phase 3 Security, Integrity & UX Regression Suite", () => {
       assert.equal(deliveredScan.location, "New Delhi, India");
       assert.equal(outScan.location, "New Delhi, India");
 
-      const suratScans = generateLogisticsMilestones({
-        orderNumber: "AVS-TEST-SURAT",
+      const localScans = generateLogisticsMilestones({
+        orderNumber: "AVS-TEST-LOCAL",
         status: "Delivered",
         createdAt: "2026-11-20T10:00:00Z",
-        city: "Surat",
-        postalCode: "395007",
+        city: "Ahmedabad",
+        postalCode: "380001",
         courierPartner: "Blue Dart Express Gujarat",
       });
 
-      const suratDelivered = suratScans.find((s) => s.status === "Delivered");
-      assert.ok(suratDelivered);
-      assert.equal(suratDelivered.location, "Surat, Gujarat");
+      const localDelivered = localScans.find((s) => s.status === "Delivered");
+      assert.ok(localDelivered);
+      assert.equal(localDelivered.location, "Ahmedabad, Gujarat");
     });
 
     test("Pincode & phone validators accept valid Pan-India values and reject malformed inputs", () => {
@@ -180,7 +180,7 @@ describe("Audit Phase 3 Security, Integrity & UX Regression Suite", () => {
               fullName: "Audit Tester",
               phone: "9876543210",
               street: "123 Heritage Lane",
-              city: "Surat",
+              city: "Ahmedabad",
               state: "Gujarat",
               pincode: "395007",
             },

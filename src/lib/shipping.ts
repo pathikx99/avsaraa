@@ -92,15 +92,15 @@ export async function getShiprocketServiceability(
   let result: ServiceabilityResult;
 
   if (isGujarat) {
-    const isSurat = cleanPin.startsWith("395");
+    const isLocalHub = cleanPin.startsWith("395");
     const isAhmedabad = cleanPin.startsWith("380");
     result = {
       pincode: cleanPin,
       serviceable: true,
-      city: isSurat ? "Surat Atelier Region" : isAhmedabad ? "Ahmedabad" : "Gujarat",
+      city: isLocalHub ? "Gujarat Express Hub" : isAhmedabad ? "Ahmedabad" : "Gujarat",
       state: "Gujarat",
-      estimatedDeliveryDays: isSurat ? 1 : 2,
-      courierPartner: isSurat ? "Avsaraa White Glove Dedicated" : "Blue Dart Express",
+      estimatedDeliveryDays: isLocalHub ? 1 : 2,
+      courierPartner: isLocalHub ? "Avsaraa White Glove Dedicated" : "Blue Dart Express",
       codAvailable: true,
       rate: 50,
       chargeableWeightKg,

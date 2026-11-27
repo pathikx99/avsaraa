@@ -15,7 +15,7 @@ import { isValidIndianPincode } from "../../src/lib/financials.ts";
 const GUEST_SYSTEM_USER_ID = "7a3b2e24-820f-4706-8cc3-4218b42b0da3";
 
 describe("E2E Order Journey - Financial Calculations", () => {
-  test("COD order above ₹500 threshold: free shipping + COD surcharge only", () => {
+  test("COD order above ₹799 threshold: free shipping + COD surcharge only", () => {
     const result = calculateOrderTotals({
       subtotal: 24999,
       discountAmount: 0,
@@ -24,7 +24,7 @@ describe("E2E Order Journey - Financial Calculations", () => {
 
     assert.strictEqual(result.subtotal, 24999);
     assert.strictEqual(result.discountAmount, 0);
-    assert.strictEqual(result.shippingFee, 0); // Above ₹500 → free shipping
+    assert.strictEqual(result.shippingFee, 0); // Above ₹799 → free shipping
     assert.strictEqual(result.codSurcharge, 20);
     assert.strictEqual(result.totalAmount, 24999 + 20);
     assert.ok(result.gstAmount > 0);
@@ -36,7 +36,7 @@ describe("E2E Order Journey - Financial Calculations", () => {
     );
   });
 
-  test("Prepaid order above ₹500 threshold: free shipping, no COD surcharge", () => {
+  test("Prepaid order above ₹799 threshold: free shipping, no COD surcharge", () => {
     const result = calculateOrderTotals({
       subtotal: 24999,
       discountAmount: 0,
@@ -48,28 +48,28 @@ describe("E2E Order Journey - Financial Calculations", () => {
     assert.strictEqual(result.totalAmount, 24999);
   });
 
-  test("Prepaid order below ₹500 threshold: standard shipping ₹50, no COD surcharge", () => {
+  test("Prepaid order below ₹799 threshold: standard shipping ₹50, no COD surcharge", () => {
     const result = calculateOrderTotals({
-      subtotal: 400,
+      subtotal: 600,
       discountAmount: 0,
       paymentMethod: "Razorpay",
     });
 
     assert.strictEqual(result.shippingFee, 50);
     assert.strictEqual(result.codSurcharge, 0);
-    assert.strictEqual(result.totalAmount, 450);
+    assert.strictEqual(result.totalAmount, 650);
   });
 
-  test("COD order below ₹500 threshold: shipping ₹50 + COD surcharge ₹20", () => {
+  test("COD order below ₹799 threshold: shipping ₹50 + COD surcharge ₹20", () => {
     const result = calculateOrderTotals({
-      subtotal: 400,
+      subtotal: 600,
       discountAmount: 0,
       paymentMethod: "COD",
     });
 
     assert.strictEqual(result.shippingFee, 50);
     assert.strictEqual(result.codSurcharge, 20);
-    assert.strictEqual(result.totalAmount, 470);
+    assert.strictEqual(result.totalAmount, 670);
   });
 
   test("Percentage discount with max cap applied correctly", () => {
@@ -127,7 +127,7 @@ describe("E2E Order Journey - Financial Calculations", () => {
 
 describe("E2E Order Journey - Pincode Validation", () => {
   test("Valid Pan-India 6-digit pincodes are accepted", () => {
-    assert.strictEqual(isValidIndianPincode("395007"), true); // Surat
+    assert.strictEqual(isValidIndianPincode("395007"), true); // Gujarat Hub
     assert.strictEqual(isValidIndianPincode("380001"), true); // Ahmedabad
     assert.strictEqual(isValidIndianPincode("110001"), true); // Delhi
     assert.strictEqual(isValidIndianPincode("400001"), true); // Mumbai

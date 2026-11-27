@@ -168,17 +168,21 @@ export default function AccountPage() {
         localStorage.setItem(`avsaraa_addresses_${userId}`, JSON.stringify(addressData));
       }
 
-      // 3. Fetch Products strictly from Supabase database
-      const { data: prodData, error: prodErr } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
+      // 3. Fetch Products strictly from Supabase database only for Super Admin
+      if (adminCheck) {
+        const { data: prodData, error: prodErr } = await supabase
+          .from("products")
+          .select("*")
+          .order("created_at", { ascending: false });
 
-      if (prodErr) {
-        console.warn("Database products query note:", prodErr.message);
-        setProducts([]);
-      } else if (prodData) {
-        setProducts(prodData);
+        if (prodErr) {
+          console.warn("Database products query note:", prodErr.message);
+          setProducts([]);
+        } else if (prodData) {
+          setProducts(prodData);
+        } else {
+          setProducts([]);
+        }
       } else {
         setProducts([]);
       }
@@ -757,7 +761,7 @@ export default function AccountPage() {
                 { label: "Status", value: isSuperAdmin ? "👑 Super Admin" : "Active Member" },
                 { label: "Saved Addresses", value: `${addresses.length} Saved` },
                 { label: "Account Role", value: isSuperAdmin ? "Master Control" : `✦ ${profile?.membership_tier || "Member"}` },
-                { label: "Studio", value: "Surat (Online Store)" },
+                { label: "Atelier", value: "India (Online Store)" },
               ].map((stat, i) => (
                 <div
                   key={i}
@@ -1691,7 +1695,7 @@ export default function AccountPage() {
                     value={newAddress.city}
                     onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
                     required
-                    placeholder="Surat"
+                    placeholder="Ahmedabad"
                     style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>

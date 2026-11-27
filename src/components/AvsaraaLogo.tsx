@@ -37,6 +37,7 @@ export default function AvsaraaLogo({
         alt="AVSARAA - Wear The Moment"
         width={finalW}
         height={finalH}
+        unoptimized
         className="avsaraa-wordmark-img"
         style={{
           width: width ? `${width}px` : undefined,

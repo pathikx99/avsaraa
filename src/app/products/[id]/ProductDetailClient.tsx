@@ -12,27 +12,27 @@ import { isValidGujaratPincode, isValidIndianPincode } from "@/lib/financials";
 import BackInStockNotifier from "@/components/BackInStockNotifier";
 import { ProductReview } from "@/types/review";
 import Footer from "@/components/Footer";
-import NavigationDrawer from "@/components/NavigationDrawer";
+import Header from "@/components/Header";
 import {
   HeartIcon,
   ShoppingBagIcon,
-  SearchIcon,
-  BackArrowIcon,
   ChevronDownIcon,
   CheckIcon,
   StarIcon,
   DeliveryVanIcon,
   ReturnBoxIcon,
   ShieldCheckIcon,
-  DiamondCrownIcon,
   LoomWeaveIcon,
   NeedleThreadIcon,
   DressEnsembleIcon,
   CloseIcon,
   ClockIcon,
-  SparkleStarIcon,
   SpinnerIcon,
   PlusIcon,
+  RulerIcon,
+  LocationPinIcon,
+  ShareIcon,
+  ExpandIcon,
 } from "@/components/Icons";
 
 interface ProductDetailClientProps {
@@ -41,7 +41,7 @@ interface ProductDetailClientProps {
 
 export default function ProductDetailClient({ initialProduct }: ProductDetailClientProps) {
   const router = useRouter();
-  const { addToCart, openCart, totalItems } = useCart();
+  const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
 
   const searchParams = useSearchParams();
@@ -62,7 +62,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   );
   const [quantity, setQuantity] = useState(1);
   const [isAddedToCart, setIsAddedToCart] = useState(false);
-  const [isNavDrawerOpen, setIsNavDrawerOpen] = useState(false);
   const [preOrderMode, setPreOrderMode] = useState(false);
 
   // Modals & Overlays
@@ -72,6 +71,9 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   );
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
+  const [zoomOffset, setZoomOffset] = useState({ x: 0, y: 0 });
+  const [isDraggingZoom, setIsDraggingZoom] = useState(false);
+  const zoomDragStartRef = useRef<{ x: number; y: number; origX: number; origY: number } | null>(null);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
   const [isWriteReviewOpen, setIsWriteReviewOpen] = useState(false);
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     message?: string;
   }>({ status: "idle" });
 
-  // Real-Time Express Delivery Countdown (5:00 PM IST Cutoff for Surat Dispatch)
+  // Real-Time Express Delivery Countdown (5:00 PM IST Cutoff for Atelier Dispatch)
   const [expressCountdown, setExpressCountdown] = useState<{
     hours: string;
     minutes: string;
@@ -366,6 +368,33 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   }, [getSizeStock, selectedSize]);
 
   const isCurrentVariantOutOfStock = currentVariantStock === 0;
+  const effectiveQuantity = isCurrentVariantOutOfStock
+    ? 0
+    : Math.min(quantity, Math.max(1, currentVariantStock));
+
+  useEffect(() => {
+    const anyModalOpen =
+      isSizeGuideOpen || isZoomOpen || isVideoOpen || isWriteReviewOpen || Boolean(viewingPhotoUrl);
+    if (!anyModalOpen) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsSizeGuideOpen(false);
+        setIsZoomOpen(false);
+        setIsVideoOpen(false);
+        setIsWriteReviewOpen(false);
+        setViewingPhotoUrl(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isSizeGuideOpen, isZoomOpen, isVideoOpen, isWriteReviewOpen, viewingPhotoUrl]);
 
   const activeGalleryImages = useMemo(() => {
     if (activeColorVariant?.gallery_images && activeColorVariant.gallery_images.length > 0) {
@@ -442,7 +471,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       name: `${product.name} · ${selectedSize}${selectedColor && selectedColor !== "Default" && selectedColor !== "Royal Edition" ? ` · ${selectedColor}` : ""}`,
     };
 
-    const success = addToCart(cartProduct, quantity);
+    const success = addToCart(cartProduct, effectiveQuantity);
     if (success) {
       setIsAddedToCart(true);
       setTimeout(() => setIsAddedToCart(false), 2400);
@@ -459,7 +488,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       name: `${product.name} · ${selectedSize}${selectedColor && selectedColor !== "Default" && selectedColor !== "Royal Edition" ? ` · ${selectedColor}` : ""}`,
     };
 
-    const success = addToCart(cartProduct, quantity);
+    const success = addToCart(cartProduct, effectiveQuantity);
     if (success) {
       router.push("/checkout");
     }
@@ -505,7 +534,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       return;
     }
 
-    const isSurat = cleanPin.startsWith("395");
+    const isLocalHub = cleanPin.startsWith("395");
     const isGujarat = isValidGujaratPincode(cleanPin);
     const isMumbai = cleanPin.startsWith("40");
     const isDelhi = cleanPin.startsWith("11");
@@ -516,12 +545,12 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     const isMetro = isMumbai || isDelhi || isBengaluru || isHyderabad || isChennai || isKolkata;
 
     const date = new Date();
-    date.setDate(date.getDate() + (isSurat ? 1 : isGujarat ? 2 : isMetro ? 3 : 5));
+    date.setDate(date.getDate() + (isLocalHub ? 1 : isGujarat ? 2 : isMetro ? 3 : 5));
     const options: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" };
     const formattedDate = date.toLocaleDateString("en-IN", options);
 
-    const detectedCity = isSurat
-      ? "Surat Local Region (Next-day)"
+    const detectedCity = isLocalHub
+      ? "Gujarat Express Hub (Next-day)"
       : cleanPin.startsWith("380")
       ? "Ahmedabad"
       : isGujarat
@@ -690,205 +719,15 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   return (
     <div className="product-page-wrapper" style={{ backgroundColor: "#FAF7F2", minHeight: "100vh" }}>
-      <NavigationDrawer isOpen={isNavDrawerOpen} onClose={() => setIsNavDrawerOpen(false)} />
-
-      {/* =========================================================================
-          1. HEADER (Minimal, Luxury Mobile Header)
-         ========================================================================= */}
-      <header
-        className="product-page-header"
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 40,
-          backgroundColor: "rgba(250, 247, 242, 0.94)",
-          borderBottom: "1px solid #E6DACF",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "1280px",
-            margin: "0 auto",
-            padding: "10px 16px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          {/* Left: Back Arrow + Hamburger Menu */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <button
-              type="button"
-              onClick={() => router.back()}
-              aria-label="Go Back"
-              style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "none",
-                backgroundColor: "transparent",
-                color: "#261B13",
-                cursor: "pointer",
-              }}
-            >
-              <BackArrowIcon size={20} color="#261B13" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsNavDrawerOpen(true)}
-              aria-label="Open Navigation Menu"
-              style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "none",
-                backgroundColor: "transparent",
-                cursor: "pointer",
-                padding: 0,
-              }}
-            >
-              <span style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                <span style={{ width: "18px", height: "2px", backgroundColor: "#261B13", borderRadius: "1px" }} />
-                <span style={{ width: "13px", height: "2px", backgroundColor: "#261B13", borderRadius: "1px" }} />
-                <span style={{ width: "18px", height: "2px", backgroundColor: "#261B13", borderRadius: "1px" }} />
-              </span>
-            </button>
-          </div>
-
-          {/* Center: AVSARAA Logo & Tagline */}
-          <Link
-            href="/"
-            aria-label="AVSARAA Home"
-            style={{
-              textDecoration: "none",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              textAlign: "center",
-            }}
-          >
-            <span
-              style={{
-                fontFamily: "var(--font-serif), Georgia, serif",
-                fontSize: "19px",
-                fontWeight: 600,
-                letterSpacing: "0.2em",
-                color: "#261B13",
-                lineHeight: 1.1,
-              }}
-            >
-              AVSARAA
-            </span>
-            <span
-              style={{
-                fontSize: "7.5px",
-                letterSpacing: "0.24em",
-                color: "#866951",
-                textTransform: "uppercase",
-                marginTop: "2px",
-                fontWeight: 500,
-              }}
-            >
-              WEAR THE MOMENT
-            </span>
-          </Link>
-
-          {/* Right: Search, Wishlist, Shopping Bag */}
-          <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-            <Link
-              href="/products"
-              aria-label="Search Collection"
-              style={{
-                width: "36px",
-                height: "36px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#261B13",
-                textDecoration: "none",
-              }}
-            >
-              <SearchIcon size={18} color="#261B13" />
-            </Link>
-
-            <Link
-              href="/wishlist"
-              aria-label="Wishlist"
-              style={{
-                width: "36px",
-                height: "36px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#261B13",
-                position: "relative",
-                textDecoration: "none",
-              }}
-            >
-              <HeartIcon size={18} color="#261B13" />
-            </Link>
-
-            <button
-              type="button"
-              onClick={openCart}
-              aria-label={totalItems > 0 ? `Shopping Bag (${totalItems} items)` : "Shopping Bag"}
-              style={{
-                width: "36px",
-                height: "36px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#261B13",
-                position: "relative",
-                border: "none",
-                backgroundColor: "transparent",
-                cursor: "pointer",
-              }}
-            >
-              <ShoppingBagIcon size={18} color="#261B13" />
-              {totalItems > 0 && (
-                <span
-                  aria-hidden="true"
-                  style={{
-                    position: "absolute",
-                    top: "1px",
-                    right: "1px",
-                    minWidth: "16px",
-                    height: "16px",
-                    padding: "0 4px",
-                    borderRadius: "9999px",
-                    backgroundColor: "#C5A059",
-                    color: "#261B13",
-                    fontSize: "9.5px",
-                    fontWeight: 700,
-                    lineHeight: "16px",
-                    textAlign: "center",
-                  }}
-                >
-                  {totalItems > 99 ? "99+" : totalItems}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header showBackOnMobile />
 
       {/* Main Container */}
-      <main className="product-page-main" style={{ maxWidth: "1240px", margin: "0 auto", paddingBottom: "90px" }}>
+      <main className="product-page-main" style={{ maxWidth: "1240px", margin: "0 auto", paddingBottom: "24px" }}>
         
         {/* Editorial Breadcrumbs */}
         <div
           style={{
-            padding: "10px 18px",
+            padding: "8px 16px",
             fontSize: "11px",
             color: "#8E7D70",
             display: "flex",
@@ -912,7 +751,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
         <div className="product-layout-grid" style={{ display: "flex", flexDirection: "column" }}>
 
           {/* =========================================================================
-              2. PRODUCT IMAGE GALLERY
+              2. PRODUCT IMAGE GALLERY (Clean Editorial Photo View)
              ========================================================================= */}
           <section className="product-gallery-section" style={{ position: "relative" }} aria-label="Product Gallery">
             {/* Main Image Frame with Swipe Support */}
@@ -930,6 +769,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               }}
               onClick={() => {
                 setZoomScale(1);
+                setZoomOffset({ x: 0, y: 0 });
                 setIsZoomOpen(true);
               }}
             >
@@ -938,8 +778,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 alt={`${product.name} - View ${selectedImageIndex + 1}`}
                 fill
                 priority
-                unoptimized={Boolean(currentGalleryImg && currentGalleryImg.includes("supabase.co"))}
-                sizes="(max-width: 768px) 100vw, 50vw"
+                sizes="(max-width: 768px) 94vw, 50vw"
                 style={{
                   objectFit: "cover",
                   objectPosition: "center 20%",
@@ -947,7 +786,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 }}
               />
 
-              {/* Floating Wishlist Heart Button (Requirement 2) */}
+              {/* Floating Wishlist Heart Button (Top Right) */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -959,52 +798,22 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   position: "absolute",
                   top: "14px",
                   right: "14px",
-                  width: "42px",
-                  height: "42px",
+                  width: "40px",
+                  height: "40px",
                   borderRadius: "50%",
                   backgroundColor: isFavorited ? "#8A181A" : "rgba(255, 255, 255, 0.94)",
                   color: isFavorited ? "#FFFFFF" : "#261B13",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: "0 4px 14px rgba(38,27,19,0.18)",
+                  boxShadow: "0 4px 14px rgba(38,27,19,0.16)",
                   border: "none",
                   cursor: "pointer",
                   zIndex: 10,
                   transition: "transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
                 }}
               >
-                <HeartIcon size={20} fill={isFavorited ? "currentColor" : "none"} stroke="currentColor" />
-              </button>
-
-              {/* Share Button (Top Left) */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleShareProduct();
-                }}
-                aria-label="Share product"
-                style={{
-                  position: "absolute",
-                  top: "14px",
-                  left: "14px",
-                  width: "42px",
-                  height: "42px",
-                  borderRadius: "50%",
-                  backgroundColor: "rgba(255, 255, 255, 0.94)",
-                  color: "#261B13",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 4px 14px rgba(38,27,19,0.18)",
-                  border: "none",
-                  cursor: "pointer",
-                  zIndex: 10,
-                  fontSize: "14px",
-                }}
-              >
-                {shareFeedback ? "✓" : "↗"}
+                <HeartIcon size={19} fill={isFavorited ? "currentColor" : "none"} stroke="currentColor" />
               </button>
 
               {/* Left Navigation Arrow */}
@@ -1021,10 +830,10 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     left: "12px",
                     top: "50%",
                     transform: "translateY(-50%)",
-                    width: "40px",
-                    height: "40px",
+                    width: "34px",
+                    height: "34px",
                     borderRadius: "50%",
-                    backgroundColor: "rgba(255, 255, 255, 0.9)",
+                    backgroundColor: "rgba(255, 255, 255, 0.92)",
                     backdropFilter: "blur(8px)",
                     color: "#261B13",
                     display: "flex",
@@ -1036,7 +845,9 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     zIndex: 10,
                   }}
                 >
-                  <span style={{ fontSize: "20px", lineHeight: 1 }}>‹</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
                 </button>
               )}
 
@@ -1054,10 +865,10 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     right: "12px",
                     top: "50%",
                     transform: "translateY(-50%)",
-                    width: "40px",
-                    height: "40px",
+                    width: "34px",
+                    height: "34px",
                     borderRadius: "50%",
-                    backgroundColor: "rgba(255, 255, 255, 0.9)",
+                    backgroundColor: "rgba(255, 255, 255, 0.92)",
                     backdropFilter: "blur(8px)",
                     color: "#261B13",
                     display: "flex",
@@ -1069,139 +880,53 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     zIndex: 10,
                   }}
                 >
-                  <span style={{ fontSize: "20px", lineHeight: 1 }}>›</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
                 </button>
               )}
 
-              {/* Floating Fullscreen Zoom Trigger & Video Trigger */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "14px",
-                  left: "14px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  zIndex: 10,
+              {/* Circular Expand / Zoom Icon Button (Bottom Right, matching minimalist photo aesthetic) */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setZoomScale(1);
+                  setZoomOffset({ x: 0, y: 0 });
+                  setIsZoomOpen(true);
                 }}
-              >
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setZoomScale(1);
-                    setIsZoomOpen(true);
-                  }}
-                  aria-label="Full-screen image zoom"
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "20px",
-                    backgroundColor: "rgba(38, 27, 19, 0.82)",
-                    backdropFilter: "blur(8px)",
-                    color: "#FAF7F2",
-                    fontSize: "11px",
-                    fontWeight: 500,
-                    border: "1px solid rgba(255,255,255,0.25)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span>⤢</span>
-                  <span>Tap to Zoom</span>
-                </button>
-
-                {/* Video Option Button (Requirement 2) */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsVideoOpen(true);
-                  }}
-                  aria-label="Watch product drape video"
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "20px",
-                    backgroundColor: "rgba(138, 24, 26, 0.92)",
-                    backdropFilter: "blur(8px)",
-                    color: "#FAF7F2",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    border: "1px solid rgba(255,255,255,0.35)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span>▶</span>
-                  <span>Drape Video</span>
-                </button>
-              </div>
-
-              {/* Image Position Indicator */}
-              <div
+                aria-label="Full-screen image zoom"
                 style={{
                   position: "absolute",
                   bottom: "14px",
                   right: "14px",
-                  padding: "4px 10px",
-                  borderRadius: "14px",
-                  backgroundColor: "rgba(38, 27, 19, 0.8)",
-                  color: "#FAF7F2",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  letterSpacing: "0.06em",
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(255, 255, 255, 0.94)",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                  color: "#261B13",
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 14px rgba(38,27,19,0.16)",
                   zIndex: 10,
                 }}
               >
-                {safeImageIndex + 1} / {activeGalleryImages.length}
-              </div>
+                <ExpandIcon size={17} color="#261B13" />
+              </button>
             </div>
 
-            {/* Mobile Pagination Capsule Dots */}
-            {activeGalleryImages.length > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "10px 0 4px 0",
-                }}
-              >
-                {activeGalleryImages.map((_, dotIdx) => {
-                  const isActive = safeImageIndex === dotIdx;
-                  return (
-                    <button
-                      key={dotIdx}
-                      type="button"
-                      onClick={() => setSelectedImageIndex(dotIdx)}
-                      aria-label={`Jump to image ${dotIdx + 1}`}
-                      style={{
-                        width: isActive ? "22px" : "6px",
-                        height: "5px",
-                        borderRadius: "3px",
-                        backgroundColor: isActive ? "#261B13" : "#D0C3B5",
-                        border: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                        transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Thumbnail Gallery Strip (Requirement 2) */}
+            {/* Thumbnail Gallery Strip directly below photo */}
             <div
               className="product-thumbnail-row"
               style={{
                 display: "flex",
-                gap: "10px",
-                padding: "8px 16px 16px 16px",
+                gap: "8px",
+                padding: "10px 2px 4px 2px",
                 overflowX: "auto",
                 scrollbarWidth: "none",
                 backgroundColor: "#FAF7F2",
@@ -1220,17 +945,16 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   style={{
                     position: "relative",
                     width: "66px",
-                    height: "82px",
+                    height: "70px",
                     flexShrink: 0,
                     borderRadius: "10px",
                     overflow: "hidden",
-                    border: selectedImageIndex === idx ? "2px solid #261B13" : "1px solid #D8CABE",
+                    border: selectedImageIndex === idx ? "2px solid #261B13" : "1px solid #E2D7CC",
                     backgroundColor: "#F2EBE3",
                     padding: 0,
                     cursor: "pointer",
-                    boxShadow: selectedImageIndex === idx ? "0 4px 12px rgba(38,27,19,0.2)" : "none",
-                    transform: selectedImageIndex === idx ? "scale(1.03)" : "scale(1)",
-                    opacity: selectedImageIndex === idx ? 1 : 0.72,
+                    boxShadow: selectedImageIndex === idx ? "0 4px 12px rgba(38,27,19,0.16)" : "none",
+                    opacity: selectedImageIndex === idx ? 1 : 0.82,
                     transition: "all 0.2s ease",
                   }}
                 >
@@ -1238,41 +962,64 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     src={img}
                     alt={`Thumbnail ${idx + 1}`}
                     fill
-                    unoptimized={Boolean(img && img.includes("supabase.co"))}
                     sizes="66px"
                     style={{ objectFit: "cover", objectPosition: "center 20%" }}
                   />
                 </button>
               ))}
 
-              {/* Video Thumbnail Button */}
-              <button
-                type="button"
-                onClick={() => setIsVideoOpen(true)}
-                aria-label="Play Product Video"
-                style={{
-                  position: "relative",
-                  width: "66px",
-                  height: "82px",
-                  flexShrink: 0,
-                  borderRadius: "10px",
-                  overflow: "hidden",
-                  border: "1.5px dashed #8A181A",
-                  backgroundColor: "#F9ECE8",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  color: "#8A181A",
-                  gap: "4px",
-                }}
-              >
-                <span style={{ fontSize: "20px" }}>▶</span>
-                <span style={{ fontSize: "9px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Video
-                </span>
-              </button>
+              {/* Video Thumbnail Card (shown only when product has an attached video link) */}
+              {Boolean(product.video_url?.trim()) && (
+                <button
+                  type="button"
+                  onClick={() => setIsVideoOpen(true)}
+                  aria-label="Play Product Drape Video"
+                  style={{
+                    position: "relative",
+                    width: "66px",
+                    height: "70px",
+                    flexShrink: 0,
+                    borderRadius: "10px",
+                    overflow: "hidden",
+                    border: "1px solid #D8CABE",
+                    backgroundColor: "#261B13",
+                    padding: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Image
+                    src={currentGalleryImg}
+                    alt="Drape video preview"
+                    fill
+                    sizes="66px"
+                    style={{ objectFit: "cover", objectPosition: "center 20%", filter: "brightness(0.75) blur(0.6px)" }}
+                  />
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: "relative",
+                      zIndex: 2,
+                      width: "30px",
+                      height: "30px",
+                      borderRadius: "50%",
+                      border: "1.5px solid rgba(255, 255, 255, 0.92)",
+                      backgroundColor: "rgba(38, 27, 19, 0.45)",
+                      backdropFilter: "blur(4px)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="7 4 20 12 7 20 7 4" />
+                    </svg>
+                  </span>
+                </button>
+              )}
             </div>
           </section>
 
@@ -1281,22 +1028,44 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
              ========================================================================= */}
           <section
             className="product-info-section"
-            style={{ padding: "0 18px 20px 18px" }}
+            style={{ padding: "0 18px 8px 18px" }}
             aria-label="Product Information"
           >
-            {/* Category / Atelier Crest */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+            {/* Category Crest & Relocated Modern Share Button */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "8px" }}>
               <span
                 style={{
-                  fontSize: "11px",
+                  fontSize: "10.5px",
                   fontWeight: 600,
-                  letterSpacing: "0.14em",
+                  letterSpacing: "0.13em",
                   textTransform: "uppercase",
                   color: "#866951",
+                  padding: "4px 10px",
+                  borderRadius: "999px",
+                  backgroundColor: "#F2EBE3",
                 }}
               >
-                ✦ HANDCRAFTED IN SURAT · {product.category.toUpperCase()} ✦
+                {product.category}
               </span>
+
+              <button
+                type="button"
+                onClick={handleShareProduct}
+                aria-label={shareFeedback ? "Product link copied" : "Share this product"}
+                className={`product-share-pill ${shareFeedback ? "is-copied" : ""}`}
+              >
+                {shareFeedback ? (
+                  <>
+                    <CheckIcon size={13} color="#1E5E3A" />
+                    <span>Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <ShareIcon size={13} color="#261B13" />
+                    <span>Share</span>
+                  </>
+                )}
+              </button>
             </div>
 
             {/* Product Name */}
@@ -1367,7 +1136,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             </div>
 
             <p style={{ fontSize: "12px", color: "#6E5B4E", marginBottom: "14px" }}>
-              Inclusive of all taxes · Fall &amp; Pico Included · Free Pan-India Delivery ₹500+
+              Inclusive of all taxes · Fall &amp; Pico Included · Free Pan-India Delivery ₹799+
             </p>
 
             {/* Short Product Description (2-3 lines) */}
@@ -1534,12 +1303,12 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
-                    gap: "4px",
+                    gap: "5px",
                     textDecoration: "underline",
                     padding: 0,
                   }}
                 >
-                  <span>📏</span>
+                  <RulerIcon size={14} color="#8A181A" />
                   <span>Size Guide</span>
                 </button>
               </div>
@@ -1734,7 +1503,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                         color: isCurrentVariantOutOfStock ? "#8A181A" : "#261B13",
                       }}
                     >
-                      {isCurrentVariantOutOfStock ? 0 : quantity}
+                      {effectiveQuantity}
                     </span>
                     <button
                       type="button"
@@ -1744,7 +1513,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                           return Math.min(maxStock, q + 1);
                         })
                       }
-                      disabled={isCurrentVariantOutOfStock || quantity >= currentVariantStock}
+                      disabled={isCurrentVariantOutOfStock || effectiveQuantity >= currentVariantStock}
                       aria-label="Increase quantity"
                       style={{
                         width: "36px",
@@ -1813,20 +1582,30 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 </div>
               </div>
 
-              {/* Same-day dispatch clock ticker */}
+              {/* Live same-day / next-day dispatch clock ticker */}
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "6px",
-                  fontSize: "11px",
-                  color: "#6E5B4E",
+                  fontSize: "11.5px",
+                  color: "#5A4535",
                   paddingTop: "8px",
                   borderTop: "1px dashed #E6DACF",
                 }}
               >
                 <ClockIcon size={14} color="#866951" />
-                <span>Order within next <strong>3 hrs 40 mins</strong> for dispatch today from Surat</span>
+                {expressCountdown ? (
+                  <span>
+                    Order within{" "}
+                    <strong>
+                      {Number(expressCountdown.hours)} hrs {Number(expressCountdown.minutes)} mins
+                    </strong>{" "}
+                    for {expressCountdown.isSameDay ? "same-day" : "next-day"} dispatch from Atelier
+                  </span>
+                ) : (
+                  <span>{product.dispatch_time || "Dispatched within 24–48 hours from Avsaraa Atelier"}</span>
+                )}
               </div>
             </div>
 
@@ -2034,67 +1813,36 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               )}
             </div>
 
-            {/* Atelier Stylist Concierge */}
-            <Link
-              href="/contact"
-              aria-label="Contact Surat Stylist"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                height: "44px",
-                borderRadius: "8px",
-                backgroundColor: "#F5F8F6",
-                border: "1px solid #C4D9CC",
-                color: "#1E5E3A",
-                textDecoration: "none",
-                fontSize: "12px",
-                fontWeight: 600,
-                letterSpacing: "0.04em",
-                marginBottom: "24px",
-                boxShadow: "0 2px 8px rgba(30, 94, 58, 0.05)",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <span style={{ fontSize: "16px" }}>{product.price >= 15000 ? "📹" : "📧"}</span>
-              <span>
-                {product.price >= 15000
-                  ? "Book Private Video Drape Consultation • Contact Stylist"
-                  : "Contact Surat Stylist"}
-              </span>
-            </Link>
-
             {/* =========================================================================
-                10. FREE SHIPPING & DELIVERY BENEFITS
+                10. CONCISE DELIVERY & TRUST ASSURANCES (Non-redundant 3-card strip)
                ========================================================================= */}
             <div
               className="product-benefits-grid"
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "12px",
-                marginBottom: "28px",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "10px",
+                marginBottom: "24px",
               }}
             >
               <div
                 style={{
                   display: "flex",
-                  alignItems: "flex-start",
-                  gap: "10px",
-                  padding: "12px",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                  gap: "6px",
+                  padding: "12px 10px",
                   backgroundColor: "#FFFFFF",
                   borderRadius: "10px",
                   border: "1px solid #E6DACF",
                 }}
               >
-                <div style={{ color: "#866951", flexShrink: 0, marginTop: "2px" }}>
-                  <DeliveryVanIcon size={20} color="#866951" />
-                </div>
+                <DeliveryVanIcon size={20} color="#866951" />
                 <div>
-                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#261B13" }}>FREE SHIPPING</div>
-                  <div style={{ fontSize: "10.5px", color: "#6E5B4E", marginTop: "2px", lineHeight: 1.35 }}>
-                    Free Pan-India shipping on orders ₹500+
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#261B13", letterSpacing: "0.04em" }}>FREE SHIPPING</div>
+                  <div style={{ fontSize: "10.5px", color: "#6A584B", marginTop: "2px", lineHeight: 1.3 }}>
+                    Orders ₹799+
                   </div>
                 </div>
               </div>
@@ -2102,21 +1850,21 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               <div
                 style={{
                   display: "flex",
-                  alignItems: "flex-start",
-                  gap: "10px",
-                  padding: "12px",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                  gap: "6px",
+                  padding: "12px 10px",
                   backgroundColor: "#FFFFFF",
                   borderRadius: "10px",
                   border: "1px solid #E6DACF",
                 }}
               >
-                <div style={{ color: "#866951", flexShrink: 0, marginTop: "2px" }}>
-                  <DiamondCrownIcon size={20} color="#866951" />
-                </div>
+                <ReturnBoxIcon size={20} color="#866951" />
                 <div>
-                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#261B13" }}>FREE DELIVERY</div>
-                  <div style={{ fontSize: "10.5px", color: "#6E5B4E", marginTop: "2px", lineHeight: 1.35 }}>
-                    No additional delivery charges
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#261B13", letterSpacing: "0.04em" }}>7-DAY RETURN &amp; EXCHANGE</div>
+                  <div style={{ fontSize: "10.5px", color: "#6A584B", marginTop: "2px", lineHeight: 1.3 }}>
+                    Easy doorstep pickup
                   </div>
                 </div>
               </div>
@@ -2124,50 +1872,28 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               <div
                 style={{
                   display: "flex",
-                  alignItems: "flex-start",
-                  gap: "10px",
-                  padding: "12px",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                  gap: "6px",
+                  padding: "12px 10px",
                   backgroundColor: "#FFFFFF",
                   borderRadius: "10px",
                   border: "1px solid #E6DACF",
                 }}
               >
-                <div style={{ color: "#866951", flexShrink: 0, marginTop: "2px" }}>
-                  <ReturnBoxIcon size={20} color="#866951" />
-                </div>
+                <ShieldCheckIcon size={20} color="#866951" />
                 <div>
-                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#261B13" }}>7-DAY EASY EXCHANGE</div>
-                  <div style={{ fontSize: "10.5px", color: "#6E5B4E", marginTop: "2px", lineHeight: 1.35 }}>
-                    Exchange for size or another dress
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "10px",
-                  padding: "12px",
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "10px",
-                  border: "1px solid #E6DACF",
-                }}
-              >
-                <div style={{ color: "#866951", flexShrink: 0, marginTop: "2px" }}>
-                  <ShieldCheckIcon size={20} color="#866951" />
-                </div>
-                <div>
-                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#261B13" }}>SECURE PAYMENTS</div>
-                  <div style={{ fontSize: "10.5px", color: "#6E5B4E", marginTop: "2px", lineHeight: 1.35 }}>
-                    Safe &amp; encrypted checkout
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#261B13", letterSpacing: "0.04em" }}>100% AUTHENTIC</div>
+                  <div style={{ fontSize: "10.5px", color: "#6A584B", marginTop: "2px", lineHeight: 1.3 }}>
+                    Insured checkout
                   </div>
                 </div>
               </div>
             </div>
 
             {/* =========================================================================
-                10B. REAL-TIME EXPRESS DELIVERY COUNTDOWN (Surat Atelier Same-Day Cutoff)
+                10B. REAL-TIME EXPRESS DELIVERY COUNTDOWN (Avsaraa Atelier Same-Day Cutoff)
                ========================================================================= */}
             {expressCountdown && (
               <div
@@ -2198,7 +1924,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       <DeliveryVanIcon size={16} color="#866951" />
                       <span style={{ fontSize: "12px", fontWeight: 700, color: "#261B13", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                        Express Dispatch from Surat
+                        Express Dispatch from Atelier
                       </span>
                     </div>
                   </div>
@@ -2272,7 +1998,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                <span style={{ fontSize: "16px" }}>📍</span>
+                <LocationPinIcon size={16} color="#866951" />
                 <h3 style={{ fontSize: "14px", fontWeight: 600, color: "#261B13", margin: 0 }}>
                   Check Delivery Availability
                 </h3>
@@ -2326,7 +2052,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               {/* Quick Select Major Cities */}
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
                 {[
-                  { city: "Surat", pin: "395007" },
+                  { city: "Ahmedabad", pin: "380001" },
                   { city: "Mumbai", pin: "400001" },
                   { city: "Delhi", pin: "110001" },
                   { city: "Bengaluru", pin: "560001" },
@@ -2369,7 +2095,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   </div>
                   <div style={{ fontSize: "11.5px", color: "#3B5244", marginTop: "4px", lineHeight: 1.4 }}>
                     ✦ Cash on Delivery (COD) available<br />
-                    ✦ Free Express Pan-India Delivery directly from Surat (Orders ₹500+)
+                    ✦ Free Express Pan-India Delivery directly from our Atelier (Orders ₹799+)
                   </div>
                 </div>
               )}
@@ -2574,7 +2300,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   }}
                 >
                   <span style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
-                    Shipping &amp; 7-Day Easy Exchange Policy
+                    Shipping &amp; 7-Day Return &amp; Exchange Policy
                   </span>
                   <span
                     style={{
@@ -2593,7 +2319,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                       At AVSARAA, we want you to love what you wear!
                     </p>
                     <ul style={{ margin: 0, paddingLeft: "18px", marginBottom: "14px" }}>
-                      <li>Exchange your purchase within 7 days of delivery.</li>
+                      <li>Return or exchange your purchase within 7 days of delivery.</li>
                       <li>Exchange for any available size or choose another dress.</li>
                       <li>
                         If the replacement product has a lower price, the difference will be credited to your AVSARAA account.
@@ -2721,50 +2447,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               </section>
             )}
 
-            {/* Signature Atelier Heirloom Keepsake Packaging Presentation */}
-            <div
-              style={{
-                backgroundColor: "#261B13",
-                color: "#FAF7F2",
-                borderRadius: "16px",
-                padding: "22px 20px",
-                marginBottom: "32px",
-                border: "1px solid rgba(197, 160, 89, 0.45)",
-                boxShadow: "0 8px 24px rgba(38,27,19,0.18)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <SparkleStarIcon size={18} color="#DFBA73" />
-                <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.14em", color: "#DFBA73", textTransform: "uppercase" }}>
-                  ✦ Signature Packaging ✦
-                </span>
-              </div>
-              <h3 style={{ fontFamily: "var(--font-serif), Georgia, serif", fontSize: "19px", fontWeight: 500, margin: "0 0 10px 0", color: "#FAF7F2" }}>
-                Signature Box Presentation
-              </h3>
-              <p style={{ fontSize: "12.5px", color: "#D8CABE", lineHeight: 1.65, margin: "0 0 16px 0" }}>
-                Every AVSARAA silhouette is delivered in our signature gold-embossed rigid keepsake box, wrapped in breathable pure muslin fabric to preserve genuine zari sheen, accompanied by an authentic Surat master-weaver certificate.
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "11.5px", color: "#EEDFCE" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span>✦</span>
-                  <span>Rigid Gold Keepsake Box</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span>✦</span>
-                  <span>Pure Muslin Protective Wrap</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span>✦</span>
-                  <span>Cedarwood Scent Sachet</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span>✦</span>
-                  <span>Loom Authenticity Certificate</span>
-                </div>
-              </div>
-            </div>
-
             {/* =========================================================================
                 16. CUSTOMER REVIEWS (Separate Section Near the Bottom of the Page)
                ========================================================================= */}
@@ -2776,7 +2458,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 borderRadius: "16px",
                 border: "1px solid #E6DACF",
                 padding: "24px 18px",
-                marginBottom: "32px",
+                marginBottom: "0px",
               }}
               aria-label="Customer Reviews"
             >
@@ -2911,9 +2593,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   {reviews
                     .flatMap((r) => r.photos || [])
                     .map((photoUrl, idx) => (
-                      <div
+                      <button
                         key={idx}
+                        type="button"
                         onClick={() => setViewingPhotoUrl(photoUrl)}
+                        aria-label={`View customer photograph ${idx + 1}`}
                         style={{
                           position: "relative",
                           width: "72px",
@@ -2924,10 +2608,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                           backgroundColor: "#F2EBE3",
                           border: "1px solid #D8CABE",
                           cursor: "pointer",
+                          padding: 0,
                         }}
                       >
                         <Image src={photoUrl} alt="Customer photo" fill sizes="72px" style={{ objectFit: "cover" }} />
-                      </div>
+                      </button>
                     ))}
                 </div>
               </div>
@@ -3012,7 +2697,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                               fill
                               sizes="54px"
                               style={{ objectFit: "cover" }}
-                              unoptimized={Boolean(pUrl && pUrl.includes("supabase.co"))}
                             />
                           </div>
                         ))}
@@ -3089,12 +2773,16 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   fontSize: "10px",
                   backgroundColor: "#F3ECE1",
                   color: "#6E5B4E",
-                  padding: "1px 5px",
-                  borderRadius: "3px",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
                   fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  maxWidth: "96px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
-                {selectedSize}
+                {selectedSize.startsWith("Free Size") ? "Free Size" : selectedSize}
               </span>
             </div>
           </div>
@@ -3144,7 +2832,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 color: isCurrentVariantOutOfStock ? "#8A181A" : "#261B13",
               }}
             >
-              {isCurrentVariantOutOfStock ? 0 : quantity}
+              {effectiveQuantity}
             </span>
             <button
               type="button"
@@ -3154,7 +2842,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   return Math.min(maxStock, q + 1);
                 })
               }
-              disabled={isCurrentVariantOutOfStock || quantity >= currentVariantStock}
+              disabled={isCurrentVariantOutOfStock || effectiveQuantity >= currentVariantStock}
               aria-label="Increase quantity"
               style={{
                 width: "30px",
@@ -3162,7 +2850,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 border: "none",
                 background: "none",
                 color:
-                  isCurrentVariantOutOfStock || quantity >= currentVariantStock
+                  isCurrentVariantOutOfStock || effectiveQuantity >= currentVariantStock
                     ? "#C0B2A4"
                     : "#261B13",
                 fontSize: "16px",
@@ -3482,7 +3170,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     </span>
                   </div>
                   <span style={{ fontSize: "11px", color: "#C4AB94", fontStyle: "italic" }}>
-                    Surat Master Craftsmen
+                    Artisan Master Craftsmen
                   </span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "11.5px", lineHeight: 1.45 }}>
@@ -3540,6 +3228,9 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
          ========================================================================= */}
       {isZoomOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Product image zoom lightbox"
           style={{
             position: "fixed",
             inset: 0,
@@ -3567,6 +3258,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
           >
             <span style={{ color: "#FAF7F2", fontSize: "13px", fontWeight: 600 }}>
               {safeImageIndex + 1} / {activeGalleryImages.length}
+              {zoomScale > 1 && " · Drag to pan"}
             </span>
 
             {/* Scale toggle controls */}
@@ -3575,7 +3267,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setZoomScale((s) => (s >= 2.5 ? 1 : s + 0.75));
+                  setZoomScale((s) => {
+                    const next = s >= 2.5 ? 1 : s + 0.75;
+                    if (next === 1) setZoomOffset({ x: 0, y: 0 });
+                    return next;
+                  });
                 }}
                 style={{
                   padding: "6px 12px",
@@ -3609,7 +3305,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   justifyContent: "center",
                 }}
               >
-                ✕
+                <CloseIcon size={18} color="#FFFFFF" />
               </button>
             </div>
           </div>
@@ -3621,19 +3317,53 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               height: "82vh",
               maxHeight: "900px",
               overflow: "hidden",
+              cursor: zoomScale > 1 ? (isDraggingZoom ? "grabbing" : "grab") : "zoom-in",
+              touchAction: "none",
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (zoomScale === 1) {
+                setZoomScale(1.75);
+              }
+            }}
+            onPointerDown={(e) => {
+              if (zoomScale <= 1) return;
+              setIsDraggingZoom(true);
+              zoomDragStartRef.current = {
+                x: e.clientX,
+                y: e.clientY,
+                origX: zoomOffset.x,
+                origY: zoomOffset.y,
+              };
+            }}
+            onPointerMove={(e) => {
+              if (!isDraggingZoom || !zoomDragStartRef.current) return;
+              const dx = e.clientX - zoomDragStartRef.current.x;
+              const dy = e.clientY - zoomDragStartRef.current.y;
+              setZoomOffset({
+                x: Math.max(-280, Math.min(280, zoomDragStartRef.current.origX + dx)),
+                y: Math.max(-280, Math.min(280, zoomDragStartRef.current.origY + dy)),
+              });
+            }}
+            onPointerUp={() => {
+              setIsDraggingZoom(false);
+              zoomDragStartRef.current = null;
+            }}
+            onPointerCancel={() => {
+              setIsDraggingZoom(false);
+              zoomDragStartRef.current = null;
+            }}
           >
             <Image
               src={currentGalleryImg}
               alt={product.name}
               fill
-              unoptimized={Boolean(currentGalleryImg && currentGalleryImg.includes("supabase.co"))}
               sizes="100vw"
+              draggable={false}
               style={{
                 objectFit: "contain",
-                transform: `scale(${zoomScale})`,
-                transition: "transform 0.25s ease",
+                transform: `translate(${zoomOffset.x}px, ${zoomOffset.y}px) scale(${zoomScale})`,
+                transition: isDraggingZoom ? "none" : "transform 0.25s ease",
               }}
             />
           </div>
@@ -3641,9 +3371,9 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       )}
 
       {/* =========================================================================
-          PRODUCT VIDEO MODAL (Requirement 2)
+          PRODUCT VIDEO MODAL (Shown only when video link is attached)
          ========================================================================= */}
-      {isVideoOpen && (
+      {Boolean(product.video_url?.trim()) && isVideoOpen && (
         <div
           style={{
             position: "fixed",
@@ -3692,8 +3422,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             </button>
             <iframe
               src={(() => {
-                const raw = product.video_url;
-                if (!raw) return "https://www.youtube.com/embed/5mGUdDq42iI?autoplay=1&rel=0";
+                const raw = (product.video_url || "").trim();
                 if (raw.includes("youtube.com/embed/")) {
                   return `${raw}${raw.includes("?") ? "&" : "?"}autoplay=1&rel=0`;
                 }
@@ -3767,7 +3496,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               fill
               sizes="90vw"
               style={{ objectFit: "contain" }}
-              unoptimized={Boolean(viewingPhotoUrl && viewingPhotoUrl.includes("supabase.co"))}
             />
           </div>
         </div>
@@ -3965,7 +3693,6 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                           fill
                           sizes="60px"
                           style={{ objectFit: "cover" }}
-                          unoptimized={Boolean(pUrl && pUrl.includes("supabase.co"))}
                         />
                         <button
                           type="button"
@@ -4086,7 +3813,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       )}
 
       {/* =========================================================================
-          17. FOOTER / BRAND SECTION
+          17. FOOTER
          ========================================================================= */}
       <Footer />
     </div>

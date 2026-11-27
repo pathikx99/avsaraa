@@ -14,6 +14,7 @@ import {
   GoogleIcon,
   SpinnerIcon,
   FlourishDivider,
+  KeyIcon,
 } from "./Icons";
 
 interface LoginFormProps {
@@ -672,9 +673,14 @@ export default function LoginForm({
                 color: authMode === "otp" ? "#261B13" : "#7E6E62",
                 boxShadow: authMode === "otp" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
                 transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "5px",
               }}
             >
-              ✉️ Email
+              <MailIcon size={14} color={authMode === "otp" ? "#261B13" : "#7E6E62"} />
+              <span>Email</span>
             </button>
             <button
               type="button"
@@ -694,9 +700,14 @@ export default function LoginForm({
                 color: authMode === "password" ? "#261B13" : "#7E6E62",
                 boxShadow: authMode === "password" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
                 transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "5px",
               }}
             >
-              🔑 Password
+              <KeyIcon size={14} color={authMode === "password" ? "#261B13" : "#7E6E62"} />
+              <span>Password</span>
             </button>
           </div>
 

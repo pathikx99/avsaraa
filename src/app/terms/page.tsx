@@ -62,7 +62,7 @@ export default function TermsPage() {
             </h2>
           </div>
           <p style={{ margin: 0, color: "#4A3B30", fontSize: "14.5px" }}>
-            AVSARAA is a fashion and apparel brand based in Surat, Gujarat, India. For questions about the website, products or orders, you can contact us at <a href="mailto:info.avsaraa@gmail.com" style={{ color: "#866951", fontWeight: 600 }}>info.avsaraa@gmail.com</a>.
+            AVSARAA is a fashion and apparel brand based in Gujarat, India. For questions about the website, products or orders, you can contact us at <a href="mailto:info.avsaraa@gmail.com" style={{ color: "#866951", fontWeight: 600 }}>info.avsaraa@gmail.com</a>.
           </p>
         </section>
 
@@ -299,7 +299,7 @@ export default function TermsPage() {
             </h2>
           </div>
           <p style={{ margin: 0, color: "#4A3B30", fontSize: "14.5px" }}>
-            These Terms &amp; Conditions are governed by the laws of India. Any dispute will be subject to the jurisdiction of the competent courts at <strong>Surat, Gujarat, India</strong>, to the extent permitted by applicable law and without restricting any consumer forum or other remedy available to a customer under applicable law.
+            These Terms &amp; Conditions are governed by the laws of India. Any dispute will be subject to the jurisdiction of the competent courts at <strong>Gujarat, India</strong>, to the extent permitted by applicable law and without restricting any consumer forum or other remedy available to a customer under applicable law.
           </p>
         </section>
 
@@ -317,7 +317,7 @@ export default function TermsPage() {
           <div style={{ padding: "18px 22px", backgroundColor: "#FAF7F2", border: "1px solid #E6DACF", borderRadius: "10px", fontSize: "14px", color: "#261B13", lineHeight: 1.8 }}>
             <strong>AVSARAA</strong><br />
             Email: <a href="mailto:info.avsaraa@gmail.com" style={{ color: "#866951", fontWeight: 600 }}>info.avsaraa@gmail.com</a><br />
-            Location: Surat, Gujarat, India
+            Location: Gujarat, India
           </div>
         </section>
       </div>

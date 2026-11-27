@@ -10,6 +10,7 @@ export default function ShopByOccasion() {
   return (
     <section
       id="shop-by-occasion"
+      className="home-occasion-section"
       style={{
         backgroundColor: "#FAF7F2",
         padding: "80px 20px 90px 20px",
@@ -20,7 +21,7 @@ export default function ShopByOccasion() {
       <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
         {/* Section Header */}
         <RevealSection>
-          <div style={{ textAlign: "center", marginBottom: "48px" }}>
+          <div className="home-section-header" style={{ textAlign: "center", marginBottom: "48px" }}>
             <span
               className="luxury-badge"
               style={{
@@ -99,14 +100,17 @@ export default function ShopByOccasion() {
                     position: "absolute",
                     inset: 0,
                     background:
-                      "linear-gradient(to top, rgba(20, 13, 8, 0.94) 0%, rgba(20, 13, 8, 0.45) 45%, rgba(20, 13, 8, 0.08) 100%)",
+                      "linear-gradient(180deg, rgba(16, 10, 6, 0.04) 0%, rgba(16, 10, 6, 0.24) 40%, rgba(16, 10, 6, 0.74) 70%, rgba(16, 10, 6, 0.96) 100%)",
                     transition: "background 0.3s ease",
+                    zIndex: 1,
+                    pointerEvents: "none",
                   }}
                   className="occasion-card-overlay"
                 />
 
                 {/* Card Content Overlay */}
                 <div
+                  className="occasion-card-content"
                   style={{
                     position: "absolute",
                     bottom: 0,

@@ -369,7 +369,7 @@ export async function POST(request: Request) {
       payment_method: "Razorpay",
       notes: notes || null,
       courier_partner: postalCode.startsWith("395")
-        ? "Avsaraa Dedicated Surat Courier"
+        ? "Avsaraa Dedicated Express Courier"
         : isValidGujaratPincode(postalCode)
         ? "Blue Dart Express Gujarat"
         : "Shiprocket Air Express",

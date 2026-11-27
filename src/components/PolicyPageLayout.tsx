@@ -357,7 +357,7 @@ export default function PolicyPageLayout({
                     }}
                   >
                     <LocationPinIcon size={15} color="#866951" />
-                    Surat, Gujarat, India
+                    Gujarat, India
                   </div>
                 </div>
               </div>

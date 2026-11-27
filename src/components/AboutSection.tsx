@@ -71,7 +71,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
                 lineHeight: 1.8,
               }}
             >
-              Avsaraa is rooted in Surat, the textile heart of India. We craft and curate authentic ethnic wear, festive ensembles, and handloom sarees, bringing timeless Indian craftsmanship directly to your doorstep with insured express delivery across India.
+              Avsaraa is rooted in India&apos;s timeless textile heritage. We craft and curate authentic ethnic wear, festive ensembles, and handloom sarees, bringing master Indian craftsmanship directly to your doorstep with insured express delivery across India.
             </p>
           </div>
         )}
@@ -88,7 +88,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
           {[
             { stat: "64+ Hours", label: "Artisan Loom Time Per Drape" },
             { stat: "100%", label: "Certified Pure Silk Guarantee" },
-            { stat: "3 Hubs", label: "Varanasi, Chanderi & Surat Clusters" },
+            { stat: "3 Hubs", label: "Varanasi, Chanderi & Guild Clusters" },
             { stat: "12,000+", label: "Happy Customers Across India & Abroad" },
           ].map((item, idx) => (
             <div
@@ -170,7 +170,7 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
                   border: "1px solid rgba(197, 160, 89, 0.35)",
                 }}
               >
-                ✦ Surat, India • Artisan Studio
+                ✦ Handloom Atelier • India
               </div>
             </div>
           </div>
@@ -190,8 +190,8 @@ export default function AboutSection({ showHeader = true }: AboutSectionProps) {
               },
               {
                 icon: <NeedleThreadIcon size={22} color="#866951" />,
-                title: "Hand Inspection & Finishing in Surat",
-                desc: "Each piece is hand-inspected in our Surat studio for zari consistency, finished with fall & pico, and dispatched in our signature protective keepsake box.",
+                title: "Hand Inspection & Finishing in Our Atelier",
+                desc: "Each piece is hand-inspected in our Indian atelier for zari consistency, finished with fall & pico, and thoughtfully prepared for insured Pan-India delivery.",
               },
             ].map((pillar, i) => (
               <div

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -13,12 +13,6 @@ import { resolveProductImage } from "@/lib/productUtils";
 export default function WishlistPage() {
   const router = useRouter();
   const { wishlist, removeFromWishlist, clearWishlist, user, isLoaded } = useWishlist();
-
-  useEffect(() => {
-    if (isLoaded && !user) {
-      router.replace("/login?redirectTo=/wishlist");
-    }
-  }, [isLoaded, user, router]);
 
   return (
     <div
@@ -205,7 +199,7 @@ export default function WishlistPage() {
                 </Link>
 
                 <Link
-                  href="/collection"
+                  href="/products"
                   style={{
                     marginTop: "8px",
                     fontSize: "12.5px",
@@ -273,7 +267,7 @@ export default function WishlistPage() {
               </p>
 
               <Link
-                href="/collection"
+                href="/products"
                 className="avsaraa-btn-primary btn-shine"
                 style={{
                   height: "50px",
@@ -361,7 +355,7 @@ export default function WishlistPage() {
                       }}
                     >
                       <Image
-                        src={resolveProductImage(product.image_url) || "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80"}
+                        src={resolveProductImage(product.image_url) || "/images/saree_model_hero.jpg"}
                         alt={product.name}
                         fill
                         sizes="(min-width: 900px) 25vw, 50vw"

@@ -130,7 +130,7 @@ export function generateLogisticsMilestones(params: {
     date: formatDate(baseTime),
     time: formatTime(baseTime),
     activity: "Order verified & handloom artisan allocation confirmed.",
-    location: "Avsaraa Atelier, Surat, Gujarat",
+    location: "Avsaraa Atelier, Gujarat, India",
     status: "Confirmed",
   });
 
@@ -148,7 +148,7 @@ export function generateLogisticsMilestones(params: {
       date: formatDate(processingTime),
       time: formatTime(processingTime),
       activity: "Heritage zari inspection & tamper-evident packaging completed.",
-      location: "Surat Quality Atelier",
+      location: "Avsaraa Quality Atelier",
       status: "Processing",
     });
   }
@@ -164,7 +164,7 @@ export function generateLogisticsMilestones(params: {
       date: formatDate(dispatchTime),
       time: formatTime(dispatchTime),
       activity: `Consignment handed over to ${courierPartner}. Manifest generated.`,
-      location: "Surat Logistics Hub (395007)",
+      location: "Gujarat Logistics Hub (395007)",
       status: "Dispatched",
     });
 
@@ -285,7 +285,7 @@ export async function trackShiprocketShipment(params: {
             courier_name: trackData.courier_name || courierPartner,
             current_status: trackData.shipment_status || orderStatus,
             status_code: Number(trackData.current_status) || 0,
-            origin: "Surat Atelier, Gujarat",
+            origin: "Avsaraa Atelier, Gujarat",
             destination: `${city}, ${postalCode}`,
             destination_city: city,
             destination_postal_code: postalCode,
@@ -330,7 +330,7 @@ export async function trackShiprocketShipment(params: {
     courier_name: courierPartner,
     current_status: orderStatus,
     status_code: 1,
-    origin: "Avsaraa White Glove Atelier, Surat, Gujarat",
+    origin: "Avsaraa White Glove Atelier, Gujarat, India",
     destination: `${city}, ${postalCode}`,
     destination_city: city,
     destination_postal_code: postalCode,

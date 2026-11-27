@@ -25,6 +25,44 @@ export const normalizeCartKey = (key: string): string => {
   return key;
 };
 
+export interface CartItemDisplay {
+  title: string;
+  size: string | null;
+  color: string | null;
+  isPreOrder: boolean;
+}
+
+/**
+ * Extracts clean title and variant attributes (Size, Color, Pre-Order)
+ * from composite cart product names (e.g. "Saree Name · Free Size · Crimson Red").
+ */
+export const parseCartItemDisplay = (product: Product): CartItemDisplay => {
+  const rawName = product?.name || "";
+  const parts = rawName.split(" · ").map((p) => p.trim()).filter(Boolean);
+  if (parts.length <= 1) {
+    return { title: rawName, size: null, color: null, isPreOrder: false };
+  }
+
+  const title = parts[0];
+  let isPreOrder = false;
+  const attrs: string[] = [];
+
+  for (let i = 1; i < parts.length; i++) {
+    if (parts[i].toLowerCase() === "pre-order") {
+      isPreOrder = true;
+    } else {
+      attrs.push(parts[i]);
+    }
+  }
+
+  return {
+    title,
+    size: attrs[0] || null,
+    color: attrs[1] || null,
+    isPreOrder,
+  };
+};
+
 /**
  * Robust cart item matcher:
  * - If explicit itemIndex & targetIndex are provided, matches strictly by position.

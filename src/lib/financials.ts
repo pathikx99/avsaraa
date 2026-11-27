@@ -2,7 +2,7 @@
  * Financials, Taxation, Logistics & Geography Utilities for Avsaraa E-Commerce
  */
 
-export const FREE_DELIVERY_THRESHOLD = 500;
+export const FREE_DELIVERY_THRESHOLD = 799;
 export const STANDARD_COURIER_FEE = 50;
 export const COD_SURCHARGE = 20;
 export const GST_RATE = 0.05; // 5% inclusive GST

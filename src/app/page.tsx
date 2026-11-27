@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -9,8 +7,14 @@ import PriceEdit from "@/components/home/PriceEdit";
 import NewArrivals from "@/components/home/NewArrivals";
 import Bestsellers from "@/components/home/Bestsellers";
 import ShoppingBenefits from "@/components/home/ShoppingBenefits";
+import { RecentlyViewedShelf } from "@/components/RecentlyViewedBar";
+import { getHomeShowcaseSlices } from "@/lib/serverCatalog";
 
-export default function HomePage() {
+export const revalidate = 300;
+
+export default async function HomePage() {
+  const { newArrivals, bestsellers } = await getHomeShowcaseSlices();
+
   return (
     <div
       className="page-enter"
@@ -31,16 +35,19 @@ export default function HomePage() {
         {/* 3. Shop by Occasion (6-card curated grid: 2 cols on mobile, 3 cols on desktop) */}
         <ShopByOccasion />
 
-        {/* 4. The ₹1,299 Edit (Curated value edit: UP TO ₹1,299) */}
+        {/* 4. New Arrivals (SSR hydrated carousel) */}
+        <NewArrivals initialProducts={newArrivals} />
+
+        {/* 5. The ₹1,299 Edit (Curated value edit: UP TO ₹1,299) */}
         <PriceEdit />
 
-        {/* 5. New Arrivals (Horizontal swipeable carousel on mobile) */}
-        <NewArrivals />
+        {/* 6. Our Bestsellers (SSR hydrated carousel) */}
+        <Bestsellers initialProducts={bestsellers} />
 
-        {/* 6. Our Bestsellers (Patron favorites & top ranked pieces) */}
-        <Bestsellers />
+        {/* 7. Inline Recently Viewed Shelf (when customer has browsing history) */}
+        <RecentlyViewedShelf />
 
-        {/* 7. Shopping Benefits (Trust Strip: Free express delivery, COD, 7-day returns, keepsake box) */}
+        {/* 8. Shopping Benefits (Trust Strip: Free shipping ₹799+, COD, 7-day return & exchange) */}
         <ShoppingBenefits />
       </main>
 

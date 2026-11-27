@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -8,7 +8,9 @@ export const HERO_SLIDES = [
   {
     id: "new-arrivals",
     badge: "NEW COLLECTION",
-    atelierTag: "Handloom Silk • Surat Craft",
+    atelierTag: "Avsaraa Couture Atelier",
+    mobileDisplayLine: "Every Moment,",
+    mobileScriptWord: "Unforgettable",
     titleLine1: "Every",
     titleLine2: "Moment",
     titleLine3: "A Little More",
@@ -16,11 +18,13 @@ export const HERO_SLIDES = [
     subtitle: "TIMELESS PIECES FOR YOUR EVERY STORY.",
     desc: "Handcrafted pure silks and artisanal weaves, thoughtfully designed for defining celebrations.",
     ctaText: "SHOP NEW ARRIVALS",
+    mobileCtaText: "Shop Collection",
     ctaLink: "/products?category=New%20Arrivals",
     secondaryText: "EXPLORE SAREES",
+    mobileSecondaryText: "Sarees",
     secondaryLink: "/products?category=Sarees",
-    mobileBanner: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1080&q=75",
-    desktopBanner: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1920&q=75",
+    mobileBanner: "/images/saree_model_hero.jpg",
+    desktopBanner: "/images/desktop_hero_cinematic_1.jpg",
     alt: "Avsaraa New Collection - Handcrafted Saree in Natural Sunlight",
     pieceNo: "№ 108",
     craft: "Pure Katan Silk & Zari Weave",
@@ -29,6 +33,8 @@ export const HERO_SLIDES = [
     id: "banarasi-silks",
     badge: "HANDLOOM HERITAGE",
     atelierTag: "Varanasi Heritage Looms",
+    mobileDisplayLine: "Woven Heritage,",
+    mobileScriptWord: "Timeless Grace",
     titleLine1: "Woven",
     titleLine2: "With Pure",
     titleLine3: "Heritage &",
@@ -36,11 +42,13 @@ export const HERO_SLIDES = [
     subtitle: "AUTHENTIC VARANASI WEAVES CRAFTED FOR CELEBRATIONS.",
     desc: "Intricately interlocked gold and silver zari on pure mulberry silk, crafted on traditional pit looms.",
     ctaText: "EXPLORE SAREES",
+    mobileCtaText: "Explore Sarees",
     ctaLink: "/products?category=Sarees",
     secondaryText: "VIEW ALL PRODUCTS",
+    mobileSecondaryText: "All Weaves",
     secondaryLink: "/products",
-    mobileBanner: "https://images.unsplash.com/photo-1641699862936-be9f49b1c38d?auto=format&fit=crop&w=1080&q=75",
-    desktopBanner: "https://images.unsplash.com/photo-1641699862936-be9f49b1c38d?auto=format&fit=crop&w=1920&q=75",
+    mobileBanner: "/images/occasion_traditional.jpg",
+    desktopBanner: "/images/desktop_hero_cinematic_2.jpg",
     alt: "Handcrafted Banarasi Silk Sarees",
     pieceNo: "№ 247",
     craft: "Varanasi Pit Loom Katan Silk",
@@ -49,6 +57,8 @@ export const HERO_SLIDES = [
     id: "royal-dresses",
     badge: "FESTIVE COLLECTION",
     atelierTag: "Artisan Occasion Wear",
+    mobileDisplayLine: "Artisan Silhouettes,",
+    mobileScriptWord: "Radiant Evenings",
     titleLine1: "Artisan",
     titleLine2: "Occasion",
     titleLine3: "Silhouettes for",
@@ -56,11 +66,13 @@ export const HERO_SLIDES = [
     subtitle: "BESPOKE ETHNIC DRESSES & TIMELESS SILKS.",
     desc: "Royal anarkalis and Chanderi silhouettes with hand-stitched gota patti and heritage accents.",
     ctaText: "EXPLORE DRESSES",
+    mobileCtaText: "Shop Festive",
     ctaLink: "/products?category=Dresses",
     secondaryText: "VIEW ALL PRODUCTS",
+    mobileSecondaryText: "Lookbook",
     secondaryLink: "/products",
-    mobileBanner: "https://images.unsplash.com/photo-1756483510859-c0ab4c45782c?auto=format&fit=crop&w=1080&q=75",
-    desktopBanner: "https://images.unsplash.com/photo-1756483510859-c0ab4c45782c?auto=format&fit=crop&w=1920&q=75",
+    mobileBanner: "/images/occasion_festive.jpg",
+    desktopBanner: "/images/desktop_hero_cinematic_3.jpg",
     alt: "Royal Occasion Wear & Handcrafted Festive Dresses",
     pieceNo: "№ 312",
     craft: "Handwoven Chanderi & Gota Patti",
@@ -69,149 +81,285 @@ export const HERO_SLIDES = [
 
 export default function HeroBanner() {
   const [heroSlide, setHeroSlide] = useState(0);
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const trackRef = useRef<HTMLDivElement>(null);
+  const pendingTargetRef = useRef<number | null>(null);
+  const lastAnnouncedRef = useRef(0);
+  const rafScrollRef = useRef<number | null>(null);
+  const scrollFallbackTimerRef = useRef<number | null>(null);
 
-  const handleMobileTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length > 0) {
-      setTouchStart({
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
+  const scrollToSlide = useCallback((targetIdx: number, announce = true) => {
+    const normalizedIdx =
+      ((targetIdx % HERO_SLIDES.length) + HERO_SLIDES.length) % HERO_SLIDES.length;
+    pendingTargetRef.current = normalizedIdx;
+    setHeroSlide(normalizedIdx);
+    if (announce && lastAnnouncedRef.current !== normalizedIdx) {
+      lastAnnouncedRef.current = normalizedIdx;
+      setAnnouncement(
+        `Slide ${normalizedIdx + 1} of ${HERO_SLIDES.length}: ${HERO_SLIDES[normalizedIdx].badge}`
+      );
+    }
+
+    const track = trackRef.current;
+    if (track && track.clientWidth > 0) {
+      const targetLeft = normalizedIdx * track.clientWidth;
+      const prefersReduced =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      track.scrollTo({
+        left: targetLeft,
+        behavior: prefersReduced ? "auto" : "smooth",
       });
     }
-  };
+  }, []);
 
-  const handleMobileTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStart || e.changedTouches.length === 0) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    const diffX = touchStart.x - touchEndX;
-    const diffY = touchStart.y - touchEndY;
+  const syncFromTrackScroll = useCallback(() => {
+    const track = trackRef.current;
+    if (!track || track.clientWidth <= 0) return;
+    if (pendingTargetRef.current !== null) return;
+    const idx = Math.min(
+      HERO_SLIDES.length - 1,
+      Math.max(0, Math.round(track.scrollLeft / track.clientWidth))
+    );
+    setHeroSlide((prev) => (prev === idx ? prev : idx));
+  }, []);
 
-    // Only swipe slides if the gesture is predominantly horizontal (at least 1.5x larger than vertical)
-    // and exceeds minimum threshold of 45px
-    if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
-      if (diffX > 0) {
-        setHeroSlide((prev) => (prev === HERO_SLIDES.length - 1 ? 0 : prev + 1));
-      } else {
-        setHeroSlide((prev) => (prev === 0 ? HERO_SLIDES.length - 1 : prev - 1));
-      }
+  const handleSettle = useCallback(() => {
+    const track = trackRef.current;
+    if (!track || track.clientWidth <= 0) return;
+    const settledIdx = Math.min(
+      HERO_SLIDES.length - 1,
+      Math.max(0, Math.round(track.scrollLeft / track.clientWidth))
+    );
+    pendingTargetRef.current = null;
+    setHeroSlide(settledIdx);
+    if (lastAnnouncedRef.current !== settledIdx) {
+      lastAnnouncedRef.current = settledIdx;
+      setAnnouncement(
+        `Slide ${settledIdx + 1} of ${HERO_SLIDES.length}: ${HERO_SLIDES[settledIdx].badge}`
+      );
     }
-    setTouchStart(null);
+  }, []);
+
+  const handleMobileScroll = () => {
+    if (rafScrollRef.current !== null) {
+      cancelAnimationFrame(rafScrollRef.current);
+    }
+    rafScrollRef.current = requestAnimationFrame(() => {
+      syncFromTrackScroll();
+      rafScrollRef.current = null;
+    });
+
+    if (typeof window !== "undefined" && !("onscrollend" in window)) {
+      if (scrollFallbackTimerRef.current !== null) {
+        clearTimeout(scrollFallbackTimerRef.current);
+      }
+      scrollFallbackTimerRef.current = globalThis.setTimeout(handleSettle, 140) as unknown as number;
+    }
   };
 
   useEffect(() => {
+    const track = trackRef.current;
+    if (!track || typeof window === "undefined") return;
+    const onScrollEnd = () => handleSettle();
+    track.addEventListener("scrollend", onScrollEnd);
+    return () => {
+      track.removeEventListener("scrollend", onScrollEnd);
+      if (rafScrollRef.current !== null) cancelAnimationFrame(rafScrollRef.current);
+      if (scrollFallbackTimerRef.current !== null) clearTimeout(scrollFallbackTimerRef.current);
+    };
+  }, [handleSettle]);
+
+  useEffect(() => {
+    if (isPaused) return;
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) return;
+
     const timer = setInterval(() => {
-      setHeroSlide((prev) => (prev === HERO_SLIDES.length - 1 ? 0 : prev + 1));
+      setHeroSlide((prev) => {
+        const next = prev === HERO_SLIDES.length - 1 ? 0 : prev + 1;
+        const track = trackRef.current;
+        if (track && track.clientWidth > 0) {
+          pendingTargetRef.current = next;
+          track.scrollTo({ left: next * track.clientWidth, behavior: "smooth" });
+        }
+        return next;
+      });
     }, 7000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isPaused]);
 
   return (
-    <section className="hero-viewport" aria-label="Haute Couture Showcase">
-      {/* MOBILE PRESENTATION: Arch Frame Card with Touch Swipe */}
-      <div
-        className="mobile-only hero-arch-container"
-        onTouchStart={handleMobileTouchStart}
-        onTouchEnd={handleMobileTouchEnd}
-        style={{ touchAction: "pan-y" }}
-      >
-        <div className="hero-arch-card hero-arch-outer-card">
-          {/* Ornamental Gilded Corner Filigree */}
-          <div className="hero-arch-corner top-left" aria-hidden="true" />
-          <div className="hero-arch-corner top-right" aria-hidden="true" />
-          <div className="hero-arch-corner bottom-left" aria-hidden="true" />
-          <div className="hero-arch-corner bottom-right" aria-hidden="true" />
+    <section
+      className="hero-viewport"
+      aria-roledescription="carousel"
+      aria-label="Haute Couture Showcase"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      {/* MOBILE PRESENTATION: Full-Bleed Atelier Lookbook Carousel */}
+      <div className="mobile-only hero-mobile-editorial">
+        <div className="hero-mobile-shell">
+          {/* Hairline Inner Champagne Frame */}
+          <div className="hero-mobile-inner-keyline" aria-hidden="true" />
 
-          {/* Top Apex Star Ornament with Gilded Flourish */}
-          <div className="hero-arch-top-ornament">
-            <span className="hero-arch-ornament-line left" aria-hidden="true" />
-            <span className="hero-arch-apex-star">✦</span>
-            <span className="hero-arch-ornament-line right" aria-hidden="true" />
-          </div>
-
-          {/* Semicircular Royal Arch Frame Window */}
-          <div className="hero-arch-frame-window">
-            <Image
-              key={HERO_SLIDES[heroSlide].id}
-              src={HERO_SLIDES[heroSlide].mobileBanner}
-              alt={HERO_SLIDES[heroSlide].alt}
-              fill
-              priority={heroSlide === 0}
-              sizes="(max-width: 899px) 94vw, 1px"
-              className="hero-arch-img"
-            />
-
-            {/* Directional Soft Limestone Gradient Scrim */}
-            <div className="hero-arch-scrim" />
-
-            {/* Top Right Atelier Piece Pill */}
-            <div
-              style={{
-                position: "absolute",
-                top: "14px",
-                right: "14px",
-                backgroundColor: "rgba(20, 13, 8, 0.72)",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
-                color: "#ECC880",
-                border: "1px solid rgba(236, 200, 128, 0.4)",
-                padding: "4px 10px",
-                borderRadius: "20px",
-                fontSize: "9.5px",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                zIndex: 4,
-                boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
-              }}
-            >
-              <span>{HERO_SLIDES[heroSlide].pieceNo}</span>
-            </div>
-
-            {/* Left-Aligned Editorial Typography */}
-            <div className="hero-arch-content">
-              <span className="hero-arch-kicker">
-                ✦ {HERO_SLIDES[heroSlide].badge} ✦
+          {/* Top Floating Atelier Controls: Slide Tag & Pause/Play */}
+          <div className="hero-mobile-top-hud">
+            <div className="hero-mobile-edition-pill">
+              <span className="hero-mobile-edition-index">
+                0{heroSlide + 1} / 0{HERO_SLIDES.length}
               </span>
-
-              <h1 className="hero-arch-title">
-                <div>{HERO_SLIDES[heroSlide].titleLine1}</div>
-                <div>{HERO_SLIDES[heroSlide].titleLine2}</div>
-                <div>{HERO_SLIDES[heroSlide].titleLine3}</div>
-                <div className="font-script hero-arch-script">
-                  {HERO_SLIDES[heroSlide].titleScript}
-                </div>
-              </h1>
-
-              <p className="hero-arch-subtitle">
-                {HERO_SLIDES[heroSlide].subtitle}
-              </p>
-
-              <Link
-                href={HERO_SLIDES[heroSlide].ctaLink}
-                className="hero-arch-cta-btn btn-shine"
-                id="hero-mobile-cta"
-              >
-                <span>{HERO_SLIDES[heroSlide].ctaText}</span>
-                <span className="hero-arch-cta-arrow">→</span>
-              </Link>
+              <span className="hero-mobile-edition-sep" aria-hidden="true" />
+              <span>{HERO_SLIDES[heroSlide].atelierTag}</span>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setIsPaused((p) => !p)}
+              className="hero-mobile-pause-btn"
+              aria-label={isPaused ? "Resume hero slideshow" : "Pause hero slideshow"}
+            >
+              {isPaused ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <polygon points="6 4 20 12 6 20 6 4" />
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+              )}
+            </button>
           </div>
 
-          {/* Bottom Carousel Indicator Dots */}
-          <div className="hero-arch-dots-bar" role="tablist" aria-label="Hero carousel navigation">
-            {HERO_SLIDES.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setHeroSlide(idx)}
-                aria-label={`Slide ${idx + 1}: ${HERO_SLIDES[idx].badge}`}
-                aria-selected={heroSlide === idx}
-                role="tab"
-                className={`hero-arch-dot ${heroSlide === idx ? "active" : ""}`}
-              />
-            ))}
+          {/* Native Snap-Scroll Editorial Track */}
+          <div
+            ref={trackRef}
+            className="hero-mobile-track"
+            onScroll={handleMobileScroll}
+            onTouchStart={() => setIsPaused(true)}
+            role="group"
+            aria-label="Hero collection editions"
+          >
+            {HERO_SLIDES.map((slide, idx) => {
+              const isActive = heroSlide === idx;
+              const HeadlineTag = idx === 0 ? "h1" : "h2";
+              return (
+                <div
+                  key={slide.id}
+                  role="group"
+                  aria-roledescription="slide"
+                  aria-label={`${idx + 1} of ${HERO_SLIDES.length}: ${slide.badge}`}
+                  className={`hero-mobile-slide ${isActive ? "is-active" : ""}`}
+                >
+                  <Image
+                    src={slide.mobileBanner}
+                    alt={slide.alt}
+                    fill
+                    priority={idx === 0}
+                    sizes="(max-width: 899px) 96vw, 1px"
+                    className="hero-mobile-slide-img"
+                  />
+
+                  <div className="hero-mobile-scrim" aria-hidden="true" />
+
+                  <div className="hero-mobile-slide-content">
+                    <div className="hero-mobile-craft-line">
+                      <span className="hero-mobile-piece">{slide.pieceNo}</span>
+                      <span aria-hidden="true" style={{ opacity: 0.55 }}>·</span>
+                      <span>{slide.craft}</span>
+                    </div>
+
+                    <HeadlineTag className="hero-mobile-headline">
+                      <span className="hero-mobile-headline-serif">
+                        {slide.mobileDisplayLine}
+                      </span>
+                      <span className="font-script hero-mobile-script">
+                        {slide.mobileScriptWord}
+                      </span>
+                    </HeadlineTag>
+
+                    <div className="hero-mobile-actions">
+                      <Link
+                        href={slide.ctaLink}
+                        className="hero-mobile-cta-primary btn-shine"
+                        id={idx === 0 ? "hero-mobile-cta" : undefined}
+                      >
+                        <span>{slide.mobileCtaText}</span>
+                        <span aria-hidden="true">→</span>
+                      </Link>
+
+                      <Link
+                        href={slide.secondaryLink}
+                        className="hero-mobile-cta-secondary"
+                      >
+                        <span>{slide.mobileSecondaryText}</span>
+                        <span aria-hidden="true">↗</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
+
+        {/* Minimalist Lookbook Pagination & Prev/Next Bar */}
+        <div className="hero-mobile-footer-rail">
+          <button
+            type="button"
+            onClick={() => scrollToSlide(heroSlide - 1)}
+            className="hero-mobile-arrow-btn"
+            aria-label="Previous hero collection"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          <nav className="hero-mobile-markers" aria-label="Choose a hero collection">
+            {HERO_SLIDES.map((slide, idx) => {
+              const isActive = heroSlide === idx;
+              return (
+                <button
+                  key={slide.id}
+                  type="button"
+                  onClick={() => scrollToSlide(idx)}
+                  aria-label={`Edition ${idx + 1}: ${slide.badge}`}
+                  aria-current={isActive ? "true" : undefined}
+                  className={`hero-mobile-marker ${isActive ? "active" : ""}`}
+                />
+              );
+            })}
+          </nav>
+
+          <button
+            type="button"
+            onClick={() => scrollToSlide(heroSlide + 1)}
+            className="hero-mobile-arrow-btn"
+            aria-label="Next hero collection"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Subtle Silk Provenance Signature Ribbon */}
+        <div className="hero-mobile-heritage-bar" aria-label="Brand assurances">
+          <span>Silk Mark Certified</span>
+          <span aria-hidden="true">·</span>
+          <span>Pure Indian Handlooms</span>
+          <span aria-hidden="true">·</span>
+          <span>Free Fall &amp; Pico</span>
+        </div>
+
+        <p className="sr-only" role="status" aria-live="polite">
+          {announcement}
+        </p>
       </div>
 
       {/* DESKTOP PRESENTATION: Full-Bleed High-Fashion Cinematic Editorial */}
@@ -289,7 +437,7 @@ export default function HeroBanner() {
             </div>
             <div className="hero-guarantee-item">
               <span className="hero-guarantee-star">✦</span>
-              <span>Pure Varanasi & Surat Looms</span>
+              <span>Pure Varanasi &amp; Indian Looms</span>
             </div>
             <div className="hero-guarantee-item">
               <span className="hero-guarantee-star">✦</span>
@@ -313,9 +461,29 @@ export default function HeroBanner() {
             </div>
           </div>
 
-          {/* Editorial Prev / Next Buttons */}
+          {/* Editorial Prev / Pause / Next Buttons */}
           <div className="hero-slide-controls">
             <button
+              type="button"
+              onClick={() => setIsPaused((p) => !p)}
+              className="hero-arrow-btn"
+              aria-label={isPaused ? "Resume hero slideshow" : "Pause hero slideshow"}
+              title={isPaused ? "Resume slideshow" : "Pause slideshow"}
+            >
+              {isPaused ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="6 4 20 12 6 20 6 4" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" />
+                  <rect x="14" y="4" width="4" height="16" />
+                </svg>
+              )}
+            </button>
+
+            <button
+              type="button"
               onClick={() =>
                 setHeroSlide((prev) => (prev === 0 ? HERO_SLIDES.length - 1 : prev - 1))
               }

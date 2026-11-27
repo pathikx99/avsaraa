@@ -1,12 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import AvsaraaLogo from "./AvsaraaLogo";
-import { UserIcon, ShoppingBagIcon, HeartIcon } from "./Icons";
+import { UserIcon, ShoppingBagIcon, HeartIcon, DeliveryVanIcon, MailIcon, CloseIcon } from "./Icons";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 import type { User } from "@supabase/supabase-js";
 
 interface NavigationDrawerProps {
@@ -24,8 +25,16 @@ export default function NavigationDrawer({
 }: NavigationDrawerProps) {
   const { totalItems, openCart } = useCart();
   const { totalWishlist } = useWishlist();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useAccessibleDialog(isOpen, onClose, panelRef);
+
   if (!isOpen) return null;
 
+  const displayIdentity =
+    user?.email && !user.email.endsWith("@phone.avsaraa.in")
+      ? user.email
+      : user?.phone || "Verified Member";
 
   const categories = [
     { label: "HOME", subtitle: "Bespoke Sanctuary & Highlights", href: "/" },
@@ -38,6 +47,9 @@ export default function NavigationDrawer({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mobile Navigation Menu"
       style={{
         position: "fixed",
         inset: 0,
@@ -48,6 +60,7 @@ export default function NavigationDrawer({
       {/* Backdrop */}
       <div
         onClick={onClose}
+        aria-hidden="true"
         style={{
           position: "absolute",
           inset: 0,
@@ -60,10 +73,11 @@ export default function NavigationDrawer({
 
       {/* Drawer Panel */}
       <div
+        ref={panelRef}
         style={{
           position: "relative",
           width: "350px",
-          maxWidth: "86vw",
+          maxWidth: "88vw",
           height: "100%",
           backgroundColor: "#FAF7F2",
           borderRight: "1px solid rgba(197, 160, 89, 0.35)",
@@ -77,6 +91,7 @@ export default function NavigationDrawer({
       >
         {/* Botanical watercolor art in bottom right */}
         <div
+          aria-hidden="true"
           style={{
             position: "absolute",
             right: "-20px",
@@ -84,7 +99,7 @@ export default function NavigationDrawer({
             width: "220px",
             height: "220px",
             pointerEvents: "none",
-            opacity: 0.5,
+            opacity: 0.45,
             zIndex: 0,
           }}
         >
@@ -112,10 +127,12 @@ export default function NavigationDrawer({
         >
           <AvsaraaLogo size="md" width={135} />
           <button
+            type="button"
             onClick={onClose}
-            aria-label="Close menu"
+            aria-label="Close navigation menu"
             style={{
-              padding: "8px",
+              width: "36px",
+              height: "36px",
               color: "#261B13",
               display: "flex",
               alignItems: "center",
@@ -126,10 +143,7 @@ export default function NavigationDrawer({
               border: "1px solid #E2D7CC",
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <CloseIcon size={16} color="#261B13" />
           </button>
         </div>
 
@@ -297,11 +311,12 @@ export default function NavigationDrawer({
           </button>
         </div>
 
-        {/* 3. ATELIER & CONTACT PAGES */}
+        {/* 3. CLIENT SERVICES & BOUTIQUE LINKS */}
         <div
           style={{
-            display: "flex",
-            gap: "12px",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "10px",
             marginTop: "16px",
             paddingTop: "14px",
             borderTop: "1px solid #EAE0D5",
@@ -310,16 +325,53 @@ export default function NavigationDrawer({
           }}
         >
           <Link
-            href="/about"
+            href="/track"
             onClick={onClose}
             style={{
-              flex: 1,
+              padding: "10px 12px",
+              backgroundColor: "#FFFFFF",
+              border: "1px solid #E2D7CC",
+              borderRadius: "12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "#261B13",
+              textDecoration: "none",
+            }}
+          >
+            <DeliveryVanIcon size={14} color="#866951" />
+            <span>Track Order</span>
+          </Link>
+          <Link
+            href="/b2b"
+            onClick={onClose}
+            style={{
               padding: "10px 12px",
               backgroundColor: "#FFFFFF",
               border: "1px solid #E2D7CC",
               borderRadius: "12px",
               textAlign: "center",
-              fontSize: "12.5px",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "#261B13",
+              textDecoration: "none",
+            }}
+          >
+            Bridal &amp; B2B
+          </Link>
+          <Link
+            href="/about"
+            onClick={onClose}
+            style={{
+              padding: "10px 12px",
+              backgroundColor: "#FFFFFF",
+              border: "1px solid #E2D7CC",
+              borderRadius: "12px",
+              textAlign: "center",
+              fontSize: "12px",
               fontWeight: 600,
               color: "#261B13",
               textDecoration: "none",
@@ -328,27 +380,26 @@ export default function NavigationDrawer({
             Our Story
           </Link>
           <Link
-            href="/contact"
+            href="/returns"
             onClick={onClose}
             style={{
-              flex: 1,
               padding: "10px 12px",
               backgroundColor: "#FFFFFF",
               border: "1px solid #E2D7CC",
               borderRadius: "12px",
               textAlign: "center",
-              fontSize: "12.5px",
+              fontSize: "12px",
               fontWeight: 600,
               color: "#261B13",
               textDecoration: "none",
             }}
           >
-            Contact
+            7-Day Return &amp; Exchange
           </Link>
         </div>
 
         {/* 4. AUTH STATUS / BUTTONS */}
-        <div style={{ marginTop: "24px", position: "relative", zIndex: 1 }}>
+        <div style={{ marginTop: "20px", position: "relative", zIndex: 1 }}>
           {user ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <div
@@ -368,12 +419,13 @@ export default function NavigationDrawer({
                     Signed in
                   </span>
                   <span style={{ display: "block", fontSize: "12.5px", color: "#261B13", fontWeight: 500, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                    {user.email}
+                    {displayIdentity}
                   </span>
                 </div>
               </div>
 
               <button
+                type="button"
                 onClick={() => {
                   onClose();
                   onLogout?.();
@@ -430,33 +482,7 @@ export default function NavigationDrawer({
         </div>
 
         {/* 5. ATELIER CONCIERGE CALLOUT */}
-        <div style={{ marginTop: "auto", paddingTop: "24px", position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
-          <Link
-            href="/contact"
-            onClick={onClose}
-            className="btn-shine"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              padding: "11px 16px",
-              borderRadius: "14px",
-              backgroundColor: "#F5F8F6",
-              border: "1px solid #C4D9CC",
-              color: "#1E5E3A",
-              fontSize: "12px",
-              fontWeight: 600,
-              textDecoration: "none",
-              letterSpacing: "0.04em",
-              boxShadow: "0 2px 6px rgba(30, 94, 58, 0.06)",
-              transition: "transform 0.15s ease",
-            }}
-          >
-            <span>📧</span>
-            <span>Contact Atelier Concierge</span>
-          </Link>
-
+        <div style={{ marginTop: "auto", paddingTop: "20px", position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
           <Link
             href="/contact"
             onClick={onClose}
@@ -478,11 +504,12 @@ export default function NavigationDrawer({
               boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
             }}
           >
-            <span>Contact Studio Concierge</span>
+            <MailIcon size={15} color="#ECC880" />
+            <span>Contact Atelier Concierge</span>
             <span>→</span>
           </Link>
-          <p style={{ marginTop: "4px", textAlign: "center", fontSize: "11px", color: "#8E7D70" }}>
-            Surat Handloom Studio • Pan-India Express Delivery (Free ₹500+)
+          <p style={{ marginTop: "2px", textAlign: "center", fontSize: "11px", color: "#6A584B" }}>
+            Avsaraa Handloom Atelier • Pan-India Express Delivery (Free ₹799+)
           </p>
         </div>
       </div>

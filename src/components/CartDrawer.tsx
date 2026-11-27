@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { getCartItemKey } from "@/lib/cartUtils";
-import { ShoppingBagIcon } from "./Icons";
+import { getCartItemKey, parseCartItemDisplay } from "@/lib/cartUtils";
+import { ShoppingBagIcon, GiftIcon, CloseIcon, SparkleStarIcon } from "./Icons";
 import { resolveProductImage } from "@/lib/productUtils";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 export default function CartDrawer() {
   const {
@@ -20,6 +21,10 @@ export default function CartDrawer() {
     clearCart,
   } = useCart();
   const [giftOptOut, setGiftOptOut] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useAccessibleDialog(isCartOpen, closeCart, panelRef);
 
   const GIFT_THRESHOLD = 2500;
   const giftProgress = Math.min(100, (subtotal / GIFT_THRESHOLD) * 100);
@@ -31,6 +36,9 @@ export default function CartDrawer() {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Shopping Bag (${totalItems} items)`}
       style={{
         position: "fixed",
         inset: 0,
@@ -42,6 +50,7 @@ export default function CartDrawer() {
       {/* Backdrop */}
       <div
         onClick={closeCart}
+        aria-hidden="true"
         style={{
           position: "absolute",
           inset: 0,
@@ -54,6 +63,7 @@ export default function CartDrawer() {
 
       {/* Drawer Panel */}
       <div
+        ref={panelRef}
         className="cart-drawer-panel"
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -73,7 +83,7 @@ export default function CartDrawer() {
         {/* Header */}
         <div
           style={{
-            padding: "20px 24px",
+            padding: "18px 22px",
             borderBottom: "1px solid #EAE0D5",
             display: "flex",
             alignItems: "center",
@@ -97,19 +107,23 @@ export default function CartDrawer() {
           </div>
 
           <button
+            type="button"
             onClick={closeCart}
-            aria-label="Close cart"
+            aria-label="Close shopping bag"
             style={{
-              padding: "6px",
-              color: "#8E7D70",
+              width: "34px",
+              height: "34px",
+              borderRadius: "50%",
+              backgroundColor: "#F2EBE3",
+              border: "1px solid #E2D7CC",
+              color: "#261B13",
               cursor: "pointer",
-              background: "none",
-              border: "none",
-              fontSize: "20px",
-              lineHeight: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            ✕
+            <CloseIcon size={16} color="#261B13" />
           </button>
         </div>
 
@@ -117,31 +131,44 @@ export default function CartDrawer() {
         <div
           className="cart-gift-shipping-bar"
           style={{
-            backgroundColor: isGiftUnlocked ? "#FDFBF7" : "#FAF6F0",
+            backgroundColor: isGiftUnlocked ? "#F4F8F5" : "#FAF6F0",
             borderBottom: "1px solid #E6DACF",
-            padding: "14px 20px",
+            padding: "13px 20px",
             transition: "all 0.3s ease",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-            <span style={{ fontSize: "12px", color: isGiftUnlocked ? "#866951" : "#5A4535", fontWeight: 600 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", gap: "8px" }}>
+            <span style={{ fontSize: "12px", color: isGiftUnlocked ? "#1E5E3A" : "#5A4535", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
               {subtotal === 0 ? (
-                <>✨ Free Insured Delivery on Orders Above ₹500</>
+                <>
+                  <SparkleStarIcon size={14} color="#866951" />
+                  <span>Free Insured Delivery on Orders Above ₹799</span>
+                </>
               ) : isGiftUnlocked ? (
-                <>🎉 <strong>Keepsake Gift Box Unlocked!</strong> Handcrafted wrap included.</>
+                <>
+                  <GiftIcon size={15} color="#1E5E3A" />
+                  <span><strong>Silk Gift Wrap Unlocked!</strong> Wrap included.</span>
+                </>
               ) : (
                 <>
-                  Add <strong style={{ color: "#261B13" }}>₹{amountRemainingForGift.toLocaleString("en-IN")}</strong> more for <strong>Complimentary Keepsake Gift Box</strong> 🎁
+                  <GiftIcon size={15} color="#866951" />
+                  <span>
+                    Add <strong style={{ color: "#261B13" }}>₹{amountRemainingForGift.toLocaleString("en-IN")}</strong> more for <strong>Silk Gift Wrap</strong>
+                  </span>
                 </>
               )}
             </span>
-            <span style={{ fontSize: "11px", fontWeight: 700, color: "#866951" }}>
+            <span style={{ fontSize: "11px", fontWeight: 700, color: isGiftUnlocked ? "#1E5E3A" : "#866951", flexShrink: 0 }}>
               {Math.round(giftProgress)}%
             </span>
           </div>
 
-          {/* Progress Bar Track */}
           <div
+            role="progressbar"
+            aria-valuenow={Math.round(giftProgress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Complimentary Silk Gift Wrap unlock progress"
             style={{
               position: "relative",
               width: "100%",
@@ -156,7 +183,7 @@ export default function CartDrawer() {
                 height: "100%",
                 width: `${subtotal === 0 ? 0 : Math.max(8, giftProgress)}%`,
                 background: isGiftUnlocked
-                  ? "linear-gradient(90deg, #C5A059 0%, #D4AF37 50%, #2E7D32 100%)"
+                  ? "linear-gradient(90deg, #C5A059 0%, #1E5E3A 100%)"
                   : "linear-gradient(90deg, #C5A059 0%, #D4AF37 100%)",
                 borderRadius: "4px",
                 transition: "width 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -164,13 +191,12 @@ export default function CartDrawer() {
             />
           </div>
 
-          {/* Milestone Badges */}
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "10px", color: "#866951" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "3px", fontWeight: 600, color: subtotal >= 500 ? "#2E7D32" : "#866951" }}>
-              {subtotal >= 500 ? "✓ " : ""}Free Shipping (₹500+)
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "10.5px", color: "#6A584B" }}>
+            <span style={{ fontWeight: 600, color: subtotal >= 799 ? "#1E5E3A" : "#6A584B" }}>
+              {subtotal >= 799 ? "✓ " : ""}Free Shipping (₹799+)
             </span>
-            <span style={{ display: "flex", alignItems: "center", gap: "3px", fontWeight: isGiftUnlocked ? 700 : 500, color: isGiftUnlocked ? "#2E7D32" : "#866951" }}>
-              {isGiftUnlocked ? "✓ " : "🎁 "} Keepsake Box (₹2,500)
+            <span style={{ fontWeight: isGiftUnlocked ? 700 : 500, color: isGiftUnlocked ? "#1E5E3A" : "#6A584B" }}>
+              {isGiftUnlocked ? "✓ " : ""}Gift Wrap (₹2,500)
             </span>
           </div>
         </div>
@@ -181,10 +207,10 @@ export default function CartDrawer() {
           style={{
             flex: 1,
             overflowY: "auto",
-            padding: "20px 24px",
+            padding: "18px 20px",
             display: "flex",
             flexDirection: "column",
-            gap: "16px",
+            gap: "14px",
           }}
         >
           {cartItems.length === 0 ? (
@@ -205,14 +231,14 @@ export default function CartDrawer() {
                   height: "64px",
                   borderRadius: "50%",
                   backgroundColor: "#F2EBE3",
+                  border: "1px solid #DFD0C2",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "26px",
                   marginBottom: "16px",
                 }}
               >
-                🛍️
+                <ShoppingBagIcon size={26} color="#866951" />
               </div>
               <h4
                 style={{
@@ -228,7 +254,7 @@ export default function CartDrawer() {
               <p
                 style={{
                   fontSize: "13px",
-                  color: "#6E5B4E",
+                  color: "#6A584B",
                   lineHeight: 1.6,
                   maxWidth: "280px",
                   marginBottom: "24px",
@@ -241,12 +267,14 @@ export default function CartDrawer() {
                 onClick={closeCart}
                 className="avsaraa-btn-primary"
                 style={{
-                  height: "42px",
+                  height: "44px",
                   padding: "0 24px",
                   fontSize: "12px",
                   textDecoration: "none",
                   display: "inline-flex",
                   alignItems: "center",
+                  width: "auto",
+                  borderRadius: "22px",
                 }}
               >
                 Explore Products →
@@ -256,189 +284,234 @@ export default function CartDrawer() {
             cartItems.map((item, idx) => {
               const itemKey = `${item.product.id}__${item.product.name}__${idx}`;
               const itemCanonicalKey = getCartItemKey(item.product);
+              const parsed = parseCartItemDisplay(item.product);
               const maxStock =
                 item.product.stock_count && item.product.stock_count > 0 ? item.product.stock_count : 20;
               const isAtMax = item.quantity >= maxStock;
 
               return (
-              <div
-                key={itemKey}
-                style={{
-                  display: "flex",
-                  gap: "14px",
-                  backgroundColor: "#FFFFFF",
-                  border: "1px solid #E8DED3",
-                  borderRadius: "16px",
-                  padding: "12px",
-                  boxShadow: "0 4px 12px rgba(38,27,19,0.03)",
-                }}
-              >
-                {/* Product Thumbnail */}
-                <Link
-                  href={`/products/${item.product.id}`}
-                  onClick={closeCart}
-                  style={{
-                    position: "relative",
-                    width: "78px",
-                    height: "94px",
-                    borderRadius: "10px",
-                    overflow: "hidden",
-                    flexShrink: 0,
-                    backgroundColor: "#F2EBE3",
-                    display: "block",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Image
-                    src={resolveProductImage(item.product.image_url) || "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=300&q=80"}
-                    alt={item.product.name}
-                    fill
-                    sizes="80px"
-                    style={{ objectFit: "cover" }}
-                  />
-                </Link>
-
-                {/* Details */}
                 <div
+                  key={itemKey}
                   style={{
                     display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    flex: 1,
+                    gap: "14px",
+                    backgroundColor: "#FFFFFF",
+                    border: "1px solid #E8DED3",
+                    borderRadius: "16px",
+                    padding: "12px",
+                    boxShadow: "0 4px 12px rgba(38,27,19,0.03)",
                   }}
                 >
-                  <div>
-                    <span
-                      style={{
-                        fontSize: "10px",
-                        color: "#866951",
-                        fontWeight: 600,
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      {item.product.category}
-                    </span>
-                    <Link
-                      href={`/products/${item.product.id}`}
-                      onClick={closeCart}
-                      style={{ textDecoration: "none" }}
-                    >
-                      <h5
-                        style={{
-                          fontFamily: "var(--font-serif), Georgia, serif",
-                          fontSize: "15px",
-                          fontWeight: 600,
-                          color: "#261B13",
-                          marginTop: "2px",
-                          marginBottom: "4px",
-                          lineHeight: 1.3,
-                          cursor: "pointer",
-                        }}
-                      >
-                        {item.product.name}
-                      </h5>
-                    </Link>
-                    <span style={{ fontSize: "14px", fontWeight: 700, color: "#261B13" }}>
-                      ₹{item.product.price.toLocaleString("en-IN")}
-                    </span>
-                  </div>
+                  <Link
+                    href={`/products/${item.product.id}`}
+                    onClick={closeCart}
+                    style={{
+                      position: "relative",
+                      width: "78px",
+                      height: "98px",
+                      borderRadius: "10px",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                      backgroundColor: "#F2EBE3",
+                      display: "block",
+                    }}
+                  >
+                    <Image
+                      src={resolveProductImage(item.product.image_url) || "/images/saree_model_hero.jpg"}
+                      alt={parsed.title}
+                      fill
+                      sizes="80px"
+                      style={{ objectFit: "cover", objectPosition: "center 20%" }}
+                    />
+                  </Link>
 
-                  {/* Quantity and Remove */}
                   <div
                     style={{
                       display: "flex",
-                      alignItems: "center",
+                      flexDirection: "column",
                       justifyContent: "space-between",
-                      marginTop: "10px",
+                      flex: 1,
+                      minWidth: 0,
                     }}
                   >
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        border: "1.5px solid #CFBEAD",
-                        borderRadius: "20px",
-                        overflow: "hidden",
-                        backgroundColor: "#FAF7F2",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(itemCanonicalKey, item.quantity - 1, idx)}
-                        aria-label="Decrease quantity"
-                        style={{
-                          width: "32px",
-                          height: "30px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "16px",
-                          fontWeight: 700,
-                          color: "#261B13",
-                          cursor: "pointer",
-                          background: "none",
-                          border: "none",
-                          transition: "background-color 0.15s ease",
-                        }}
-                      >
-                        -
-                      </button>
+                    <div>
                       <span
                         style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          padding: "0 10px",
-                          color: "#261B13",
-                          minWidth: "22px",
-                          textAlign: "center",
+                          fontSize: "10px",
+                          color: "#866951",
+                          fontWeight: 600,
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
                         }}
                       >
-                        {item.quantity}
+                        {item.product.category}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(itemCanonicalKey, item.quantity + 1, idx)}
-                        disabled={isAtMax}
-                        aria-label="Increase quantity"
-                        style={{
-                          width: "32px",
-                          height: "30px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "16px",
-                          fontWeight: 700,
-                          color: isAtMax ? "#B8A99A" : "#261B13",
-                          cursor: isAtMax ? "not-allowed" : "pointer",
-                          background: "none",
-                          border: "none",
-                          transition: "background-color 0.15s ease",
-                        }}
+                      <Link
+                        href={`/products/${item.product.id}`}
+                        onClick={closeCart}
+                        style={{ textDecoration: "none" }}
                       >
-                        +
-                      </button>
+                        <h5
+                          style={{
+                            fontFamily: "var(--font-serif), Georgia, serif",
+                            fontSize: "15px",
+                            fontWeight: 600,
+                            color: "#261B13",
+                            marginTop: "2px",
+                            marginBottom: "6px",
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          {parsed.title}
+                        </h5>
+                      </Link>
+
+                      {/* Variant Size & Color Chips */}
+                      {(parsed.size || parsed.color || parsed.isPreOrder) && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "6px" }}>
+                          {parsed.isPreOrder && (
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                padding: "2px 7px",
+                                borderRadius: "6px",
+                                backgroundColor: "#F9ECE8",
+                                color: "#8A181A",
+                                border: "1px solid rgba(138,24,26,0.2)",
+                              }}
+                            >
+                              Pre-Order
+                            </span>
+                          )}
+                          {parsed.size && (
+                            <span
+                              style={{
+                                fontSize: "10.5px",
+                                fontWeight: 600,
+                                padding: "2px 7px",
+                                borderRadius: "6px",
+                                backgroundColor: "#FAF7F2",
+                                color: "#543E2E",
+                                border: "1px solid #E2D7CC",
+                              }}
+                            >
+                              Size: {parsed.size}
+                            </span>
+                          )}
+                          {parsed.color && (
+                            <span
+                              style={{
+                                fontSize: "10.5px",
+                                fontWeight: 600,
+                                padding: "2px 7px",
+                                borderRadius: "6px",
+                                backgroundColor: "#FAF7F2",
+                                color: "#543E2E",
+                                border: "1px solid #E2D7CC",
+                              }}
+                            >
+                              Shade: {parsed.color}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: "#261B13" }}>
+                        ₹{(item.product.price * item.quantity).toLocaleString("en-IN")}
+                      </span>
+                      {item.quantity > 1 && (
+                        <span style={{ fontSize: "11px", color: "#6A584B", marginLeft: "6px" }}>
+                          (₹{item.product.price.toLocaleString("en-IN")} each)
+                        </span>
+                      )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => removeFromCart(itemCanonicalKey, idx)}
+                    {/* Quantity and Remove */}
+                    <div
                       style={{
-                        fontSize: "12px",
-                        color: "#A83E2D",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        fontWeight: 500,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginTop: "10px",
                       }}
                     >
-                      Remove
-                    </button>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          border: "1.5px solid #CFBEAD",
+                          borderRadius: "20px",
+                          overflow: "hidden",
+                          backgroundColor: "#FAF7F2",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(itemCanonicalKey, item.quantity - 1, idx)}
+                          aria-label={`Decrease quantity of ${parsed.title}`}
+                          style={{
+                            width: "32px",
+                            height: "30px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "16px",
+                            fontWeight: 700,
+                            color: "#261B13",
+                          }}
+                        >
+                          -
+                        </button>
+                        <span
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            padding: "0 10px",
+                            color: "#261B13",
+                            minWidth: "22px",
+                            textAlign: "center",
+                          }}
+                        >
+                          {item.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(itemCanonicalKey, item.quantity + 1, idx)}
+                          disabled={isAtMax}
+                          aria-label={`Increase quantity of ${parsed.title}`}
+                          style={{
+                            width: "32px",
+                            height: "30px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "16px",
+                            fontWeight: 700,
+                            color: isAtMax ? "#B8A99A" : "#261B13",
+                            cursor: isAtMax ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(itemCanonicalKey, idx)}
+                        style={{
+                          fontSize: "12px",
+                          color: "#8A181A",
+                          textDecoration: "underline",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
+              );
             })
           )}
         </div>
@@ -448,12 +521,12 @@ export default function CartDrawer() {
           <div
             className="cart-drawer-footer"
             style={{
-              padding: "18px 22px calc(18px + env(safe-area-inset-bottom, 12px)) 22px",
+              padding: "16px 20px calc(18px + env(safe-area-inset-bottom, 12px)) 20px",
               borderTop: "1px solid #EAE0D5",
               backgroundColor: "#FFFFFF",
               display: "flex",
               flexDirection: "column",
-              gap: "14px",
+              gap: "12px",
             }}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -462,7 +535,7 @@ export default function CartDrawer() {
                   display: "flex",
                   justifyContent: "space-between",
                   fontSize: "13px",
-                  color: "#6E5B4E",
+                  color: "#6A584B",
                 }}
               >
                 <span>Subtotal ({totalItems} items)</span>
@@ -475,12 +548,12 @@ export default function CartDrawer() {
                   display: "flex",
                   justifyContent: "space-between",
                   fontSize: "13px",
-                  color: "#6E5B4E",
+                  color: "#6A584B",
                 }}
               >
                 <span>Pan-India Insured Delivery</span>
-                <span style={{ color: subtotal >= 500 || subtotal === 0 ? "#2E6930" : "#866951", fontWeight: 600 }}>
-                  {subtotal >= 500 || subtotal === 0 ? "FREE" : "₹50 (Free ₹500+)"}
+                <span style={{ color: subtotal >= 799 || subtotal === 0 ? "#1E5E3A" : "#866951", fontWeight: 600 }}>
+                  {subtotal >= 799 || subtotal === 0 ? "FREE" : "₹50 (Free ₹799+)"}
                 </span>
               </div>
               <div
@@ -495,15 +568,14 @@ export default function CartDrawer() {
                   color: "#261B13",
                 }}
               >
-                <span>Total</span>
-                <span>₹{subtotal.toLocaleString("en-IN")}</span>
+                <span>Estimated Total</span>
+                <span>₹{(subtotal + (subtotal > 0 && subtotal < 799 ? 50 : 0)).toLocaleString("en-IN")}</span>
               </div>
-              <span style={{ fontSize: "10.5px", color: "#8E7D70" }}>
-                * All applicable GST and handcrafted charges included
+              <span style={{ fontSize: "11px", color: "#6A584B" }}>
+                * Inclusive of GST · Promo codes applied at checkout
               </span>
             </div>
 
-            {/* Complimentary Handwritten Gift Note & Keepsake Box */}
             <div
               style={{
                 display: "flex",
@@ -514,21 +586,22 @@ export default function CartDrawer() {
                 border: "1px dashed #D6C7B8",
                 borderRadius: "12px",
                 fontSize: "12px",
-                color: "#6E5B4E",
+                color: "#6A584B",
               }}
             >
               <input
                 type="checkbox"
                 id="keepsake-gift-box"
+                className="avsaraa-checkbox"
                 checked={giftNote}
                 onChange={(e) => setGiftOptOut(!e.target.checked)}
-                style={{ accentColor: "#866951", width: "16px", height: "16px", cursor: "pointer" }}
               />
               <label htmlFor="keepsake-gift-box" style={{ cursor: "pointer", flex: 1, userSelect: "none" }}>
-                <span style={{ fontWeight: 600, color: "#261B13", display: "block", fontSize: "12px" }}>
-                  🎁 Complimentary Keepsake Box & Note
+                <span style={{ fontWeight: 600, color: "#261B13", display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
+                  <GiftIcon size={14} color="#866951" />
+                  <span>Complimentary Silk Gift Wrap &amp; Note</span>
                 </span>
-                <span style={{ fontSize: "10.5px", color: "#8E7D70" }}>
+                <span style={{ fontSize: "10.5px", color: "#6A584B" }}>
                   Handwritten on gold foil vellum paper with satin ribbon wrap
                 </span>
               </label>
@@ -569,28 +642,49 @@ export default function CartDrawer() {
                     fontSize: "12px",
                     color: "#866951",
                     textDecoration: "underline",
-                    cursor: "pointer",
-                    background: "none",
-                    border: "none",
                     padding: "4px 0",
                   }}
                 >
                   ← Continue Shopping
                 </button>
-                <button
-                  type="button"
-                  onClick={clearCart}
-                  style={{
-                    fontSize: "12px",
-                    color: "#8E7D70",
-                    cursor: "pointer",
-                    background: "none",
-                    border: "none",
-                    padding: "4px 0",
-                  }}
-                >
-                  Clear Bag
-                </button>
+                {confirmingClear ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearCart();
+                        setConfirmingClear(false);
+                      }}
+                      style={{
+                        fontSize: "11.5px",
+                        fontWeight: 700,
+                        color: "#8A181A",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      Confirm Clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingClear(false)}
+                      style={{ fontSize: "11.5px", color: "#6A584B" }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingClear(true)}
+                    style={{
+                      fontSize: "12px",
+                      color: "#6A584B",
+                      padding: "4px 0",
+                    }}
+                  >
+                    Clear Bag
+                  </button>
+                )}
               </div>
             </div>
           </div>

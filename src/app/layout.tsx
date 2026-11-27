@@ -26,8 +26,8 @@ const alexBrush = Alex_Brush({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://avsaraa.in"),
-  title: "AVSARAA | Handcrafted Sarees, Ethnic Wear & Clothes Online | Surat, India",
-  description: "Explore handcrafted sarees, ethnic dresses, and occasion wear from Surat's textile heart. Buy authentic Indian clothes online with insured Pan-India delivery.",
+  title: "AVSARAA | Handcrafted Sarees, Ethnic Wear & Clothes Online | India",
+  description: "Explore handcrafted sarees, ethnic dresses, and occasion wear crafted from India's finest textile traditions. Buy authentic Indian clothes online with insured Pan-India delivery.",
   icons: {
     icon: "/favicon.ico",
   },
@@ -41,7 +41,6 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 
 const CartDrawer = dynamic(() => import("@/components/CartDrawer"));
 const AuthRequiredModal = dynamic(() => import("@/components/AuthRequiredModal"));
-const RecentlyViewedBar = dynamic(() => import("@/components/RecentlyViewedBar"));
 
 export default function RootLayout({
   children,
@@ -60,7 +59,6 @@ export default function RootLayout({
             {children}
             <CartDrawer />
             <AuthRequiredModal />
-            <RecentlyViewedBar />
             <Suspense fallback={null}>
               <MobileBottomNav />
             </Suspense>

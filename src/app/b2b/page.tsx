@@ -67,7 +67,7 @@ export default function B2BWholesalePage() {
             B2B & Handloom Bulk Inquiries
           </h1>
           <p style={{ maxWidth: "640px", margin: "0 auto", fontSize: "15px", color: "#6A5C52", lineHeight: 1.6 }}>
-            Partner directly with our Surat workshop for premium silk sarees, festive wear, bridal collections, and custom corporate gifting.
+            Partner directly with our handloom workshop for premium silk sarees, festive wear, bridal collections, and custom corporate gifting.
           </p>
         </div>
 
@@ -83,7 +83,7 @@ export default function B2BWholesalePage() {
             <DeliveryVanIcon size={32} color="#866951" />
             <h3 style={{ fontSize: "16px", margin: "14px 0 8px" }}>Direct Loom Pricing</h3>
             <p style={{ fontSize: "13px", color: "#6A5C52", margin: 0 }}>
-              Tiered wholesale rates with direct dispatch from our Surat craft center.
+              Tiered wholesale rates with direct dispatch from our artisan craft center.
             </p>
           </div>
           <div style={{ backgroundColor: "#FFFFFF", padding: "28px", borderRadius: "12px", border: "1px solid #EAE3D9", textAlign: "center" }}>
@@ -206,7 +206,7 @@ export default function B2BWholesalePage() {
                     type="text"
                     value={form.city}
                     onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    placeholder="e.g. Surat, Gujarat"
+                    placeholder="e.g. Ahmedabad, Gujarat"
                     style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "8px", border: "1px solid #D4BEAA" }}
                   />
                 </div>

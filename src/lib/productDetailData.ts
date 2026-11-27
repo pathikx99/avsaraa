@@ -70,7 +70,7 @@ export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [
     available_sizes: ["Free Size (5.5m + 0.8m Blouse)"],
     stock_status: "in_stock",
     stock_count: 4,
-    dispatch_time: "Dispatched within 24–48 hours from Surat Atelier",
+    dispatch_time: "Dispatched within 24–48 hours from Avsaraa Atelier",
     specifications: {
       fabric: "Pure Mulberry Katan Silk (Handloom Certified)",
       work: "Intricate Antique Gold Zari Kadhwa Weave & Handwoven Floral Jaal",
@@ -104,7 +104,6 @@ export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [
       "/images/occasion_party.jpg",
       "/images/botanical_flowers.jpg",
     ],
-    video_url: "https://www.youtube.com/embed/5mGUdDq42iI",
     description: "Contemporary silhouette crafted from lightweight Chanderi weave featuring artisanal metallic foil accents, soft inner lining, and a flowing flared hem.",
     color_variants: [
       { name: "Festive Gold", hex: "#D4AF37", image_url: "/images/occasion_festive.jpg" },
@@ -119,7 +118,7 @@ export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [
     available_sizes: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"],
     stock_status: "in_stock",
     stock_count: 7,
-    dispatch_time: "Dispatched within 24 hours from Surat Atelier",
+    dispatch_time: "Dispatched within 24 hours from Avsaraa Atelier",
     specifications: {
       fabric: "Pure Chanderi Silk Blend with Soft Butter Crepe Lining",
       work: "Artisanal Metallic Gold Foil Print & Micro-Sequin Yoke",
@@ -153,7 +152,6 @@ export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [
       "/images/occasion_party.jpg",
       "/images/saree_model_hero.jpg",
     ],
-    video_url: "https://www.youtube.com/embed/5mGUdDq42iI",
     description: "Whisper-light handloom organza saree in deep emerald adorned with scalloped hand-cut resham embroidery and delicate badla zari accents.",
     color_variants: [
       { name: "Deep Emerald", hex: "#0E4731", image_url: "/images/occasion_traditional.jpg" },
@@ -167,7 +165,7 @@ export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [
     available_sizes: ["Free Size (5.5m + 0.8m Blouse)"],
     stock_status: "in_stock",
     stock_count: 3,
-    dispatch_time: "Dispatched within 24–48 hours from Surat Atelier",
+    dispatch_time: "Dispatched within 24–48 hours from Avsaraa Atelier",
     specifications: {
       fabric: "Pure Sheer Handloom Organza Silk",
       work: "Hand-cut Scalloped Resham Border with Micro-Zari Highlights",
@@ -200,7 +198,6 @@ export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [
       "/images/occasion_festive.jpg",
       "/images/botanical_flowers.jpg",
     ],
-    video_url: "https://www.youtube.com/embed/5mGUdDq42iI",
     description: "Breathable pure cotton slub suit set in deep indigo blue, featuring traditional handblock botanical motifs, comfortable straight-fit trousers, and matching lightweight stole.",
     color_variants: [
       { name: "Indigo Blue", hex: "#233D60", image_url: "/images/occasion_everyday.jpg" },
@@ -214,7 +211,7 @@ export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [
     available_sizes: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"],
     stock_status: "in_stock",
     stock_count: 12,
-    dispatch_time: "Dispatched within 24 hours from Surat Atelier",
+    dispatch_time: "Dispatched within 24 hours from Avsaraa Atelier",
     specifications: {
       fabric: "100% Breathable Pure Cotton Slub",
       work: "Authentic Bagru Handblock Botanical Print",
@@ -247,7 +244,6 @@ export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [
       "/images/occasion_everyday.jpg",
       "/images/occasion_party.jpg",
     ],
-    video_url: "https://www.youtube.com/embed/5mGUdDq42iI",
     description: "Minimalist hand-spun linen kurta in soothing sage green. Tailored with a relaxed silhouette, side slits, and mother-of-pearl button detailing for effortless everyday elegance.",
     color_variants: [
       { name: "Sage Green", hex: "#7E8C78", image_url: "/images/occasion_everyday.jpg" },
@@ -261,7 +257,7 @@ export const SEED_CATALOG_PRODUCTS: DetailedProduct[] = [
     available_sizes: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"],
     stock_status: "in_stock",
     stock_count: 9,
-    dispatch_time: "Dispatched within 24 hours from Surat Atelier",
+    dispatch_time: "Dispatched within 24 hours from Avsaraa Atelier",
     specifications: {
       fabric: "Pure Handloom Linen & Breathable Cotton Blend",
       work: "Minimalist Stitch Detailing & Mother-of-Pearl Accents",
@@ -379,7 +375,7 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
       }
     : isMen
     ? {
-        fabric: "Pure Surat Raw Silk & Handloom Linen Blend",
+        fabric: "Pure Indian Raw Silk & Handloom Linen Blend",
         work: "Minimalist Stitch Detailing & Mother-of-Pearl Buttons",
         pattern: "Self-Textured Slub Weave",
         fit: "Classic Straight Cut with Comfort Side Slits",
@@ -450,12 +446,12 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
       ];
 
   const defaultClusterOrigin = isSaree
-    ? "Surat Zari Guild & Varanasi Weaving Cluster"
+    ? "Artisan Zari Guild & Varanasi Weaving Cluster"
     : isMen
-    ? "Surat Raw Silk Studio, Gujarat"
+    ? "Gujarat Raw Silk Studio, India"
     : isCoord
     ? "Bagru & Sanganer Handblock Cluster"
-    : "Surat Handloom Collective";
+    : "Avsaraa Handloom Collective";
 
   const cluster_origin =
     product.cluster_origin ||
@@ -471,7 +467,7 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
           { name: "Original Edition", hex: "#261B13", image_url: primaryImg },
         ];
 
-  const video_url = product.video_url || "https://www.youtube.com/embed/5mGUdDq42iI";
+  const video_url = product.video_url?.trim() || undefined;
 
   return {
     ...product,
@@ -489,7 +485,7 @@ export function enrichProductToDetailed(product: Product): DetailedProduct {
     stock_status: (product.stock_count !== undefined && product.stock_count <= 0) ? "out_of_stock" : "in_stock",
     stock_count: product.stock_count !== undefined ? product.stock_count : 5,
     size_inventory: product.size_inventory || (product.specifications?.size_inventory as Record<string, number> | undefined),
-    dispatch_time: "Dispatched within 24–48 hours from Surat",
+    dispatch_time: "Dispatched within 24–48 hours from Avsaraa Atelier",
     specifications,
     wash_care_bullets,
     color_variants,

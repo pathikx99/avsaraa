@@ -71,19 +71,19 @@ export default function ShippingPolicyPage() {
             </h2>
           </div>
           <p style={{ margin: "0 0 14px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            AVSARAA currently offers <strong>free standard shipping and delivery on prepaid orders of ₹500+</strong> across serviceable delivery locations across India (₹50 standard shipping below ₹500).
+            AVSARAA currently offers <strong>free standard shipping and delivery on orders above ₹799</strong> across serviceable delivery locations across India (₹50 standard shipping below ₹799).
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", marginBottom: "14px" }}>
             <div style={{ padding: "20px", backgroundColor: "#FAF7F2", border: "1px solid #CFBEAD", borderRadius: "10px" }}>
               <span style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#866951", display: "block", marginBottom: "4px" }}>
-                PREPAID ORDERS (₹500+)
+                PREPAID ORDERS (₹799+)
               </span>
               <div style={{ fontSize: "20px", fontFamily: "var(--font-serif), Georgia, serif", color: "#261B13", fontWeight: 600, marginBottom: "6px" }}>
                 Free Shipping &amp; Delivery
               </div>
               <p style={{ fontSize: "13px", color: "#6E5B4E", margin: 0 }}>
-                Prepaid orders of ₹500 or above (UPI, Cards, NetBanking via Razorpay) qualify for complimentary Pan-India delivery. Orders under ₹500 carry a ₹50 shipping fee.
+                Prepaid orders of ₹799 or above (UPI, Cards, NetBanking via Razorpay) qualify for complimentary Pan-India delivery. Orders under ₹799 carry a ₹50 shipping fee.
               </p>
             </div>
 
@@ -251,7 +251,7 @@ export default function ShippingPolicyPage() {
           <div style={{ padding: "18px 22px", backgroundColor: "#FAF7F2", border: "1px solid #E6DACF", borderRadius: "10px", fontSize: "14px", color: "#261B13", lineHeight: 1.8 }}>
             <strong>AVSARAA</strong><br />
             Email: <a href="mailto:info.avsaraa@gmail.com" style={{ color: "#866951", fontWeight: 600 }}>info.avsaraa@gmail.com</a><br />
-            Location: Surat, Gujarat, India
+            Location: Gujarat, India
           </div>
         </section>
       </div>

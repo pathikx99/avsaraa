@@ -24,6 +24,7 @@ import {
   DeliveryVanIcon,
   TagIcon,
   DiamondCrownIcon,
+  RefreshIcon,
 } from "@/components/Icons";
 import { AdminUser, CustomerProfile, ContactInquiry, NewsletterSubscriber, ProductReview } from "@/types/admin";
 import { Product, ProductCategory } from "@/types/product";
@@ -2028,8 +2029,8 @@ export default function AdminDashboardPage() {
                 transition: "all 0.15s ease",
               }}
             >
-              <span style={{ display: "inline-block", transform: isRefreshing ? "rotate(360deg)" : "none", transition: "transform 0.6s ease" }}>
-                {isRefreshing ? <SpinnerIcon size={14} color="#866951" /> : "🔄"}
+              <span style={{ display: "inline-flex", alignItems: "center" }}>
+                {isRefreshing ? <SpinnerIcon size={14} color="#866951" /> : <RefreshIcon size={14} color="#866951" />}
               </span>
               <span>{isRefreshing ? "Syncing..." : "Sync Live Data"}</span>
             </button>
@@ -2126,7 +2127,10 @@ export default function AdminDashboardPage() {
         >
           {/* Card 1: Gross Revenue */}
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => setActiveTab("orders")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab("orders"); } }}
             style={{
               backgroundColor: "#FFFFFF",
               border: activeTab === "orders" ? "2px solid #866951" : "1px solid #E8DED3",
@@ -2170,7 +2174,10 @@ export default function AdminDashboardPage() {
 
           {/* Card 2: Orders & Fulfillment Pipeline */}
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => setActiveTab("orders")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab("orders"); } }}
             style={{
               backgroundColor: "#FFFFFF",
               border: activeTab === "orders" ? "2px solid #866951" : "1px solid #E8DED3",
@@ -2186,14 +2193,14 @@ export default function AdminDashboardPage() {
           >
             <div>
               <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
-                Orders & Logistics
+                Orders &amp; Logistics
               </span>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 {adminOrders.length}
               </div>
-              <span style={{ fontSize: "11px", color: orderStats.exchangeRequestedCount > 0 ? "#D97706" : "#28A745", fontWeight: 600 }}>
+              <span style={{ fontSize: "11px", color: orderStats.exchangeRequestedCount > 0 ? "#B37A2C" : "#1E5E3A", fontWeight: 600 }}>
                 {orderStats.exchangeRequestedCount > 0
-                  ? `⚠️ ${orderStats.exchangeRequestedCount} Exchange Action Req.`
+                  ? `${orderStats.exchangeRequestedCount} Exchange Action Req.`
                   : `${orderStats.inTransitCount} In Transit · ${orderStats.deliveredCount} Delivered`}
               </span>
             </div>
@@ -2216,7 +2223,10 @@ export default function AdminDashboardPage() {
 
           {/* Card 3: Products in Catalog */}
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => setActiveTab("products")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab("products"); } }}
             style={{
               backgroundColor: "#FFFFFF",
               border: activeTab === "products" ? "2px solid #866951" : "1px solid #E8DED3",
@@ -2232,15 +2242,15 @@ export default function AdminDashboardPage() {
           >
             <div>
               <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
-                Catalog & Stock
+                Catalog &amp; Stock
               </span>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 {products.length} Items
               </div>
-              <span style={{ fontSize: "11px", color: inventoryStats.lowStockCount > 0 || inventoryStats.outOfStockCount > 0 ? "#DC2626" : "#866951", fontWeight: 600 }}>
+              <span style={{ fontSize: "11px", color: inventoryStats.lowStockCount > 0 || inventoryStats.outOfStockCount > 0 ? "#B91C1C" : "#866951", fontWeight: 600 }}>
                 {inventoryStats.lowStockCount > 0 || inventoryStats.outOfStockCount > 0
-                  ? `⚠️ ${inventoryStats.outOfStockCount} OOS · ${inventoryStats.lowStockCount} Low Stock`
-                  : `● ${inventoryStats.totalStockSum} Units in Stock`}
+                  ? `${inventoryStats.outOfStockCount} OOS · ${inventoryStats.lowStockCount} Low Stock`
+                  : `${inventoryStats.totalStockSum} Units in Stock`}
               </span>
             </div>
             <div
@@ -2262,7 +2272,10 @@ export default function AdminDashboardPage() {
 
           {/* Card 4: Customer Accounts */}
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => setActiveTab("customers")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab("customers"); } }}
             style={{
               backgroundColor: "#FFFFFF",
               border: activeTab === "customers" ? "2px solid #866951" : "1px solid #E8DED3",
@@ -2278,7 +2291,7 @@ export default function AdminDashboardPage() {
           >
             <div>
               <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#866951", fontWeight: 700 }}>
-                Patrons & CRM
+                Patrons &amp; CRM
               </span>
               <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 {customerProfiles.length}
@@ -2306,7 +2319,10 @@ export default function AdminDashboardPage() {
 
           {/* Card 5: Inquiries & Leads */}
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => setActiveTab("inquiries")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab("inquiries"); } }}
             style={{
               backgroundColor: "#FFFFFF",
               border: activeTab === "inquiries" ? "2px solid #866951" : "1px solid #E8DED3",
@@ -2327,8 +2343,8 @@ export default function AdminDashboardPage() {
               <div style={{ fontSize: "24px", fontWeight: 700, color: "#261B13", marginTop: "4px" }}>
                 {inquiries.length + subscribers.length}
               </div>
-              <span style={{ fontSize: "11px", color: inquiryStats.unreadCount > 0 ? "#DC2626" : "#866951", fontWeight: 600 }}>
-                {inquiryStats.unreadCount > 0 ? `🔔 ${inquiryStats.unreadCount} Unread Messages` : "● All Inquiries Replied"}
+              <span style={{ fontSize: "11px", color: inquiryStats.unreadCount > 0 ? "#B91C1C" : "#866951", fontWeight: 600 }}>
+                {inquiryStats.unreadCount > 0 ? `${inquiryStats.unreadCount} Unread Messages` : "All Inquiries Replied"}
               </span>
             </div>
             <div
@@ -2362,10 +2378,11 @@ export default function AdminDashboardPage() {
         >
           {/* Tabs Container */}
           <div
+            role="tablist"
+            aria-label="Admin Management Sections"
+            className="admin-tabs-scroll"
             style={{
-              display: "flex",
               alignItems: "center",
-              flexWrap: "wrap",
               gap: "4px",
               backgroundColor: "#EFE8E1",
               borderRadius: "14px",
@@ -2387,6 +2404,9 @@ export default function AdminDashboardPage() {
               return (
                 <button
                   key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
                   onClick={() => {
                     setActiveTab(tab.id as typeof activeTab);
                     setSearchQuery("");
@@ -2848,7 +2868,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <div style={{ overflowX: "auto" }}>
+            <div className="admin-table-wrap">
               <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
                 <thead>
                   <tr style={{ backgroundColor: "#FAF7F2", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
@@ -3410,7 +3430,7 @@ export default function AdminDashboardPage() {
                 overflow: "hidden",
               }}
             >
-              <div style={{ overflowX: "auto" }}>
+              <div className="admin-table-wrap">
                 <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
                   <thead>
                     <tr style={{ backgroundColor: "#FAF7F2", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
@@ -3693,7 +3713,7 @@ export default function AdminDashboardPage() {
                 </span>
               </div>
 
-              <div style={{ overflowX: "auto" }}>
+              <div className="admin-table-wrap">
                 <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
                   <thead>
                     <tr style={{ backgroundColor: "#FCFAF7", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
@@ -3840,7 +3860,7 @@ export default function AdminDashboardPage() {
                 </span>
               </div>
 
-              <div style={{ overflowX: "auto" }}>
+              <div className="admin-table-wrap">
                 <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
                   <thead>
                     <tr style={{ backgroundColor: "#FCFAF7", borderBottom: "1px solid #E8DED3", color: "#866951" }}>
@@ -5903,7 +5923,7 @@ export default function AdminDashboardPage() {
                         type="text"
                         value={productForm.cluster_origin}
                         onChange={(e) => setProductForm({ ...productForm, cluster_origin: e.target.value })}
-                        placeholder="e.g. Surat Zari Guild & Varanasi Weaving Cluster"
+                        placeholder="e.g. Artisan Zari Guild & Varanasi Weaving Cluster"
                         style={{
                           width: "100%",
                           padding: "8px 10px",
@@ -5917,13 +5937,13 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                        YouTube Drape Video Link
+                        YouTube Drape Video Link (Optional)
                       </label>
                       <input
                         type="text"
                         value={productForm.video_url}
                         onChange={(e) => setProductForm({ ...productForm, video_url: e.target.value })}
-                        placeholder="e.g. https://www.youtube.com/watch?v=..."
+                        placeholder="Optional: https://www.youtube.com/watch?v=..."
                         style={{
                           width: "100%",
                           padding: "8px 10px",

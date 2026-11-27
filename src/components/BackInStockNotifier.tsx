@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { CloseIcon, SparkleStarIcon } from "@/components/Icons";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 interface BackInStockNotifierProps {
   productId: string;
@@ -23,6 +24,9 @@ export default function BackInStockNotifier({
   const [phone, setPhone] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useAccessibleDialog(isOpen, () => setIsOpen(false), modalRef);
 
   const isOutOfStock = Boolean(stockCount === 0);
 
@@ -99,6 +103,10 @@ export default function BackInStockNotifier({
       {/* Modal */}
       {isOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Back in Stock Notification"
+          onClick={() => setIsOpen(false)}
           style={{
             position: "fixed",
             inset: 0,
@@ -112,7 +120,10 @@ export default function BackInStockNotifier({
           }}
         >
           <div
+            ref={modalRef}
+            onClick={(e) => e.stopPropagation()}
             style={{
+              position: "relative",
               backgroundColor: "#FFFFFF",
               borderRadius: "20px",
               maxWidth: "480px",

@@ -23,9 +23,9 @@ const POLICIES = [
     title: "Terms & Conditions",
     href: "/terms",
     badge: "LEGAL AGREEMENT",
-    description: "The official terms governing website browsing, ordering authentic handloom apparel, pricing, user eligibility, and Surat jurisdiction.",
+    description: "The official terms governing website browsing, ordering authentic handloom apparel, pricing, user eligibility, and governing jurisdiction.",
     icon: <ShieldCheckIcon size={24} color="#866951" />,
-    features: ["Account & Order Acceptance", "Payment & Pricing Terms", "Governing Law (Surat, Gujarat)"],
+    features: ["Account & Order Acceptance", "Payment & Pricing Terms", "Governing Law (Gujarat, India)"],
   },
   {
     title: "Shipping & Delivery Policy",
@@ -33,7 +33,7 @@ const POLICIES = [
     badge: "LOGISTICS & DISPATCH",
     description: "Information regarding Shiprocket courier logistics, free shipping on prepaid orders, ₹20 COD handling charge, and tracking procedures.",
     icon: <DeliveryVanIcon size={24} color="#866951" />,
-    features: ["Free Pan-India Prepaid Delivery ₹500+", "₹20 Cash on Delivery Charge", "Real-Time Courier Tracking"],
+    features: ["Free Pan-India Prepaid Delivery ₹799+", "₹20 Cash on Delivery Charge", "Real-Time Courier Tracking"],
   },
   {
     title: "Return, Exchange & Refund Policy",
@@ -294,7 +294,7 @@ export default function PoliciesHubPage() {
                   }}
                 >
                   <LocationPinIcon size={15} color="#866951" />
-                  Surat, Gujarat, India
+                  Gujarat, India
                 </div>
               </div>
             </div>

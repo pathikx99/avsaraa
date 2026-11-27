@@ -32,14 +32,15 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
     assert.strictEqual(resZero.taxableAmount, 0);
   });
 
-  test("Courier fee enforces ₹500 free delivery threshold", () => {
-    assert.strictEqual(FREE_DELIVERY_THRESHOLD, 500);
-    // Under ₹500 threshold incurs ₹50 courier fee
+  test("Courier fee enforces ₹799 free delivery threshold", () => {
+    assert.strictEqual(FREE_DELIVERY_THRESHOLD, 799);
+    // Under ₹799 threshold incurs ₹50 courier fee
+    assert.strictEqual(computeCourierFee(798), 50);
     assert.strictEqual(computeCourierFee(499), 50);
     assert.strictEqual(computeCourierFee(0), 50);
 
-    // ₹500 or above qualifies for complimentary delivery (₹0)
-    assert.strictEqual(computeCourierFee(500), 0);
+    // ₹799 or above qualifies for complimentary delivery (₹0)
+    assert.strictEqual(computeCourierFee(799), 0);
     assert.strictEqual(computeCourierFee(1299), 0);
     assert.strictEqual(computeCourierFee(15000), 0);
   });
@@ -53,7 +54,7 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
 
   test("Pan-India pincode verification accepts all valid 6-digit Indian PINs (100000–999999) and Gujarat helper detects intra-state range", () => {
     // Valid Pan-India 6-digit PINs across states
-    assert.strictEqual(isValidIndianPincode("395007"), true); // Surat
+    assert.strictEqual(isValidIndianPincode("395007"), true); // Gujarat Hub
     assert.strictEqual(isValidIndianPincode("380001"), true); // Ahmedabad
     assert.strictEqual(isValidIndianPincode("110001"), true); // Delhi
     assert.strictEqual(isValidIndianPincode(400001), true);   // Mumbai (numeric)

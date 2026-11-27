@@ -708,7 +708,7 @@ function OrderSuccessContent() {
                 <AvsaraaLogo width={150} />
                 <div style={{ marginTop: "8px", fontSize: "11px", color: "#333", lineHeight: "1.4" }}>
                   <strong>AVSARAA LOOMS & ATELIER PVT. LTD.</strong><br />
-                  Ring Road Textile Hub, Surat, Gujarat — 395002<br />
+                  Gujarat — 395002, India<br />
                   <strong>GSTIN:</strong> 24AAACA0000A1Z5 | <strong>State Code:</strong> 24 (Gujarat)<br />
                   <strong>Contact:</strong> contact.avsaraa@gmail.com | +91 98765 43210
                 </div>
@@ -908,8 +908,8 @@ function OrderSuccessContent() {
             >
               <div>
                 <p style={{ margin: 0 }}>
-                  1. Goods once sold are covered by Avsaraa&apos;s 7-Day Exchange Guarantee.<br />
-                  2. All disputes subject to jurisdiction of Surat courts only.<br />
+                  1. Goods once sold are covered by Avsaraa&apos;s 7-Day Return &amp; Exchange Guarantee.<br />
+                  2. All disputes subject to jurisdiction of competent courts in Gujarat, India only.<br />
                   3. Computer-generated tax invoice; no physical stamp required under IT Act 2000.
                 </p>
               </div>

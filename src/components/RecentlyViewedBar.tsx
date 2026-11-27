@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState, useMemo, useSyncExternalStore } from "react";
+import React, { useState, useMemo, useRef, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { formatINR } from "@/lib/productUtils";
+import { formatINR, resolveProductImage } from "@/lib/productUtils";
+import { EyeIcon, CloseIcon } from "./Icons";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 export interface RecentlyViewedItem {
   id: string;
@@ -41,10 +43,8 @@ function getServerSnapshot(): string {
   return "";
 }
 
-export default function RecentlyViewedBar() {
-  const pathname = usePathname();
+function useRecentlyViewedItems() {
   const rawItems = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const [isOpen, setIsOpen] = useState(false);
 
   const items = useMemo<RecentlyViewedItem[]>(() => {
     if (!rawItems) return [];
@@ -56,18 +56,158 @@ export default function RecentlyViewedBar() {
     }
   }, [rawItems]);
 
-  const clearHistory = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const clearHistory = () => {
     try {
       localStorage.removeItem(STORAGE_KEY);
-      setIsOpen(false);
       window.dispatchEvent(new Event("avsaraa:recently-viewed-updated"));
     } catch {
       // LocalStorage access failsafe
     }
   };
 
-  // Hide on admin, checkout, and inquiry forms so controls are never obscured
+  return { items, clearHistory };
+}
+
+/**
+ * Inline horizontal shelf for recently viewed pieces on mobile & desktop pages
+ * without colliding with fixed bottom navigation bars.
+ */
+export function RecentlyViewedShelf({ excludeProductId }: { excludeProductId?: string }) {
+  const { items, clearHistory } = useRecentlyViewedItems();
+
+  const displayItems = useMemo(() => {
+    const filtered = excludeProductId ? items.filter((item) => item.id !== excludeProductId) : items;
+    return filtered.slice(0, 6);
+  }, [items, excludeProductId]);
+
+  if (displayItems.length === 0) return null;
+
+  return (
+    <section
+      aria-label="Recently Viewed Pieces"
+      style={{
+        backgroundColor: "#FAF7F2",
+        padding: "48px 20px",
+        borderTop: "1px solid #E6DACF",
+      }}
+    >
+      <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "12px",
+            marginBottom: "20px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <EyeIcon size={18} color="#866951" />
+            <h2
+              style={{
+                fontFamily: "var(--font-serif), Georgia, serif",
+                fontSize: "clamp(22px, 3vw, 28px)",
+                fontWeight: 500,
+                color: "#261B13",
+                margin: 0,
+              }}
+            >
+              Recently Viewed
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={clearHistory}
+            style={{
+              fontSize: "12px",
+              color: "#6A584B",
+              textDecoration: "underline",
+              textUnderlineOffset: "3px",
+              cursor: "pointer",
+            }}
+          >
+            Clear History
+          </button>
+        </div>
+
+        <div className="recently-viewed-shelf-track">
+          {displayItems.map((item) => (
+            <Link
+              key={item.id}
+              href={`/products/${item.id}`}
+              className="luxury-hover-card"
+              style={{
+                scrollSnapAlign: "start",
+                backgroundColor: "#FFFFFF",
+                borderRadius: "14px",
+                border: "1px solid #E6DACF",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                textDecoration: "none",
+              }}
+            >
+              <div style={{ position: "relative", width: "100%", aspectRatio: "3 / 4", backgroundColor: "#F2EBE3" }}>
+                <Image
+                  src={resolveProductImage(item.image_url)}
+                  alt={item.name}
+                  fill
+                  sizes="240px"
+                  style={{ objectFit: "cover", objectPosition: "center 20%" }}
+                />
+              </div>
+              <div style={{ padding: "12px" }}>
+                <span style={{ fontSize: "10px", fontWeight: 600, color: "#866951", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  {item.category}
+                </span>
+                <div
+                  style={{
+                    fontFamily: "var(--font-serif), Georgia, serif",
+                    fontSize: "14.5px",
+                    fontWeight: 600,
+                    color: "#261B13",
+                    marginTop: "2px",
+                    marginBottom: "4px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {item.name}
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                  <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#261B13" }}>
+                    {formatINR(item.price)}
+                  </span>
+                  {item.mrp && item.mrp > item.price && (
+                    <span style={{ fontSize: "11px", color: "#6A584B", textDecoration: "line-through" }}>
+                      {formatINR(item.mrp)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Desktop-only floating quick-access pill so mobile bottom navigation and sticky
+ * purchase bars remain completely unobstructed.
+ */
+export default function RecentlyViewedBar() {
+  const pathname = usePathname();
+  const { items, clearHistory } = useRecentlyViewedItems();
+  const [isOpen, setIsOpen] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  useAccessibleDialog(isOpen, () => setIsOpen(false), drawerRef);
+
   const isExcluded =
     pathname.startsWith("/admin") ||
     pathname.startsWith("/checkout") ||
@@ -79,23 +219,21 @@ export default function RecentlyViewedBar() {
     return null;
   }
 
-  // Avoid showing current PDP drape as the only drape in the bar
   const displayItems = items.slice(0, 6);
 
   return (
     <aside
-      className="recently-viewed-floating-bar"
+      className="desktop-only recently-viewed-floating-bar"
       aria-label="Recently Viewed Drapes"
       style={{
         position: "fixed",
         left: "18px",
-        bottom: "calc(18px + env(safe-area-inset-bottom, 0px))",
+        bottom: "18px",
         zIndex: 140,
         fontFamily: "var(--font-sans), system-ui, sans-serif",
       }}
     >
       {!isOpen ? (
-        /* Collapsed Floating Pill */
         <button
           type="button"
           onClick={() => setIsOpen(true)}
@@ -107,17 +245,14 @@ export default function RecentlyViewedBar() {
             gap: "10px",
             backgroundColor: "#261B13",
             color: "#FAF7F2",
-            border: "1px solid #866951",
+            border: "1px solid rgba(197, 160, 89, 0.55)",
             borderRadius: "30px",
             padding: "8px 16px 8px 10px",
             boxShadow: "0 8px 24px rgba(38, 27, 19, 0.25)",
             cursor: "pointer",
             transition: "transform 0.2s ease, box-shadow 0.2s ease",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")}
-          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
-          {/* Micro image avatars preview */}
           <div style={{ display: "flex", alignItems: "center", marginRight: "2px" }}>
             {displayItems.slice(0, 3).map((item, idx) => (
               <div
@@ -135,7 +270,7 @@ export default function RecentlyViewedBar() {
                 }}
               >
                 <Image
-                  src={item.image_url}
+                  src={resolveProductImage(item.image_url)}
                   alt={item.name}
                   fill
                   sizes="26px"
@@ -146,15 +281,18 @@ export default function RecentlyViewedBar() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "14px" }}>👁️</span>
+            <EyeIcon size={14} color="#ECC880" />
             <span style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
               Recently Viewed ({displayItems.length})
             </span>
           </div>
         </button>
       ) : (
-        /* Expanded Floating Card / Drawer */
         <div
+          ref={drawerRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Recently Viewed Drapes"
           style={{
             width: "360px",
             maxWidth: "calc(100vw - 36px)",
@@ -163,10 +301,9 @@ export default function RecentlyViewedBar() {
             border: "1px solid #E6DACF",
             boxShadow: "0 12px 36px rgba(38, 27, 19, 0.25)",
             overflow: "hidden",
-            animation: "slideUpFade 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+            animation: "fadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         >
-          {/* Header */}
           <div
             style={{
               padding: "12px 16px",
@@ -178,7 +315,7 @@ export default function RecentlyViewedBar() {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "14px" }}>👁️</span>
+              <EyeIcon size={15} color="#ECC880" />
               <span
                 style={{
                   fontFamily: "var(--font-serif), Georgia, serif",
@@ -187,24 +324,23 @@ export default function RecentlyViewedBar() {
                   letterSpacing: "0.03em",
                 }}
               >
-                Recently Viewed Drapes ({displayItems.length})
+                Recently Viewed ({displayItems.length})
               </span>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <button
                 type="button"
-                onClick={clearHistory}
+                onClick={() => {
+                  clearHistory();
+                  setIsOpen(false);
+                }}
                 style={{
-                  background: "none",
-                  border: "none",
                   color: "#D8CABE",
-                  fontSize: "10.5px",
+                  fontSize: "11px",
                   textDecoration: "underline",
-                  cursor: "pointer",
                   padding: "2px 4px",
                 }}
-                title="Clear browsing history"
               >
                 Clear
               </button>
@@ -213,21 +349,17 @@ export default function RecentlyViewedBar() {
                 onClick={() => setIsOpen(false)}
                 aria-label="Close recently viewed drawer"
                 style={{
-                  background: "none",
-                  border: "none",
                   color: "#FAF7F2",
-                  fontSize: "16px",
-                  cursor: "pointer",
-                  lineHeight: 1,
-                  padding: "2px 6px",
+                  padding: "4px",
+                  display: "flex",
+                  alignItems: "center",
                 }}
               >
-                ✕
+                <CloseIcon size={15} color="#FAF7F2" />
               </button>
             </div>
           </div>
 
-          {/* List of items */}
           <div
             className="no-scrollbar"
             style={{
@@ -250,10 +382,8 @@ export default function RecentlyViewedBar() {
                   borderRadius: "10px",
                   border: "1px solid #E8DED3",
                   padding: "8px 10px",
-                  transition: "background-color 0.15s ease",
                 }}
               >
-                {/* Thumbnail */}
                 <Link
                   href={`/products/${item.id}`}
                   onClick={() => setIsOpen(false)}
@@ -269,7 +399,7 @@ export default function RecentlyViewedBar() {
                   }}
                 >
                   <Image
-                    src={item.image_url}
+                    src={resolveProductImage(item.image_url)}
                     alt={item.name}
                     fill
                     sizes="48px"
@@ -277,7 +407,6 @@ export default function RecentlyViewedBar() {
                   />
                 </Link>
 
-                {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ fontSize: "10px", color: "#866951", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
                     {item.category}
@@ -305,14 +434,13 @@ export default function RecentlyViewedBar() {
                       {formatINR(item.price)}
                     </span>
                     {item.mrp && item.mrp > item.price && (
-                      <span style={{ fontSize: "11px", color: "#8E7D70", textDecoration: "line-through" }}>
+                      <span style={{ fontSize: "11px", color: "#6A584B", textDecoration: "line-through" }}>
                         {formatINR(item.mrp)}
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Action Link */}
                 <Link
                   href={`/products/${item.id}`}
                   onClick={() => setIsOpen(false)}
@@ -329,13 +457,12 @@ export default function RecentlyViewedBar() {
                     flexShrink: 0,
                   }}
                 >
-                  View Drape
+                  View
                 </Link>
               </div>
             ))}
           </div>
 
-          {/* Footer bar */}
           <div
             style={{
               padding: "8px 14px",
@@ -354,7 +481,7 @@ export default function RecentlyViewedBar() {
                 textDecoration: "none",
               }}
             >
-              Explore Full Atelier Catalog →
+              Explore Full Catalog →
             </Link>
           </div>
         </div>

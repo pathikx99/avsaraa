@@ -95,7 +95,7 @@ const mockSampleOrder: Order = {
   payment_status: "Paid",
   payment_method: "Razorpay",
   notes: "Urgent wedding order. Gift packing requested.",
-  courier_partner: "Avsaraa Dedicated Surat Courier",
+  courier_partner: "Avsaraa Dedicated Express Courier",
   tracking_number: "BLUEDART-882910291",
   estimated_delivery: new Date(Date.now() + 86400000 * 3).toISOString(),
   created_at: new Date().toISOString(),
@@ -108,7 +108,7 @@ const mockSampleOrder: Order = {
     address_line1: "402 Royal Heritage Apartments",
     address_line2: "Opp. Iscon Temple, Ring Road",
     landmark: "Behind Lotus Mall",
-    city: "Surat",
+    city: "Ahmedabad",
     state: "Gujarat",
     postal_code: "395007",
     country: "India",
@@ -179,7 +179,7 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
       const adminHtml = generateAdminOrderAlertEmailHtml(mockSampleOrder);
       assert.match(adminHtml, /🚨 New Order Received: #AVS-20261115-TEST/);
       assert.match(adminHtml, /Packing Slip Items/);
-      assert.match(adminHtml, /Surat Local Atelier Hand-Delivery/);
+      assert.match(adminHtml, /Avsaraa Local Atelier Hand-Delivery/);
     });
 
     it("Generates compliant Inquiry Acknowledgement HTML with support@avsaraa.in", () => {

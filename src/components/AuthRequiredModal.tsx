@@ -1,16 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 
-import { HeartIcon } from "./Icons";
+import { HeartIcon, ShoppingBagIcon, CloseIcon } from "./Icons";
 import { resolveProductImage } from "@/lib/productUtils";
+import { useAccessibleDialog } from "@/hooks/useAccessibleDialog";
 
 export default function AuthRequiredModal() {
   const { isAuthModalOpen, closeAuthModal, pendingProduct, authModalReason } = useCart();
   const [imgError, setImgError] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useAccessibleDialog(isAuthModalOpen, closeAuthModal, dialogRef);
 
   if (!isAuthModalOpen) return null;
 
@@ -18,6 +22,9 @@ export default function AuthRequiredModal() {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={isWishlist ? "Sign In to Save Items" : "Sign In to Add to Bag"}
       style={{
         position: "fixed",
         top: 0,
@@ -36,6 +43,7 @@ export default function AuthRequiredModal() {
       onClick={closeAuthModal}
     >
       <div
+        ref={dialogRef}
         onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: "#FAF7F2",
@@ -47,26 +55,31 @@ export default function AuthRequiredModal() {
           boxShadow: "0 25px 60px rgba(0,0,0,0.3)",
           textAlign: "center",
           position: "relative",
-          animation: "scaleUp 0.25s ease",
+          animation: "fadeInUp 0.25s ease",
         }}
       >
         {/* Close Button */}
         <button
+          type="button"
           onClick={closeAuthModal}
           aria-label="Close dialog"
           style={{
             position: "absolute",
             top: "16px",
             right: "18px",
-            fontSize: "22px",
-            color: "#8E7D70",
+            width: "34px",
+            height: "34px",
+            borderRadius: "50%",
+            backgroundColor: "#F2EBE3",
+            border: "1px solid #E2D7CC",
+            color: "#261B13",
             cursor: "pointer",
-            background: "none",
-            border: "none",
-            padding: "4px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          ✕
+          <CloseIcon size={16} color="#261B13" />
         </button>
 
         {/* Icon & Badge */}
@@ -81,12 +94,11 @@ export default function AuthRequiredModal() {
             alignItems: "center",
             justifyContent: "center",
             margin: "0 auto 16px auto",
-            fontSize: "24px",
             color: "#866951",
             boxShadow: "0 6px 18px rgba(134,105,81,0.12)",
           }}
         >
-          {isWishlist ? <HeartIcon size={24} color="#866951" /> : "🛍️"}
+          {isWishlist ? <HeartIcon size={24} color="#866951" /> : <ShoppingBagIcon size={24} color="#866951" />}
         </div>
 
         <span

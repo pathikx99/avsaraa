@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { supabase } from "@/lib/supabaseClient";
 import { formatINR, resolveProductImage } from "@/lib/productUtils";
+import { parseCartItemDisplay } from "@/lib/cartUtils";
 import {
   ShoppingBagIcon,
   ShieldCheckIcon,
@@ -18,6 +19,8 @@ import {
   BackArrowIcon,
   WhatsAppIcon,
   MailIcon,
+  PhoneIcon,
+  ChevronDownIcon,
 } from "@/components/Icons";
 import { AddressSnapshot, PaymentMethod, Order, RazorpayFailureResponse } from "@/types/order";
 import type { User } from "@supabase/supabase-js";
@@ -119,6 +122,7 @@ export default function CheckoutPage() {
   const [orderNotes, setOrderNotes] = useState("");
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [mobileSummaryExpanded, setMobileSummaryExpanded] = useState(false);
 
   // Dual-Contact Verification State (WhatsApp OTP / Email verification)
   const [phoneProofToken, setPhoneProofToken] = useState<string | null>(null);
@@ -961,7 +965,7 @@ export default function CheckoutPage() {
           amount: createData.amount,
           currency: createData.currency || "INR",
           name: "AVSARAA",
-          description: `Order #${createData.order_number} · Surat Handloom Atelier`,
+          description: `Order #${createData.order_number} · Avsaraa Handloom Atelier`,
           image: "/favicon.ico",
           order_id: createData.razorpay_order_id,
           prefill: {
@@ -1192,7 +1196,7 @@ export default function CheckoutPage() {
         </div>
         <h1
           style={{
-            fontFamily: "var(--font-cinzel), serif",
+            fontFamily: "var(--font-serif), serif",
             fontSize: "28px",
             fontWeight: 500,
             marginBottom: "10px",
@@ -1287,14 +1291,14 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Page Title & Luxury Stepper */}
-        <div style={{ textAlign: "center", marginBottom: "36px" }}>
+        {/* Page Title & Luxury 3-Step Progress */}
+        <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <h1
             style={{
-              fontFamily: "var(--font-cinzel), serif",
-              fontSize: "32px",
+              fontFamily: "var(--font-serif), serif",
+              fontSize: "clamp(26px, 4vw, 34px)",
               fontWeight: 500,
-              letterSpacing: "0.06em",
+              letterSpacing: "0.04em",
               textTransform: "uppercase",
               margin: 0,
             }}
@@ -1304,19 +1308,97 @@ export default function CheckoutPage() {
           <p
             style={{
               color: "#866951",
-              fontSize: "13px",
-              letterSpacing: "0.08em",
+              fontSize: "12px",
+              letterSpacing: "0.1em",
               textTransform: "uppercase",
               marginTop: "6px",
+              marginBottom: "18px",
             }}
           >
             AVSARAA · Wear the moment
           </p>
+
+          <nav aria-label="Checkout progress" style={{ display: "inline-flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "center", padding: "8px 16px", backgroundColor: "#FFFFFF", border: "1px solid #E6DACF", borderRadius: "24px", fontSize: "11.5px", fontWeight: 600 }}>
+            <span style={{ color: hasValidAddress ? "#1E5E3A" : "#261B13" }}>
+              {hasValidAddress ? "✓ " : "1. "}Delivery
+            </span>
+            <span style={{ color: "#C4AB94" }}>→</span>
+            <span style={{ color: "#261B13" }}>2. Payment</span>
+            <span style={{ color: "#C4AB94" }}>→</span>
+            <span style={{ color: "#6A584B" }}>3. Verify &amp; Place Order</span>
+          </nav>
+        </div>
+
+        {/* Mobile Collapsible Order Summary Bar */}
+        <div className="checkout-mobile-summary-bar">
+          <div
+            style={{
+              backgroundColor: "#FFFFFF",
+              border: "1px solid #E6DACF",
+              borderRadius: "14px",
+              overflow: "hidden",
+              boxShadow: "0 4px 14px rgba(38,27,19,0.04)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setMobileSummaryExpanded((prev) => !prev)}
+              aria-expanded={mobileSummaryExpanded}
+              style={{
+                width: "100%",
+                padding: "14px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                backgroundColor: "#FAF7F2",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600, color: "#261B13" }}>
+                <ShoppingBagIcon size={16} color="#866951" />
+                <span>
+                  {mobileSummaryExpanded ? "Hide" : "Show"} Order Summary ({totalItems} {totalItems === 1 ? "item" : "items"})
+                </span>
+                <span style={{ transform: mobileSummaryExpanded ? "rotate(180deg)" : "none", transition: "transform 0.2s ease", display: "inline-flex" }}>
+                  <ChevronDownIcon size={14} color="#866951" />
+                </span>
+              </span>
+              <span style={{ fontSize: "15px", fontWeight: 700, color: "#261B13" }}>
+                {formatINR(financials.totalAmount)}
+              </span>
+            </button>
+
+            {mobileSummaryExpanded && (
+              <div style={{ padding: "12px 16px", borderTop: "1px solid #EAE0D5", display: "flex", flexDirection: "column", gap: "10px" }}>
+                {cartItems.map((item, idx) => {
+                  const parsed = parseCartItemDisplay(item.product);
+                  return (
+                    <div key={`mob-${item.product.id}-${idx}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", fontSize: "12.5px" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, color: "#261B13", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {parsed.title}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#6A584B" }}>
+                          Qty {item.quantity}
+                          {parsed.size ? ` · ${parsed.size}` : ""}
+                          {parsed.color ? ` · ${parsed.color}` : ""}
+                        </div>
+                      </div>
+                      <span style={{ fontWeight: 600, color: "#261B13", flexShrink: 0 }}>
+                        {formatINR(item.product.price * item.quantity)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Global Error Banner */}
         {errorMessage && (
           <div
+            role="alert"
             style={{
               backgroundColor: "rgba(180, 40, 40, 0.08)",
               border: "1px solid rgba(180, 40, 40, 0.25)",
@@ -1335,6 +1417,7 @@ export default function CheckoutPage() {
             <button
               type="button"
               onClick={() => setErrorMessage(null)}
+              aria-label="Dismiss error"
               style={{
                 background: "none",
                 border: "none",
@@ -1349,15 +1432,8 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {/* Checkout Grid: 2 Columns */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: "36px",
-            alignItems: "start",
-          }}
-        >
+        {/* Checkout Grid: 2 Responsive Columns */}
+        <div className="checkout-layout-grid">
           {/* LEFT COLUMN: Delivery Address & Payment Method */}
           <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
             {/* Guest Checkout Notice if unauthenticated */}
@@ -1436,10 +1512,10 @@ export default function CheckoutPage() {
                   </div>
                   <h2
                     style={{
-                      fontFamily: "var(--font-cinzel), serif",
-                      fontSize: "18px",
+                      fontFamily: "var(--font-serif), serif",
+                      fontSize: "19px",
                       fontWeight: 600,
-                      letterSpacing: "0.04em",
+                      letterSpacing: "0.03em",
                       margin: 0,
                     }}
                   >
@@ -1482,13 +1558,22 @@ export default function CheckoutPage() {
                 <>
                   {/* Saved Addresses List */}
                   {!isAddingNewAddress && addresses.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div role="radiogroup" aria-label="Saved Delivery Addresses" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                       {addresses.map((addr) => {
                         const isSelected = selectedAddressId === addr.id;
                         return (
                           <div
                             key={addr.id}
+                            role="radio"
+                            aria-checked={isSelected}
+                            tabIndex={0}
                             onClick={() => setSelectedAddressId(addr.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setSelectedAddressId(addr.id);
+                              }
+                            }}
                             style={{
                               border: isSelected
                                 ? "2px solid #261B13"
@@ -1576,9 +1661,13 @@ export default function CheckoutPage() {
                                 color: "#866951",
                                 margin: "4px 0 0",
                                 fontWeight: 500,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
                               }}
                             >
-                              📞 Phone: {addr.phone_number}
+                              <PhoneIcon size={13} color="#866951" />
+                              <span>{addr.phone_number}</span>
                             </p>
                           </div>
                         );
@@ -1618,7 +1707,7 @@ export default function CheckoutPage() {
                         )}
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <div className="checkout-form-row-2">
                         <div>
                           <label htmlFor="checkout_recipient_name" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
                             Recipient Name *
@@ -1714,7 +1803,7 @@ export default function CheckoutPage() {
                         />
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <div className="checkout-form-row-2">
                         <div>
                           <label style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
                             Street / Area
@@ -1756,7 +1845,7 @@ export default function CheckoutPage() {
                         </div>
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                      <div className="checkout-form-row-3">
                         <div>
                           <label style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
                             City *
@@ -1844,8 +1933,8 @@ export default function CheckoutPage() {
                         </p>
                       )}
 
-                      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginTop: "4px" }}>
-                        <div style={{ display: "flex", gap: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginTop: "4px" }}>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                           {["Home", "Work", "Studio", "Other"].map((type) => (
                             <button
                               key={type}
@@ -1939,10 +2028,10 @@ export default function CheckoutPage() {
                 </div>
                 <h2
                   style={{
-                    fontFamily: "var(--font-cinzel), serif",
-                    fontSize: "18px",
+                    fontFamily: "var(--font-serif), serif",
+                    fontSize: "19px",
                     fontWeight: 600,
-                    letterSpacing: "0.04em",
+                    letterSpacing: "0.03em",
                     margin: 0,
                   }}
                 >
@@ -1950,10 +2039,19 @@ export default function CheckoutPage() {
                 </h2>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div role="radiogroup" aria-label="Payment Method" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 {/* Option A: Razorpay (Cards, UPI, Wallets, NetBanking) */}
                 <div
+                  role="radio"
+                  aria-checked={paymentMethod === "Razorpay"}
+                  tabIndex={0}
                   onClick={() => setPaymentMethod("Razorpay")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setPaymentMethod("Razorpay");
+                    }
+                  }}
                   style={{
                     border:
                       paymentMethod === "Razorpay"
@@ -2010,7 +2108,16 @@ export default function CheckoutPage() {
 
                 {/* Option B: Cash on Delivery (COD) */}
                 <div
+                  role="radio"
+                  aria-checked={paymentMethod === "COD"}
+                  tabIndex={0}
                   onClick={() => setPaymentMethod("COD")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setPaymentMethod("COD");
+                    }
+                  }}
                   style={{
                     border:
                       paymentMethod === "COD"
@@ -2121,10 +2228,10 @@ export default function CheckoutPage() {
             >
               <h2
                 style={{
-                  fontFamily: "var(--font-cinzel), serif",
-                  fontSize: "18px",
+                  fontFamily: "var(--font-serif), serif",
+                  fontSize: "19px",
                   fontWeight: 600,
-                  letterSpacing: "0.04em",
+                  letterSpacing: "0.03em",
                   margin: "0 0 16px 0",
                   paddingBottom: "12px",
                   borderBottom: "1px solid rgba(38, 27, 19, 0.08)",
@@ -2145,61 +2252,78 @@ export default function CheckoutPage() {
                   marginBottom: "20px",
                 }}
               >
-                {cartItems.map((item, idx) => (
-                  <div
-                    key={`${item.product.id}-${idx}`}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      paddingBottom: "12px",
-                      borderBottom: "1px dashed rgba(38, 27, 19, 0.08)",
-                    }}
-                  >
+                {cartItems.map((item, idx) => {
+                  const parsed = parseCartItemDisplay(item.product);
+                  return (
                     <div
+                      key={`${item.product.id}-${idx}`}
                       style={{
-                        position: "relative",
-                        width: "56px",
-                        height: "70px",
-                        borderRadius: "8px",
-                        overflow: "hidden",
-                        flexShrink: 0,
-                        backgroundColor: "#EFECE6",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        paddingBottom: "12px",
+                        borderBottom: "1px dashed rgba(38, 27, 19, 0.08)",
                       }}
                     >
-                      <Image
-                        src={resolveProductImage(item.product.image_url)}
-                        alt={item.product.name}
-                        fill
-                        sizes="56px"
-                        style={{ objectFit: "cover" }}
-                      />
-                    </div>
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p
+                      <div
                         style={{
-                          fontSize: "13px",
-                          fontWeight: 500,
-                          margin: 0,
-                          color: "#261B13",
+                          position: "relative",
+                          width: "56px",
+                          height: "70px",
+                          borderRadius: "8px",
                           overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                          backgroundColor: "#EFECE6",
                         }}
                       >
-                        {item.product.name}
-                      </p>
-                      <p style={{ fontSize: "12px", color: "#866951", margin: "2px 0 0" }}>
-                        Qty: {item.quantity} · {formatINR(item.product.price)}
-                      </p>
-                    </div>
+                        <Image
+                          src={resolveProductImage(item.product.image_url)}
+                          alt={parsed.title}
+                          fill
+                          sizes="56px"
+                          style={{ objectFit: "cover" }}
+                        />
+                      </div>
 
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#261B13", flexShrink: 0 }}>
-                      {formatINR(item.product.price * item.quantity)}
-                    </span>
-                  </div>
-                ))}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            margin: 0,
+                            color: "#261B13",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {parsed.title}
+                        </p>
+                        {(parsed.size || parsed.color) && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "3px" }}>
+                            {parsed.size && (
+                              <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "4px", backgroundColor: "#FAF7F2", border: "1px solid #E2D7CC", color: "#543E2E", fontWeight: 600 }}>
+                                {parsed.size}
+                              </span>
+                            )}
+                            {parsed.color && (
+                              <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "4px", backgroundColor: "#FAF7F2", border: "1px solid #E2D7CC", color: "#543E2E", fontWeight: 600 }}>
+                                {parsed.color}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <p style={{ fontSize: "11.5px", color: "#6A584B", margin: "3px 0 0" }}>
+                          Qty: {item.quantity} · {formatINR(item.product.price)}
+                        </p>
+                      </div>
+
+                      <span style={{ fontSize: "13px", fontWeight: 600, color: "#261B13", flexShrink: 0 }}>
+                        {formatINR(item.product.price * item.quantity)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Promo Coupon Section */}
@@ -2337,16 +2461,16 @@ export default function CheckoutPage() {
                           fontSize: "10px",
                           padding: "1px 6px",
                           borderRadius: "8px",
-                          backgroundColor: "rgba(40, 167, 69, 0.12)",
-                          color: "#28a745",
+                          backgroundColor: "rgba(30, 94, 58, 0.12)",
+                          color: "#1E5E3A",
                           fontWeight: 600,
                         }}
                       >
-                        {isFreeDeliveryCoupon ? "FREE (Promo Applied)" : "FREE (Orders ≥ ₹500)"}
+                        {isFreeDeliveryCoupon ? "FREE (Promo Applied)" : "FREE (Orders ≥ ₹799)"}
                       </span>
                     )}
                   </div>
-                  <span style={{ fontWeight: 600, color: financials.shippingFee === 0 ? "#28a745" : "#261B13" }}>
+                  <span style={{ fontWeight: 600, color: financials.shippingFee === 0 ? "#1E5E3A" : "#261B13" }}>
                     {financials.shippingFee === 0 ? "₹0" : formatINR(financials.shippingFee)}
                   </span>
                 </div>
@@ -2424,9 +2548,13 @@ export default function CheckoutPage() {
                 )}
               </button>
 
-              {!hasValidAddress && (
+              {!hasValidAddress ? (
                 <p style={{ textAlign: "center", fontSize: "11px", color: "#866951", margin: "8px 0 0" }}>
                   * Please enter or select a delivery address above to confirm your order.
+                </p>
+              ) : (
+                <p style={{ textAlign: "center", fontSize: "11px", color: "#1E5E3A", margin: "8px 0 0", fontWeight: 500 }}>
+                  ✦ Quick WhatsApp &amp; Email OTP verification may appear to protect your delivery.
                 </p>
               )}
 
@@ -2456,14 +2584,14 @@ export default function CheckoutPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>
                   <DeliveryVanIcon size={16} color="#866951" />
                   <span>
-                    {subtotal >= 500
+                    {subtotal >= 799
                       ? "Complimentary Pan-India Insured Express Shipping"
-                      : "Insured Pan-India Express Shipping (Free ₹500+)"}
+                      : "Insured Pan-India Express Shipping (Free ₹799+)"}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>
                   <ReturnBoxIcon size={16} color="#866951" />
-                  <span>7-Day Hassle-Free Heritage Exchange Guarantee</span>
+                  <span>7-Day Return &amp; Exchange Guarantee</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>
                   <ShieldCheckIcon size={16} color="#866951" />
@@ -2478,6 +2606,9 @@ export default function CheckoutPage() {
       {/* Mandatory Dual-Contact Verification Modal (WhatsApp Phone + Email OTP) */}
       {isOtpModalOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Verify WhatsApp and Email before completing order"
           style={{
             position: "fixed",
             inset: 0,

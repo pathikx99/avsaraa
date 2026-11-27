@@ -104,7 +104,7 @@ export function generateCustomerTaxInvoiceEmailHtml(order: Order): string {
     <tr>
       <td style="background-color: #261B13; padding: 32px 36px 28px; text-align: center;">
         <h1 style="color: #FAF7F2; font-size: 26px; letter-spacing: 0.18em; margin: 0; font-weight: 300; text-transform: uppercase;">AVSARAA</h1>
-        <p style="color: #D4BEAA; font-size: 11px; letter-spacing: 0.22em; margin: 6px 0 0 0; text-transform: uppercase;">Surat Handloom Atelier · Wear The Moment</p>
+        <p style="color: #D4BEAA; font-size: 11px; letter-spacing: 0.22em; margin: 6px 0 0 0; text-transform: uppercase;">Handloom Atelier · Wear The Moment</p>
       </td>
     </tr>
 
@@ -116,7 +116,7 @@ export function generateCustomerTaxInvoiceEmailHtml(order: Order): string {
             <td valign="top" style="width: 55%; font-size: 12px; line-height: 1.6; color: #55504A;">
               <strong style="font-size: 13px; color: #261B13; text-transform: uppercase; letter-spacing: 0.05em;">Seller & Registered Atelier</strong><br />
               <strong>AVSARAA LOOMS & ATELIER PVT. LTD.</strong><br />
-              Ring Road Textile Hub, Surat, Gujarat — 395002<br />
+              Gujarat — 395002, India<br />
               <strong>GSTIN:</strong> <span style="color: #261B13; font-weight: 600;">24AAACA0000A1Z5</span><br />
               <strong>State:</strong> Gujarat (State Code: 24)<br />
               <strong>CIN / MSME:</strong> GJ-24-TEXT-2026-00918
@@ -251,8 +251,8 @@ export function generateCustomerTaxInvoiceEmailHtml(order: Order): string {
         <table width="100%" border="0" cellspacing="0" cellpadding="0">
           <tr>
             <td style="font-size: 11px; color: #866951; line-height: 1.5;">
-              ✓ Handcrafted in Surat with certified silk mark authenticity.<br />
-              ✓ 7-Day Hassle-Free Exchange guarantee.<br />
+              ✓ Handcrafted in India with certified silk mark authenticity.<br />
+              ✓ 7-Day Return &amp; Exchange guarantee.<br />
               <em>Computer-generated tax invoice issued in accordance with Rule 46 of CGST Rules, 2017.</em>
             </td>
             <td style="text-align: right;">
@@ -311,7 +311,7 @@ export function generateAdminOrderAlertEmailHtml(order: Order): string {
   const isGuest = Boolean(order.shipping_address_snapshot.is_guest);
 
   const courierAdvice = safePin.startsWith("395")
-    ? "Surat Local Atelier Hand-Delivery"
+    ? "Avsaraa Local Atelier Hand-Delivery"
     : "Blue Dart Express Gujarat";
 
   const itemsList = (order.order_items || [])

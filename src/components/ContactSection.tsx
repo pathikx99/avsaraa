@@ -225,11 +225,10 @@ export default function ContactSection({ showHeader = true }: ContactSectionProp
                   marginBottom: "14px",
                 }}
               >
-                Surat Studio & Online Store
+                Online Store &amp; Artisan Atelier
               </h3>
               <p style={{ fontSize: "14px", color: "#543E2E", lineHeight: 1.7, marginBottom: "28px" }}>
-                Avsaraa Studio<br />
-                Ring Road Textile Hub, Surat<br />
+                Avsaraa Atelier<br />
                 Gujarat - 395002, India<br />
                 <span style={{ color: "#866951", fontSize: "12.5px", fontWeight: 600 }}>✦ Online Orders Delivered Across India</span>
               </p>

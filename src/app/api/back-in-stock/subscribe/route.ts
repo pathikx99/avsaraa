@@ -115,7 +115,7 @@ export async function POST(request: Request) {
           <p>Thank you for subscribing to restock alerts for <strong>${safeProductName}</strong>.</p>
           <p>${safeVariant ? `Variant: <strong>${safeVariant}</strong><br/>` : ""}${safeSize ? `Size: <strong>${safeSize}</strong><br/>` : ""}</p>
           <p>We'll notify you at ${safeEmail} as soon as it's back in stock.</p>
-          <p style="color:#6E5B4E;font-size:12px;">- The AVSARAA Concierge, Surat</p>
+          <p style="color:#6E5B4E;font-size:12px;">- The AVSARAA Concierge, India</p>
         </div>
       `,
     }).catch(() => {});

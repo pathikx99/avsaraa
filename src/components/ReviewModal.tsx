@@ -226,7 +226,7 @@ export default function ReviewModal({
                 type="text"
                 value={customerCity}
                 onChange={(e) => setCustomerCity(e.target.value)}
-                placeholder="e.g. Mumbai, Surat, London"
+                placeholder="e.g. Mumbai, Ahmedabad, London"
                 style={{
                   width: "100%",
                   padding: "10px 12px",

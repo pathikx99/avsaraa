@@ -25,7 +25,7 @@ export default function PriceEdit() {
               <div className="price-edit-image-col">
                 <div className="price-edit-image-window">
                   <Image
-                    src="https://images.unsplash.com/photo-1768651925875-d1523ed07cb6?auto=format&fit=crop&w=1000&q=85"
+                    src="/images/occasion_everyday.jpg"
                     alt="The ₹1,299 Edit - Handcrafted Daily Wear"
                     fill
                     sizes="(max-width: 767px) 94vw, 48vw"

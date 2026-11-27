@@ -81,6 +81,7 @@ export default function Footer() {
     <footer style={{ backgroundColor: "#F7F2EE", borderTop: "1px solid #E6DACF", marginTop: "auto" }}>
       {/* 1. Newsletter Section */}
       <div
+        className="footer-newsletter-section"
         style={{
           position: "relative",
           backgroundColor: "#F2EBE3",
@@ -91,6 +92,7 @@ export default function Footer() {
       >
         {/* Background botanical illustration */}
         <div
+          className="footer-newsletter-botanical"
           style={{
             position: "absolute",
             right: "-40px",
@@ -203,7 +205,7 @@ export default function Footer() {
       </div>
 
       {/* 2. Main Footer Directory */}
-      <div style={{ maxWidth: "1140px", margin: "0 auto", padding: "56px 24px 36px 24px" }}>
+      <div className="footer-main-container" style={{ maxWidth: "1140px", margin: "0 auto", padding: "56px 24px 36px 24px" }}>
         <div
           className="footer-links-grid"
           style={{
@@ -214,7 +216,7 @@ export default function Footer() {
           }}
         >
           {/* Brand Column */}
-          <div style={{ maxWidth: "300px" }}>
+          <div className="footer-brand-col" style={{ maxWidth: "300px" }}>
             <AvsaraaLogo size="md" width={160} />
             <p style={{ marginTop: "14px", fontSize: "13.5px", lineHeight: 1.6, color: "#6E5B4E" }}>
               Thoughtfully designed ethnic and festive wear for every special moment.
@@ -278,7 +280,7 @@ export default function Footer() {
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px", fontSize: "13.5px", color: "#4A3525" }}>
               <li><Link href="/about">Our Story</Link></li>
               <li><Link href="/about">Handmade Silks</Link></li>
-              <li><Link href="/contact">Surat Studio & Online Store</Link></li>
+              <li><Link href="/contact">Online Store &amp; Atelier</Link></li>
             </ul>
           </div>
 
@@ -318,6 +320,7 @@ export default function Footer() {
 
         {/* 3. Four Value Pillars with Bespoke SVG Icons */}
         <div
+          className="footer-trust-strip"
           style={{
             borderTop: "1px solid #E6DACF",
             borderBottom: "1px solid #E6DACF",
@@ -334,8 +337,8 @@ export default function Footer() {
                 <DeliveryVanIcon size={20} color="#866951" />
               </div>
             </div>
-            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Free Shipping ₹500+</h4>
-            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Complimentary delivery above ₹500</p>
+            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Free Shipping ₹799+</h4>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Complimentary delivery above ₹799</p>
           </div>
 
           <div>
@@ -344,8 +347,8 @@ export default function Footer() {
                 <ReturnBoxIcon size={20} color="#866951" />
               </div>
             </div>
-            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Easy Returns</h4>
-            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>7-day easy returns</p>
+            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>7-Day Return &amp; Exchange</h4>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Hassle-free 7-day returns &amp; exchanges</p>
           </div>
 
           <div>

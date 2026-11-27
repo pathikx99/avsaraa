@@ -13,8 +13,8 @@ const BENEFITS = [
         <circle cx="18.5" cy="18.5" r="2.5" />
       </svg>
     ),
-    title: "Free Shipping ₹500+",
-    subtitle: "Complimentary priority Pan-India delivery on orders ₹500+.",
+    title: "Free Shipping ₹799+",
+    subtitle: "Complimentary priority Pan-India delivery on orders above ₹799.",
   },
   {
     icon: (
@@ -34,19 +34,8 @@ const BENEFITS = [
         <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
       </svg>
     ),
-    title: "Easy 7-Day Returns",
-    subtitle: "Hassle-free doorstep exchange and returns guarantee for complete peace of mind.",
-  },
-  {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-        <line x1="12" y1="22.08" x2="12" y2="12" />
-      </svg>
-    ),
-    title: "Archival Keepsake Box",
-    subtitle: "Hand-wrapped in luxury tissue, rigid keepsake box, and aromatic cedar sachet.",
+    title: "7-Day Return & Exchange",
+    subtitle: "Hassle-free doorstep returns and exchanges within 7 days for complete peace of mind.",
   },
 ];
 
@@ -54,6 +43,7 @@ export default function ShoppingBenefits() {
   return (
     <section
       id="shopping-benefits"
+      className="home-benefits-section"
       style={{
         backgroundColor: "#F7F2EB",
         borderTop: "1px solid rgba(197, 160, 89, 0.25)",
@@ -62,17 +52,11 @@ export default function ShoppingBenefits() {
       }}
     >
       <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
-            gap: "20px",
-          }}
-        >
+        <div className="benefits-responsive-grid">
           {BENEFITS.map((item, idx) => (
             <RevealSection key={item.title} delay={idx * 60}>
               <div
-                className="luxury-hover-card"
+                className="luxury-hover-card benefit-card-item"
                 style={{
                   display: "flex",
                   alignItems: "flex-start",
@@ -87,6 +71,7 @@ export default function ShoppingBenefits() {
                 }}
               >
                 <div
+                  className="benefit-card-icon"
                   style={{
                     width: "44px",
                     height: "44px",
@@ -106,6 +91,7 @@ export default function ShoppingBenefits() {
 
                 <div>
                   <h3
+                    className="benefit-card-title"
                     style={{
                       fontFamily: "var(--font-serif), Georgia, serif",
                       fontSize: "17px",
@@ -118,6 +104,7 @@ export default function ShoppingBenefits() {
                     {item.title}
                   </h3>
                   <p
+                    className="benefit-card-desc"
                     style={{
                       fontSize: "12.5px",
                       color: "#6E5B4E",

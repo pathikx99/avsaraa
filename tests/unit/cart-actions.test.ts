@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { getCartItemKey, isCartItemMatch, normalizeCartKey, type CartItem } from "../../src/lib/cartUtils.ts";
+import { getCartItemKey, isCartItemMatch, normalizeCartKey, parseCartItemDisplay, type CartItem } from "../../src/lib/cartUtils.ts";
 import type { Product } from "../../src/types/product.ts";
 
 describe("Cart Actions, Matching & Drawer Operations Unit Tests", () => {
@@ -216,6 +216,32 @@ describe("Cart Actions, Matching & Drawer Operations Unit Tests", () => {
       updateQty(getCartItemKey(mockProduct1), 0, 0);
       assert.equal(items.length, 1);
       assert.equal(items[0].product.id, "prod-202");
+    });
+  });
+
+  describe("4. Cart Variant Display Parser", () => {
+    it("extracts title, size, and color from composite product names", () => {
+      const parsed = parseCartItemDisplay(variantRed.product);
+      assert.equal(parsed.title, "Crimson Banarasi Silk Saree");
+      assert.equal(parsed.size, "Free Size");
+      assert.equal(parsed.color, "Crimson Red");
+      assert.equal(parsed.isPreOrder, false);
+    });
+
+    it("handles pre-order items and plain titles without delimiters", () => {
+      const preOrderParsed = parseCartItemDisplay({
+        ...mockProduct1,
+        name: "Katan Silk · Pre-Order · M · Emerald",
+      });
+      assert.equal(preOrderParsed.title, "Katan Silk");
+      assert.equal(preOrderParsed.isPreOrder, true);
+      assert.equal(preOrderParsed.size, "M");
+      assert.equal(preOrderParsed.color, "Emerald");
+
+      const plainParsed = parseCartItemDisplay(mockProduct1);
+      assert.equal(plainParsed.title, "Crimson Banarasi Silk Saree");
+      assert.equal(plainParsed.size, null);
+      assert.equal(plainParsed.color, null);
     });
   });
 });

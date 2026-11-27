@@ -115,7 +115,7 @@ describe(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: process.env.ADMIN_EMAIL || "web.avsaraa@gmail.com",
-          password: process.env.ADMIN_PASSWORD || "V@123456",
+          password: process.env.ADMIN_PASSWORD || "V@12345678",
         }),
       });
       assert.equal(res.status, 200);

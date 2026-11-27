@@ -10,7 +10,7 @@ describe("Tracking & Payment Hardening Security Tests", () => {
       orderNumber: "AVS-20261119-TEST",
       status: "Dispatched",
       createdAt: new Date().toISOString(),
-      city: "Surat",
+      city: "Ahmedabad",
       postalCode: "395007",
       courierPartner: "Blue Dart Express Gujarat",
     });
@@ -26,7 +26,7 @@ describe("Tracking & Payment Hardening Security Tests", () => {
     // Oldest scan at bottom should be order confirmed
     const initialScan = milestones[milestones.length - 1];
     assert.strictEqual(initialScan.status, "Confirmed");
-    assert.ok(initialScan.location.includes("Surat"));
+    assert.ok(initialScan.location.includes("Gujarat"));
   });
 
   test("Delivered order lifecycle completes all 5 logistics checkpoints", () => {

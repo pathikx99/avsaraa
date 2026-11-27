@@ -237,7 +237,7 @@ export default function ReturnsPolicyPage() {
           <div style={{ padding: "18px 22px", backgroundColor: "#FAF7F2", border: "1px solid #E6DACF", borderRadius: "10px", fontSize: "14px", color: "#261B13", lineHeight: 1.8 }}>
             <strong>AVSARAA</strong><br />
             Email: <a href="mailto:info.avsaraa@gmail.com" style={{ color: "#866951", fontWeight: 600 }}>info.avsaraa@gmail.com</a><br />
-            Location: Surat, Gujarat, India
+            Location: Gujarat, India
           </div>
         </section>
       </div>

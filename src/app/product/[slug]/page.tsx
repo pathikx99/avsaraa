@@ -52,7 +52,7 @@ export default async function ProductSlugPage({ params }: PageProps) {
     "@type": "Product",
     name: product.name,
     image: product.image_url,
-    description: product.description || "Handcrafted Indian sarees and festive wear from Surat.",
+    description: product.description || "Handcrafted Indian sarees and festive wear from our artisan atelier.",
     brand: {
       "@type": "Brand",
       name: "AVSARAA",

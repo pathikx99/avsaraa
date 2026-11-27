@@ -1,34 +1,49 @@
 "use client";
 
-import React, { useState, useEffect, useRef, Suspense } from "react";
+import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import AvsaraaLogo from "./AvsaraaLogo";
 import NavigationDrawer from "./NavigationDrawer";
 import { supabase } from "@/lib/supabaseClient";
-import { UserIcon, ShoppingBagIcon, HeartIcon, SearchIcon, CloseIcon } from "./Icons";
+import {
+  UserIcon,
+  ShoppingBagIcon,
+  HeartIcon,
+  SearchIcon,
+  CloseIcon,
+  BackArrowIcon,
+} from "./Icons";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { useScrolled } from "./RevealSection";
+import { fetchCatalog } from "@/lib/useProductsCatalog";
+import { formatINR, resolveProductImage } from "@/lib/productUtils";
+import type { Product } from "@/types/product";
 import type { User } from "@supabase/supabase-js";
 
 const ANNOUNCEMENTS = [
-  "FREE PAN-INDIA SHIPPING ON ORDERS ₹500+",
+  "FREE PAN-INDIA SHIPPING ON ORDERS ₹799+",
   "100% PURE HANDLOOM SILK & WEAVES",
   "COMPLIMENTARY FALL & PICO PRE-STITCHED",
-  "HANDCRAFTED IN SURAT • INSURED PAN-INDIA DELIVERY",
+  "HANDCRAFTED IN INDIA • INSURED PAN-INDIA DELIVERY",
 ];
 
 const QUICK_SEARCH_TERMS = [
   "Banarasi Silk",
-  "Tissue Organza",
-  "Heritage Anarkali",
-  "Pure Chanderi",
-  "Bridal Drape",
-  "Zari Weaves",
+  "Organza",
+  "Chanderi",
+  "Sarees",
+  "Dresses",
+  "Everyday",
 ];
 
-function HeaderInner() {
+interface HeaderProps {
+  showBackOnMobile?: boolean;
+}
+
+function HeaderInner({ showBackOnMobile = false }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -38,8 +53,11 @@ function HeaderInner() {
   const { totalWishlist } = useWishlist();
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchOpenPath, setSearchOpenPath] = useState<string | null>(null);
+  const isSearchOpen = searchOpenPath === pathname;
+  const setIsSearchOpen = (open: boolean) => setSearchOpenPath(open ? pathname : null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [catalogCache, setCatalogCache] = useState<Product[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,6 +71,7 @@ function HeaderInner() {
     currentCategory?.toLowerCase().includes("under");
   const isProductsActive =
     (pathname.startsWith("/products") || pathname.startsWith("/collection")) &&
+    pathname === "/products" &&
     (!currentCategory || currentCategory === "ALL") &&
     !isUnder1299Active;
   const isSareesActive =
@@ -83,25 +102,39 @@ function HeaderInner() {
 
   useEffect(() => {
     if (!isSearchOpen) return;
+
+    if (catalogCache.length === 0) {
+      fetchCatalog()
+        .then((prods) => setCatalogCache(prods || []))
+        .catch(() => {});
+    }
+
     if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setIsSearchOpen(false);
+        setSearchOpenPath(null);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSearchOpen]);
+  }, [isSearchOpen, catalogCache.length]);
 
-  const [prevPathname, setPrevPathname] = useState(pathname);
-  if (prevPathname !== pathname) {
-    setPrevPathname(pathname);
-    if (isSearchOpen) {
-      setIsSearchOpen(false);
-    }
-  }
+  const instantMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q || catalogCache.length === 0) return [];
+    return catalogCache
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q) ||
+          p.fabric?.toLowerCase().includes(q) ||
+          p.description?.toLowerCase().includes(q)
+      )
+      .slice(0, 4);
+  }, [searchQuery, catalogCache]);
 
   const handleSignOut = async () => {
     try {
@@ -150,6 +183,7 @@ function HeaderInner() {
       {/* 1. Dark Espresso Announcement Bar with Chevrons */}
       <div className="announcement-bar-espresso">
         <button
+          type="button"
           onClick={handlePrevAnnouncement}
           aria-label="Previous announcement"
           className="announcement-chevron-btn"
@@ -159,13 +193,14 @@ function HeaderInner() {
           </svg>
         </button>
 
-        <div className="announcement-text-slider">
-          <span style={{ color: "#ECC880", marginRight: "6px", fontSize: "9px" }}>✦</span>
+        <div className="announcement-text-slider" aria-live="polite">
+          <span style={{ color: "#ECC880", marginRight: "6px", fontSize: "9px" }} aria-hidden="true">✦</span>
           <span>{ANNOUNCEMENTS[announcementIdx]}</span>
-          <span style={{ color: "#ECC880", marginLeft: "6px", fontSize: "9px" }}>✦</span>
+          <span style={{ color: "#ECC880", marginLeft: "6px", fontSize: "9px" }} aria-hidden="true">✦</span>
         </div>
 
         <button
+          type="button"
           onClick={handleNextAnnouncement}
           aria-label="Next announcement"
           className="announcement-chevron-btn"
@@ -179,9 +214,21 @@ function HeaderInner() {
       {/* 2. Main Navigation Bar */}
       <header className={`avsaraa-main-header ${scrolled ? "header-scrolled" : ""}`}>
         <div className="header-inner-grid">
-          {/* Left: Hamburger Menu (Mobile) & Desktop Navigation Links */}
-          <div className="header-col-left">
+          {/* Left: Mobile Back/Hamburger & Desktop Navigation Links */}
+          <div className="header-col-left" style={{ gap: "4px" }}>
+            {showBackOnMobile && (
+              <button
+                type="button"
+                onClick={() => router.back()}
+                aria-label="Go back"
+                className="mobile-only header-icon-btn"
+              >
+                <BackArrowIcon size={19} color="#261B13" />
+              </button>
+            )}
+
             <button
+              type="button"
               onClick={() => setIsDrawerOpen(true)}
               aria-label="Open navigation menu"
               className="mobile-only header-hamburger-btn"
@@ -192,7 +239,7 @@ function HeaderInner() {
             </button>
 
             {/* Desktop Only: Nav Links */}
-            <nav className="desktop-only desktop-nav-links">
+            <nav className="desktop-only desktop-nav-links" aria-label="Primary Navigation">
               <Link href="/" className={`luxury-nav-link ${isHomeActive ? "active" : ""}`}>
                 Home
               </Link>
@@ -227,24 +274,23 @@ function HeaderInner() {
 
           {/* Right: Search, Wishlist, Cart Bag, Account */}
           <div className="header-col-right">
-            {/* Search Button */}
             <button
               type="button"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              aria-label="Search collection"
+              aria-label={isSearchOpen ? "Close search" : "Search collection"}
+              aria-expanded={isSearchOpen}
               className="header-icon-btn"
             >
               <SearchIcon size={20} color="#261B13" />
             </button>
 
-            {/* Wishlist Icon */}
             <Link
               href="/wishlist"
               aria-label={`Saved pieces: ${totalWishlist}`}
               className="header-icon-btn"
-              style={{ color: totalWishlist > 0 ? "#B83A4B" : "#261B13" }}
+              style={{ color: totalWishlist > 0 ? "#8A181A" : "#261B13" }}
             >
-              <HeartIcon size={20} color={totalWishlist > 0 ? "#B83A4B" : "#261B13"} />
+              <HeartIcon size={20} color={totalWishlist > 0 ? "#8A181A" : "#261B13"} />
               {totalWishlist > 0 && (
                 <span className="header-wishlist-badge">
                   {totalWishlist}
@@ -252,7 +298,6 @@ function HeaderInner() {
               )}
             </Link>
 
-            {/* Shopping Bag Button with dark circular badge showing count */}
             <button
               type="button"
               onClick={openCart}
@@ -276,10 +321,7 @@ function HeaderInner() {
                   <UserIcon size={19} color="#261B13" />
                 </Link>
               ) : (
-                <Link
-                  href="/login"
-                  className="header-signin-btn"
-                >
+                <Link href="/login" className="header-signin-btn">
                   Sign In
                 </Link>
               )}
@@ -287,7 +329,7 @@ function HeaderInner() {
           </div>
         </div>
 
-        {/* 4. Luxury Quick Search Slide-Down Bar */}
+        {/* 4. Luxury Quick Search Slide-Down Bar with Instant Results */}
         {isSearchOpen && (
           <div
             style={{
@@ -337,9 +379,10 @@ function HeaderInner() {
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  style={{ color: "#8E7D70", padding: "4px" }}
+                  aria-label="Clear search query"
+                  style={{ color: "#6A584B", padding: "4px" }}
                 >
-                  <CloseIcon size={14} color="#8E7D70" />
+                  <CloseIcon size={14} color="#6A584B" />
                 </button>
               )}
               <button
@@ -364,14 +407,82 @@ function HeaderInner() {
                 onClick={() => setIsSearchOpen(false)}
                 aria-label="Close search"
                 style={{
-                  color: "#8E7D70",
+                  color: "#6A584B",
                   padding: "4px",
                   cursor: "pointer",
                 }}
               >
-                ✕
+                <CloseIcon size={15} color="#6A584B" />
               </button>
             </form>
+
+            {/* Instant Search Match Preview */}
+            {instantMatches.length > 0 && (
+              <div
+                style={{
+                  maxWidth: "720px",
+                  margin: "12px auto 0 auto",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: "10px",
+                }}
+              >
+                {instantMatches.map((prod) => (
+                  <Link
+                    key={prod.id}
+                    href={`/products/${prod.id}`}
+                    onClick={() => setIsSearchOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "8px",
+                      borderRadius: "12px",
+                      backgroundColor: "#FFFFFF",
+                      border: "1px solid #E6DACF",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "relative",
+                        width: "44px",
+                        height: "54px",
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                        flexShrink: 0,
+                        backgroundColor: "#F2EBE3",
+                      }}
+                    >
+                      <Image
+                        src={resolveProductImage(prod.image_url)}
+                        alt={prod.name}
+                        fill
+                        sizes="44px"
+                        style={{ objectFit: "cover" }}
+                      />
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: "12.5px",
+                          fontWeight: 600,
+                          color: "#261B13",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {prod.name}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#6A584B" }}>
+                        {prod.category} · <strong style={{ color: "#261B13" }}>{formatINR(prod.price)}</strong>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
 
             {/* Quick Trend Chips */}
             <div
@@ -385,7 +496,7 @@ function HeaderInner() {
                 gap: "8px",
               }}
             >
-              <span style={{ fontSize: "11px", color: "#8E7D70", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <span style={{ fontSize: "11px", color: "#6A584B", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 Trending:
               </span>
               {QUICK_SEARCH_TERMS.map((term) => (
@@ -395,21 +506,13 @@ function HeaderInner() {
                   onClick={() => handleQuickTagClick(term)}
                   style={{
                     fontSize: "11px",
-                    color: "#6E523D",
+                    color: "#543E2E",
                     backgroundColor: "#FAF7F2",
                     border: "1px solid #E6DACF",
                     borderRadius: "14px",
-                    padding: "3px 10px",
+                    padding: "4px 10px",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "#C5A059";
-                    e.currentTarget.style.color = "#261B13";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "#E6DACF";
-                    e.currentTarget.style.color = "#6E523D";
                   }}
                 >
                   ✦ {term}
@@ -431,11 +534,10 @@ function HeaderInner() {
   );
 }
 
-export default function Header() {
+export default function Header({ showBackOnMobile = false }: HeaderProps) {
   return (
     <Suspense fallback={<div style={{ height: "80px", backgroundColor: "#FAF7F2" }} />}>
-      <HeaderInner />
+      <HeaderInner showBackOnMobile={showBackOnMobile} />
     </Suspense>
   );
 }
-
