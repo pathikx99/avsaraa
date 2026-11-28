@@ -67,9 +67,21 @@ export async function POST(
       );
     }
 
+    if (!isAdmin && order.payment_status === "Paid") {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Prepaid orders cannot be cancelled for a refund (Exchanges only, no refunds). Please contact support for an exchange or store credit.",
+        },
+        { status: 400 }
+      );
+    }
+
     const nowIso = new Date().toISOString();
-    const cancelNote = `\n[Cancelled on ${new Date().toLocaleDateString("en-IN")}] Reason: ${reason || "Customer requested cancellation"}`;
-    const nextPaymentStatus = order.payment_status === "Paid" ? "Refunded" : order.payment_status;
+    const policyTag = order.payment_status === "Paid" ? " [Store Credit / Exchange Only — No Refunds]" : "";
+    const cancelNote = `\n[Cancelled on ${new Date().toLocaleDateString("en-IN")}]${policyTag} Reason: ${reason || "Customer requested cancellation"}`;
+    const nextPaymentStatus = order.payment_status;
     const existingHistory = Array.isArray((order as { edit_history?: unknown[] }).edit_history)
       ? ((order as { edit_history?: unknown[] }).edit_history as unknown[])
       : [];

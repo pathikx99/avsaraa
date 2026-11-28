@@ -24,7 +24,7 @@ import type { Product } from "@/types/product";
 import type { User } from "@supabase/supabase-js";
 
 const ANNOUNCEMENTS = [
-  "FREE PAN-INDIA SHIPPING ON ORDERS ₹799+",
+  "APPLY CODE FREESHIP IN YOUR BAG FOR FREE PAN-INDIA SHIPPING",
   "100% PURE HANDLOOM SILK & WEAVES",
   "COMPLIMENTARY FALL & PICO PRE-STITCHED",
   "HANDCRAFTED IN INDIA • INSURED PAN-INDIA DELIVERY",
@@ -86,9 +86,12 @@ function HeaderInner({ showBackOnMobile = false }: HeaderProps) {
   const isStoryActive = pathname === "/about";
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
+    const syncUser = () => {
+      supabase.auth.getUser().then(({ data }) => {
+        setUser(data.user ?? null);
+      });
+    };
+    syncUser();
 
     const {
       data: { subscription },
@@ -96,8 +99,13 @@ function HeaderInner({ showBackOnMobile = false }: HeaderProps) {
       setUser(session?.user ?? null);
     });
 
+    window.addEventListener("avsaraa-auth-changed", syncUser);
+    window.addEventListener("focus", syncUser);
+
     return () => {
       subscription.unsubscribe();
+      window.removeEventListener("avsaraa-auth-changed", syncUser);
+      window.removeEventListener("focus", syncUser);
     };
   }, []);
 
@@ -311,20 +319,45 @@ function HeaderInner({ showBackOnMobile = false }: HeaderProps) {
               </span>
             </button>
 
-            {/* Desktop Only: User Account / Sign In */}
-            <div className="desktop-only" style={{ marginLeft: "4px" }}>
+            {/* User Account / Sign In (Responsive for both mobile & desktop) */}
+            <div style={{ marginLeft: "2px", display: "flex", alignItems: "center" }}>
               {user ? (
                 <Link
                   href="/account"
-                  aria-label="My Account"
+                  aria-label="My Profile & Account"
+                  title="My Profile & Account"
                   className="header-icon-btn"
+                  style={{ position: "relative" }}
                 >
                   <UserIcon size={19} color="#261B13" />
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      top: "4px",
+                      right: "4px",
+                      width: "7px",
+                      height: "7px",
+                      borderRadius: "50%",
+                      backgroundColor: "#1E5E3A",
+                      border: "1.5px solid #FAF7F2",
+                    }}
+                  />
                 </Link>
               ) : (
-                <Link href="/login" className="header-signin-btn">
-                  Sign In
-                </Link>
+                <>
+                  <Link href="/login" className="desktop-only header-signin-btn">
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/login"
+                    aria-label="Sign In"
+                    title="Sign In"
+                    className="mobile-only header-icon-btn"
+                  >
+                    <UserIcon size={19} color="#6E5B4E" />
+                  </Link>
+                </>
               )}
             </div>
           </div>

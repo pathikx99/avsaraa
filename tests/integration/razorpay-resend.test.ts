@@ -422,7 +422,7 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
     it("POST /api/razorpay/verify rejects missing order_id or mismatched razorpay_order_id with 400", async () => {
       const secret = process.env.RAZORPAY_KEY_SECRET || "avsaraa_test_razorpay_secret_key_2026";
       const swappedRzpOrderId = "order_swapped_mismatch_999";
-      const razorpay_payment_id = "pay_test_swapped_111";
+      const razorpay_payment_id = "pay_integ_swapped_111";
       const sigForSwapped = crypto
         .createHmac("sha256", secret)
         .update(`${swappedRzpOrderId}|${razorpay_payment_id}`)
@@ -459,7 +459,7 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
     it("POST /api/razorpay/verify verifies bound order signature using timingSafeMatch", async () => {
       const secret = process.env.RAZORPAY_KEY_SECRET || "avsaraa_test_razorpay_secret_key_2026";
       const razorpay_order_id = createdRazorpayOrderId;
-      const razorpay_payment_id = `pay_test_${Date.now()}`;
+      const razorpay_payment_id = `pay_integ_${Date.now()}`;
       const validSignature = crypto
         .createHmac("sha256", secret)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -487,8 +487,8 @@ describe("Razorpay & Resend Transactional Integration Suite", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          razorpay_order_id: "order_test_999",
-          razorpay_payment_id: "pay_test_999",
+          razorpay_order_id: "order_integ_999",
+          razorpay_payment_id: "pay_integ_999",
           razorpay_signature: "forged_malicious_signature_hex",
         }),
       });

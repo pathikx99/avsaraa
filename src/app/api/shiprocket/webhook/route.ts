@@ -181,6 +181,15 @@ export async function POST(request: Request) {
 
           const { data: updatedOrder } = await updateQuery.select("id").maybeSingle();
 
+          // Sync COD/payment settlement row on Delivered webhook
+          if (updatedOrder && mappedStatus === "Delivered") {
+            await adminClient
+              .from("payments")
+              .update({ status: "Paid" })
+              .eq("order_id", existingOrder.id)
+              .neq("status", "Paid");
+          }
+
           // Atomically restore inventory only if this webhook transitioned order -> Cancelled
           if (updatedOrder && mappedStatus === "Cancelled") {
             const { data: items } = await adminClient

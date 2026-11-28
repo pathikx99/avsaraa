@@ -155,7 +155,7 @@ export async function POST(request: Request) {
         insertError.message?.toLowerCase().includes("constraint"))
     ) {
       insertPayload.discount_type = "fixed";
-      insertPayload.discount_value = 50; // standard delivery amount fallback
+      insertPayload.discount_value = 250; // standard delivery amount fallback
       const fallbackRetry = await supabaseAdmin
         .from("coupons")
         .insert(insertPayload)

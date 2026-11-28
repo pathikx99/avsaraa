@@ -71,19 +71,19 @@ export default function ShippingPolicyPage() {
             </h2>
           </div>
           <p style={{ margin: "0 0 14px 0", color: "#4A3B30", fontSize: "14.5px" }}>
-            AVSARAA currently offers <strong>free standard shipping and delivery on orders above ₹799</strong> across serviceable delivery locations across India (₹50 standard shipping below ₹799).
+            AVSARAA applies a flat <strong>₹250 standard shipping fee</strong> across serviceable delivery locations in India. Customers can enjoy free shipping by applying an eligible free-shipping promo code (such as <strong>FREESHIP</strong>) in their Shopping Bag before checkout.
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", marginBottom: "14px" }}>
             <div style={{ padding: "20px", backgroundColor: "#FAF7F2", border: "1px solid #CFBEAD", borderRadius: "10px" }}>
               <span style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#866951", display: "block", marginBottom: "4px" }}>
-                PREPAID ORDERS (₹799+)
+                STANDARD DELIVERY
               </span>
               <div style={{ fontSize: "20px", fontFamily: "var(--font-serif), Georgia, serif", color: "#261B13", fontWeight: 600, marginBottom: "6px" }}>
-                Free Shipping &amp; Delivery
+                ₹250 Flat (Waived with Promo)
               </div>
               <p style={{ fontSize: "13px", color: "#6E5B4E", margin: 0 }}>
-                Prepaid orders of ₹799 or above (UPI, Cards, NetBanking via Razorpay) qualify for complimentary Pan-India delivery. Orders under ₹799 carry a ₹50 shipping fee.
+                Insured Pan-India delivery is ₹250 per order, or ₹0 when a valid free-shipping promo code is applied in your Shopping Bag.
               </p>
             </div>
 

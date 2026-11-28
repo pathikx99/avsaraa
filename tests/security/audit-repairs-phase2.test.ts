@@ -2,6 +2,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "crypto";
 import fs from "fs";
+import path from "path";
 import { validateCsrfOrigin } from "../../src/lib/csrf.ts";
 import { isSuperAdminUser } from "../../src/lib/adminConstants.ts";
 import { escapeHtml } from "../../src/lib/emailTemplates.ts";
@@ -379,6 +380,51 @@ describe("Audit Phase 2 Security & Integrity Regression Suite", () => {
       assert.equal(safe("https://evil.example/phish"), "/account");
       assert.equal(safe("/\\evil.example"), "/account");
       assert.equal(safe("/account\r\nLocation: evil"), "/account");
+    });
+
+    test(
+      "GET /robots.txt and /sitemap.xml serve valid SEO metadata routes",
+      { skip: !serverOnline ? "Server offline" : false },
+      async () => {
+        const robotsRes = await fetch(`${baseUrl}/robots.txt`);
+        assert.equal(robotsRes.status, 200);
+        const robotsTxt = await robotsRes.text();
+        assert.match(robotsTxt, /Disallow: \/admin/);
+        assert.match(robotsTxt, /Disallow: \/checkout/);
+        assert.match(robotsTxt, /Sitemap: .*\/sitemap\.xml/);
+
+        const sitemapRes = await fetch(`${baseUrl}/sitemap.xml`);
+        assert.equal(sitemapRes.status, 200);
+        const sitemapXml = await sitemapRes.text();
+        assert.match(sitemapXml, /<urlset/);
+        assert.match(sitemapXml, /\/products/);
+        assert.match(sitemapXml, /\/returns/);
+      }
+    );
+
+    test("Exchange-only cancel policy, payments settlement sync, and admin stock_count sync are enforced in source", () => {
+      const cancelSource = fs.readFileSync(
+        path.resolve("src/app/api/orders/[id]/cancel/route.ts"),
+        "utf8"
+      );
+      assert.equal(cancelSource.includes('"Refunded"'), false);
+      assert.match(cancelSource, /order\.payment_status === "Paid"/);
+
+      const webhookSource = fs.readFileSync(
+        path.resolve("src/app/api/shiprocket/webhook/route.ts"),
+        "utf8"
+      );
+      assert.match(webhookSource, /\.from\("payments"\)/);
+      assert.match(webhookSource, /update\(\{ status: "Paid" \}\)/);
+
+      const adminSource = fs.readFileSync(path.resolve("src/app/admin/page.tsx"), "utf8");
+      assert.match(adminSource, /prev\.available_sizes\.length === 1[\s\S]*size_inventory/);
+
+      const pdpSource = fs.readFileSync(
+        path.resolve("src/app/products/[id]/ProductDetailClient.tsx"),
+        "utf8"
+      );
+      assert.match(pdpSource, /Special Promo/);
     });
   });
 });

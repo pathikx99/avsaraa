@@ -15,7 +15,7 @@ import { isValidIndianPincode } from "../../src/lib/financials.ts";
 const GUEST_SYSTEM_USER_ID = "7a3b2e24-820f-4706-8cc3-4218b42b0da3";
 
 describe("E2E Order Journey - Financial Calculations", () => {
-  test("COD order above ₹799 threshold: free shipping + COD surcharge only", () => {
+  test("COD order without promo: standard shipping ₹250 + COD surcharge ₹20", () => {
     const result = calculateOrderTotals({
       subtotal: 24999,
       discountAmount: 0,
@@ -24,9 +24,9 @@ describe("E2E Order Journey - Financial Calculations", () => {
 
     assert.strictEqual(result.subtotal, 24999);
     assert.strictEqual(result.discountAmount, 0);
-    assert.strictEqual(result.shippingFee, 0); // Above ₹799 → free shipping
+    assert.strictEqual(result.shippingFee, 250);
     assert.strictEqual(result.codSurcharge, 20);
-    assert.strictEqual(result.totalAmount, 24999 + 20);
+    assert.strictEqual(result.totalAmount, 24999 + 250 + 20);
     assert.ok(result.gstAmount > 0);
     assert.ok(result.taxableAmount > 0);
     assert.strictEqual(
@@ -36,44 +36,46 @@ describe("E2E Order Journey - Financial Calculations", () => {
     );
   });
 
-  test("Prepaid order above ₹799 threshold: free shipping, no COD surcharge", () => {
+  test("Prepaid order without promo: standard shipping ₹250 applies even on ₹2,499+", () => {
     const result = calculateOrderTotals({
-      subtotal: 24999,
+      subtotal: 2499,
       discountAmount: 0,
       paymentMethod: "Razorpay",
     });
 
-    assert.strictEqual(result.shippingFee, 0);
+    assert.strictEqual(result.baseShippingFee, 250);
+    assert.strictEqual(result.shippingFee, 250);
+    assert.strictEqual(result.shippingDiscount, 0);
     assert.strictEqual(result.codSurcharge, 0);
-    assert.strictEqual(result.totalAmount, 24999);
+    assert.strictEqual(result.totalAmount, 2499 + 250);
   });
 
-  test("Prepaid order below ₹799 threshold: standard shipping ₹50, no COD surcharge", () => {
+  test("Prepaid low-value order without promo: standard shipping ₹250, no COD surcharge", () => {
     const result = calculateOrderTotals({
       subtotal: 600,
       discountAmount: 0,
       paymentMethod: "Razorpay",
     });
 
-    assert.strictEqual(result.shippingFee, 50);
+    assert.strictEqual(result.shippingFee, 250);
     assert.strictEqual(result.codSurcharge, 0);
-    assert.strictEqual(result.totalAmount, 650);
+    assert.strictEqual(result.totalAmount, 850);
   });
 
-  test("COD order below ₹799 threshold: shipping ₹50 + COD surcharge ₹20", () => {
+  test("COD low-value order without promo: shipping ₹250 + COD surcharge ₹20", () => {
     const result = calculateOrderTotals({
       subtotal: 600,
       discountAmount: 0,
       paymentMethod: "COD",
     });
 
-    assert.strictEqual(result.shippingFee, 50);
+    assert.strictEqual(result.shippingFee, 250);
     assert.strictEqual(result.codSurcharge, 20);
-    assert.strictEqual(result.totalAmount, 670);
+    assert.strictEqual(result.totalAmount, 870);
   });
 
-  test("Percentage discount with max cap applied correctly", () => {
-    // 10% of ₹10,000 = ₹1,000, capped at ₹500
+  test("Percentage discount with max cap applied correctly alongside standard shipping", () => {
+    // 10% of ₹10,000 = ₹1,000, capped at ₹500 + ₹250 shipping = ₹9,750
     const result = calculateOrderTotals({
       subtotal: 10000,
       discountAmount: 500, // pre-capped by coupon engine
@@ -81,23 +83,26 @@ describe("E2E Order Journey - Financial Calculations", () => {
     });
 
     assert.strictEqual(result.discountAmount, 500);
-    assert.strictEqual(result.totalAmount, 9500);
+    assert.strictEqual(result.shippingFee, 250);
+    assert.strictEqual(result.totalAmount, 9750);
   });
 
-  test("Free shipping coupon: shipping fee waived to ₹0", () => {
+  test("Free shipping promo coupon: shipping ₹250 − promo discount ₹250 = ₹0", () => {
     const result = calculateOrderTotals({
-      subtotal: 400,
+      subtotal: 2499,
       discountAmount: 0,
       paymentMethod: "Razorpay",
       customShippingFee: 0, // free_shipping coupon sets customShippingFee to 0
     });
 
+    assert.strictEqual(result.baseShippingFee, 250);
+    assert.strictEqual(result.shippingDiscount, 250);
     assert.strictEqual(result.shippingFee, 0);
     assert.strictEqual(result.codSurcharge, 0);
-    assert.strictEqual(result.totalAmount, 400);
+    assert.strictEqual(result.totalAmount, 2499);
   });
 
-  test("Zero cart total: shipping still applies (below ₹500 threshold), no GST", () => {
+  test("Zero cart total: shipping still applies, no GST", () => {
     const result = calculateOrderTotals({
       subtotal: 0,
       discountAmount: 0,
@@ -106,9 +111,9 @@ describe("E2E Order Journey - Financial Calculations", () => {
 
     assert.strictEqual(result.subtotal, 0);
     assert.strictEqual(result.discountAmount, 0);
-    assert.strictEqual(result.shippingFee, 50); // Below ₹500 threshold → standard shipping
+    assert.strictEqual(result.shippingFee, 250);
     assert.strictEqual(result.codSurcharge, 0);
-    assert.strictEqual(result.totalAmount, 50);
+    assert.strictEqual(result.totalAmount, 250);
     assert.strictEqual(result.gstAmount, 0);
     assert.strictEqual(result.taxableAmount, 0);
   });
@@ -121,7 +126,7 @@ describe("E2E Order Journey - Financial Calculations", () => {
     });
 
     assert.strictEqual(result.discountAmount, 100); // capped at subtotal
-    assert.strictEqual(result.totalAmount, 50); // merchandise ₹0 + shipping ₹50
+    assert.strictEqual(result.totalAmount, 250); // merchandise ₹0 + shipping ₹250
   });
 });
 

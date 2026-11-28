@@ -2,8 +2,8 @@
  * Financials, Taxation, Logistics & Geography Utilities for Avsaraa E-Commerce
  */
 
-export const FREE_DELIVERY_THRESHOLD = 799;
-export const STANDARD_COURIER_FEE = 50;
+export const FREE_DELIVERY_THRESHOLD = Number.POSITIVE_INFINITY; // Automatic free shipping disabled; requires free-shipping promo code
+export const STANDARD_COURIER_FEE = 250;
 export const COD_SURCHARGE = 20;
 export const GST_RATE = 0.05; // 5% inclusive GST
 
@@ -40,9 +40,7 @@ export function computeInclusiveGst(amount: number): {
   if (safeAmount === 0) {
     return { taxableAmount: 0, gstAmount: 0, rate: GST_RATE };
   }
-  // Formula: Tax = (Amount * 0.05) / 1.05
   const gstRaw = (safeAmount * GST_RATE) / (1 + GST_RATE);
-  // Round to 2 decimal places (paise)
   const gstAmount = Math.round(gstRaw * 100) / 100;
   const taxableAmount = Math.round((safeAmount - gstAmount) * 100) / 100;
   return {
@@ -53,15 +51,18 @@ export function computeInclusiveGst(amount: number): {
 }
 
 /**
- * Computes courier delivery fee based on subtotal.
- * Free delivery threshold: ₹500
+ * Computes courier delivery fee.
+ * Shipping never becomes free automatically; only a free-shipping promo waives it.
  */
-export function computeCourierFee(subtotal: number, baseFee: number = STANDARD_COURIER_FEE): number {
-  const safeSubtotal = Math.max(0, Number(subtotal) || 0);
-  if (safeSubtotal >= FREE_DELIVERY_THRESHOLD) {
+export function computeCourierFee(
+  _subtotal: number,
+  baseFee: number = STANDARD_COURIER_FEE,
+  hasFreeShippingPromo = false
+): number {
+  if (hasFreeShippingPromo) {
     return 0;
   }
-  return baseFee;
+  return Math.max(0, Number(baseFee) || 0);
 }
 
 /**
@@ -112,6 +113,8 @@ export function calculateOrderTotals(params: {
 }): {
   subtotal: number;
   discountAmount: number;
+  baseShippingFee: number;
+  shippingDiscount: number;
   shippingFee: number;
   codSurcharge: number;
   totalAmount: number;
@@ -122,20 +125,23 @@ export function calculateOrderTotals(params: {
   const discountAmount = Math.min(subtotal, Math.max(0, Number(params.discountAmount) || 0));
   const discountedSubtotal = subtotal - discountAmount;
 
+  const baseShippingFee = STANDARD_COURIER_FEE;
   const shippingFee =
     params.customShippingFee !== undefined
       ? Math.max(0, params.customShippingFee)
       : computeCourierFee(discountedSubtotal);
+  const shippingDiscount = Math.max(0, baseShippingFee - shippingFee);
 
   const codSurcharge = computeCodSurcharge(params.paymentMethod);
   const totalAmount = Math.max(0, discountedSubtotal + shippingFee + codSurcharge);
 
-  // Inclusive GST on the merchandise after discounts
   const { gstAmount, taxableAmount } = computeInclusiveGst(discountedSubtotal);
 
   return {
     subtotal,
     discountAmount,
+    baseShippingFee,
+    shippingDiscount,
     shippingFee,
     codSurcharge,
     totalAmount,

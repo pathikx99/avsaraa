@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -13,7 +13,6 @@ import {
   ShieldCheckIcon,
   DeliveryVanIcon,
   ReturnBoxIcon,
-  CheckIcon,
   SpinnerIcon,
   PlusIcon,
   BackArrowIcon,
@@ -25,6 +24,7 @@ import {
 import { AddressSnapshot, PaymentMethod, Order, RazorpayFailureResponse } from "@/types/order";
 import type { User } from "@supabase/supabase-js";
 import { isValidIndianPincode, calculateOrderTotals } from "@/lib/financials";
+import { ALL_INDIAN_STATES, lookupPincodeLocally } from "@/lib/pincodeLookup";
 import { normalizePhoneNumber } from "@/lib/phoneUtils";
 
 interface AddressItem {
@@ -44,41 +44,11 @@ interface AddressItem {
   is_default: boolean;
 }
 
-const INDIAN_STATES = [
-  "Andhra Pradesh",
-  "Arunachal Pradesh",
-  "Assam",
-  "Bihar",
-  "Chhattisgarh",
-  "Goa",
-  "Gujarat",
-  "Haryana",
-  "Himachal Pradesh",
-  "Jharkhand",
-  "Karnataka",
-  "Kerala",
-  "Madhya Pradesh",
-  "Maharashtra",
-  "Manipur",
-  "Meghalaya",
-  "Mizoram",
-  "Nagaland",
-  "Odisha",
-  "Punjab",
-  "Rajasthan",
-  "Sikkim",
-  "Tamil Nadu",
-  "Telangana",
-  "Tripura",
-  "Uttar Pradesh",
-  "Uttarakhand",
-  "West Bengal",
-  "Delhi NCR",
-];
+const INDIAN_STATES = ALL_INDIAN_STATES;
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cartItems, totalItems, subtotal, clearCart } = useCart();
+  const { cartItems, totalItems, subtotal, clearCart, appliedCoupon, openCart } = useCart();
 
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -104,18 +74,7 @@ export default function CheckoutPage() {
     address_type: "Home",
     is_default: false,
   });
-
-  // Coupons
-  const [couponCodeInput, setCouponCodeInput] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<{
-    code: string;
-    discount_amount: number;
-    discount_type: string;
-    discount_value: number;
-    max_discount_amount?: number | null;
-  } | null>(null);
-  const [validatingCoupon, setValidatingCoupon] = useState(false);
-  const [couponError, setCouponError] = useState<string | null>(null);
+  const [pinLookupLoading, setPinLookupLoading] = useState(false);
 
   // Payment & Order Options
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Razorpay");
@@ -240,70 +199,45 @@ export default function CheckoutPage() {
     };
   }, [loadAddresses]);
 
-  // Handle Apply Coupon
-  const handleApplyCoupon = useCallback(async (codeToApply?: string) => {
-    const targetCode = (codeToApply || couponCodeInput).trim().toUpperCase();
-    if (!targetCode) return;
+  const handleCheckoutPinChange = useCallback(async (rawVal: string) => {
+    const cleanPin = rawVal.replace(/\D/g, "").slice(0, 6);
+    const localHit = isValidIndianPincode(cleanPin) ? lookupPincodeLocally(cleanPin) : null;
 
-    setValidatingCoupon(true);
-    setCouponError(null);
+    setNewAddress((prev) => ({
+      ...prev,
+      postal_code: cleanPin,
+      ...(localHit
+        ? {
+            city: localHit.city || prev.city,
+            state: localHit.state || prev.state,
+          }
+        : {}),
+    }));
 
-    try {
-      const res = await fetch("/api/coupons/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: targetCode, subtotal }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.valid && data.coupon) {
-        setAppliedCoupon(data.coupon);
-        setCouponCodeInput("");
-        setCouponError(null);
-        try {
-          localStorage.setItem("avsaraa_applied_coupon", data.coupon.code);
-        } catch {}
-      } else {
-        setCouponError(data.message || "Invalid coupon code.");
+    if (isValidIndianPincode(cleanPin)) {
+      setPinLookupLoading(true);
+      try {
+        const res = await fetch(`/api/pincode?code=${encodeURIComponent(cleanPin)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.valid) {
+            setNewAddress((prev) => {
+              if (prev.postal_code !== cleanPin) return prev;
+              return {
+                ...prev,
+                city: data.city || prev.city,
+                state: data.state || prev.state,
+              };
+            });
+          }
+        }
+      } catch {
+        // Sync prefix lookup already applied cleanly
+      } finally {
+        setPinLookupLoading(false);
       }
-    } catch {
-      setCouponError("Could not validate coupon. Please try again.");
-    } finally {
-      setValidatingCoupon(false);
     }
-  }, [couponCodeInput, subtotal]);
-
-  const handleRemoveCoupon = () => {
-    setAppliedCoupon(null);
-    setCouponError(null);
-    try {
-      localStorage.removeItem("avsaraa_applied_coupon");
-    } catch {}
-  };
-
-  const autoCouponAttemptedRef = useRef<string | null>(null);
-
-  // Auto-apply stored coupon from product page or previous session (guarded against infinite retry loops)
-  useEffect(() => {
-    try {
-      const savedCoupon = localStorage.getItem("avsaraa_applied_coupon");
-      const attemptKey = savedCoupon ? `${savedCoupon}:${subtotal}` : null;
-      if (
-        savedCoupon &&
-        attemptKey &&
-        autoCouponAttemptedRef.current !== attemptKey &&
-        !appliedCoupon &&
-        subtotal > 0 &&
-        !validatingCoupon
-      ) {
-        autoCouponAttemptedRef.current = attemptKey;
-        const timer = setTimeout(() => {
-          handleApplyCoupon(savedCoupon);
-        }, 0);
-        return () => clearTimeout(timer);
-      }
-    } catch {}
-  }, [subtotal, appliedCoupon, validatingCoupon, handleApplyCoupon]);
+  }, []);
 
   // Handle Save New Address
   const handleSaveAddress = async (e: React.FormEvent) => {
@@ -1847,10 +1781,36 @@ export default function CheckoutPage() {
 
                       <div className="checkout-form-row-3">
                         <div>
-                          <label style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
+                          <label htmlFor="checkout_postal_code" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
+                            PIN Code * {pinLookupLoading ? "(Auto-filling...)" : ""}
+                          </label>
+                          <input
+                            id="checkout_postal_code"
+                            name="postal_code"
+                            type="text"
+                            required
+                            maxLength={6}
+                            placeholder="e.g. 380001"
+                            value={newAddress.postal_code}
+                            onChange={(e) => handleCheckoutPinChange(e.target.value)}
+                            style={{
+                              width: "100%",
+                              padding: "10px 12px",
+                              borderRadius: "8px",
+                              border: "1px solid rgba(38, 27, 19, 0.18)",
+                              fontSize: "13px",
+                              backgroundColor: "#FAF7F2",
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label htmlFor="checkout_city" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
                             City *
                           </label>
                           <input
+                            id="checkout_city"
+                            name="city"
                             type="text"
                             required
                             placeholder="City"
@@ -1868,10 +1828,12 @@ export default function CheckoutPage() {
                         </div>
 
                         <div>
-                          <label style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
+                          <label htmlFor="checkout_state" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
                             State *
                           </label>
                           <select
+                            id="checkout_state"
+                            name="state"
                             value={newAddress.state}
                             onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
                             style={{
@@ -1889,28 +1851,6 @@ export default function CheckoutPage() {
                               </option>
                             ))}
                           </select>
-                        </div>
-
-                        <div>
-                          <label style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "#866951", marginBottom: "4px" }}>
-                            PIN Code *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            maxLength={6}
-                            placeholder="6 digits"
-                            value={newAddress.postal_code}
-                            onChange={(e) => setNewAddress({ ...newAddress, postal_code: e.target.value })}
-                            style={{
-                              width: "100%",
-                              padding: "10px 12px",
-                              borderRadius: "8px",
-                              border: "1px solid rgba(38, 27, 19, 0.18)",
-                              fontSize: "13px",
-                              backgroundColor: "#FAF7F2",
-                            }}
-                          />
                         </div>
                       </div>
 
@@ -2194,11 +2134,11 @@ export default function CheckoutPage() {
                   marginBottom: "8px",
                 }}
               >
-                Special Delivery Instructions / Gift Message (Optional)
+                Special Delivery Instructions (Optional)
               </label>
               <textarea
                 rows={2}
-                placeholder="e.g. Please include signature gift packaging, leave with reception, etc."
+                placeholder="e.g. Call before delivery, leave with building security or concierge, etc."
                 value={orderNotes}
                 onChange={(e) => setOrderNotes(e.target.value)}
                 style={{
@@ -2326,137 +2266,53 @@ export default function CheckoutPage() {
                 })}
               </div>
 
-              {/* Promo Coupon Section */}
-              <div
-                style={{
-                  padding: "16px",
-                  backgroundColor: "rgba(197, 168, 128, 0.08)",
-                  borderRadius: "12px",
-                  marginBottom: "20px",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-                  <span style={{ fontSize: "12px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#5A4535" }}>
-                    Promo Code
-                  </span>
-                </div>
-
-                {appliedCoupon ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      backgroundColor: "#FFFFFF",
-                      padding: "8px 12px",
-                      borderRadius: "8px",
-                      border: "1px solid rgba(40, 167, 69, 0.3)",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <CheckIcon size={14} color="#28a745" />
-                      <span style={{ fontSize: "12px", fontWeight: 600, color: "#28a745" }}>
-                        {appliedCoupon.code} Applied ({isFreeDeliveryCoupon ? "Free Delivery" : `-${formatINR(discountAmount)}`})
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleRemoveCoupon}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#866951",
-                        fontSize: "12px",
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                      }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <input
-                      type="text"
-                      placeholder="Enter promo code"
-                      value={couponCodeInput}
-                      onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
-                      style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(38, 27, 19, 0.18)",
-                        fontSize: "12px",
-                        backgroundColor: "#FFFFFF",
-                        textTransform: "uppercase",
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleApplyCoupon()}
-                      disabled={validatingCoupon || !couponCodeInput.trim()}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        border: "none",
-                        backgroundColor: "#261B13",
-                        color: "#FAF7F2",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
-                      {validatingCoupon ? <SpinnerIcon size={12} color="#FAF7F2" /> : "Apply"}
-                    </button>
-                  </div>
-                )}
-
-                {couponError && (
-                  <p style={{ margin: "6px 0 0", fontSize: "11px", color: "#8A1818" }}>
-                    {couponError}
-                  </p>
-                )}
-              </div>
-
               {/* Price Breakdown */}
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#5A4535" }}>
-                  <span>Bag Subtotal</span>
-                  <span>{formatINR(subtotal)}</span>
+                  <span>Subtotal</span>
+                  <span>{formatINR(financials.subtotal)}</span>
                 </div>
 
-                {appliedCoupon && (
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#28a745" }}>
-                    <span>Promotion ({appliedCoupon.code})</span>
-                    <span>{isFreeDeliveryCoupon ? "Free Delivery" : `-${formatINR(discountAmount)}`}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#5A4535" }}>
+                  <span>Shipping</span>
+                  <span style={{ fontWeight: 600, color: "#261B13" }}>
+                    {formatINR(financials.baseShippingFee)}
+                  </span>
+                </div>
+
+                {appliedCoupon && isFreeDeliveryCoupon && financials.shippingDiscount > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#1E5E3A", fontWeight: 600 }}>
+                    <span>Free-shipping promo discount ({appliedCoupon.code})</span>
+                    <span>−{formatINR(financials.shippingDiscount)}</span>
                   </div>
                 )}
 
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#5A4535" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                    <span>Pan-India Insured Courier Delivery</span>
-                    {financials.shippingFee === 0 && (
-                      <span
-                        style={{
-                          fontSize: "10px",
-                          padding: "1px 6px",
-                          borderRadius: "8px",
-                          backgroundColor: "rgba(30, 94, 58, 0.12)",
-                          color: "#1E5E3A",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {isFreeDeliveryCoupon ? "FREE (Promo Applied)" : "FREE (Orders ≥ ₹799)"}
-                      </span>
-                    )}
+                {appliedCoupon && !isFreeDeliveryCoupon && discountAmount > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#1E5E3A", fontWeight: 600 }}>
+                    <span>Promo discount ({appliedCoupon.code})</span>
+                    <span>−{formatINR(discountAmount)}</span>
                   </div>
-                  <span style={{ fontWeight: 600, color: financials.shippingFee === 0 ? "#1E5E3A" : "#261B13" }}>
-                    {financials.shippingFee === 0 ? "₹0" : formatINR(financials.shippingFee)}
-                  </span>
-                </div>
+                )}
+
+                {!appliedCoupon && (
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                      type="button"
+                      onClick={openCart}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        fontSize: "11.5px",
+                        color: "#866951",
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Have a promo code? Apply in Shopping Bag →
+                    </button>
+                  </div>
+                )}
 
                 {financials.codSurcharge > 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#5A4535" }}>
@@ -2484,7 +2340,7 @@ export default function CheckoutPage() {
                     marginTop: "4px",
                   }}
                 >
-                  <span>Total Amount</span>
+                  <span>Total</span>
                   <span>{formatINR(financials.totalAmount)}</span>
                 </div>
               </div>
@@ -2567,14 +2423,14 @@ export default function CheckoutPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>
                   <DeliveryVanIcon size={16} color="#866951" />
                   <span>
-                    {subtotal >= 799
-                      ? "Complimentary Pan-India Insured Express Shipping"
-                      : "Insured Pan-India Express Shipping (Free ₹799+)"}
+                    {isFreeDeliveryCoupon
+                      ? "Complimentary Shipping Unlocked via Promo Code"
+                      : "Insured Pan-India Express Shipping"}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>
                   <ReturnBoxIcon size={16} color="#866951" />
-                  <span>7-Day Exchange Guarantee (No Refunds)</span>
+                  <span>7-Day Easy Size &amp; Style Exchange Guarantee</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#5A4535" }}>
                   <ShieldCheckIcon size={16} color="#866951" />

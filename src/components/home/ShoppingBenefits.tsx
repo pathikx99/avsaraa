@@ -13,8 +13,8 @@ const BENEFITS = [
         <circle cx="18.5" cy="18.5" r="2.5" />
       </svg>
     ),
-    title: "Free Shipping ₹799+",
-    subtitle: "Complimentary priority Pan-India delivery on orders above ₹799.",
+    title: "Pan-India Express Shipping",
+    subtitle: "Insured doorstep delivery across India · Apply promo code FREESHIP in bag for free shipping.",
   },
   {
     icon: (
@@ -34,8 +34,8 @@ const BENEFITS = [
         <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
       </svg>
     ),
-    title: "7-Day Exchange Only",
-    subtitle: "Hassle-free doorstep size and design exchanges within 7 days (No refunds).",
+    title: "7-Day Easy Exchange",
+    subtitle: "Seamless doorstep size and style exchanges within 7 days of delivery.",
   },
 ];
 

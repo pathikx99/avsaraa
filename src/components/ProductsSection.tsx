@@ -31,7 +31,7 @@ export default function ProductsSection({
 }: ProductsSectionProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { addToCart } = useCart();
+  const { addToCart, openCart } = useCart();
 
   const currentParamsKey = searchParams ? searchParams.toString() : "";
 
@@ -130,6 +130,7 @@ export default function ProductsSection({
   const [quickViewColor, setQuickViewColor] = useState<string>("");
   const [quickViewSize, setQuickViewSize] = useState<string>("");
   const [quickViewAdded, setQuickViewAdded] = useState(false);
+  const [quickViewError, setQuickViewError] = useState<string | null>(null);
 
   const [selectedFabric, setSelectedFabric] = useState<string>("all");
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
@@ -270,17 +271,28 @@ export default function ProductsSection({
   };
 
   const openQuickView = (product: Product) => {
+    const colors = product.color_variants || [];
+    const sizes =
+      product.available_sizes && product.available_sizes.length > 0
+        ? product.available_sizes
+        : product.category === "Sarees"
+        ? ["Free Size (5.5m + 0.8m Blouse)"]
+        : ["XS", "S", "M", "L", "XL"];
     setSelectedProduct(product);
-    setQuickViewColor(product.color_variants?.[0]?.name || "");
-    setQuickViewSize(
-      product.available_sizes?.[0] ||
-        (product.category === "Sarees" ? "Free Size (5.5m + 0.8m Blouse)" : "M")
-    );
+    setQuickViewColor(colors.length === 1 ? colors[0].name : "");
+    setQuickViewSize(sizes.length === 1 ? sizes[0] : "");
     setQuickViewAdded(false);
+    setQuickViewError(null);
   };
 
   const handleQuickViewAddToBag = () => {
     if (!selectedProduct) return;
+    const hasColors = Boolean(selectedProduct.color_variants && selectedProduct.color_variants.length > 0);
+    if ((hasColors && !quickViewColor) || !quickViewSize) {
+      setQuickViewError("Please select both colour and size before adding to your bag.");
+      return;
+    }
+    setQuickViewError(null);
     const activeVariant = selectedProduct.color_variants?.find((v) => v.name === quickViewColor);
     const imgUrl = activeVariant?.primary_image || activeVariant?.image_url || selectedProduct.image_url;
     const colorSuffix = quickViewColor ? ` · ${quickViewColor}` : "";
@@ -293,8 +305,8 @@ export default function ProductsSection({
     if (ok) {
       setQuickViewAdded(true);
       setTimeout(() => {
-        setSelectedProduct(null);
-      }, 650);
+        setQuickViewAdded(false);
+      }, 2200);
     }
   };
 
@@ -1106,7 +1118,7 @@ export default function ProductsSection({
                       marginBottom: "14px",
                     }}
                   >
-                    Inclusive of all taxes • Free Pan-India delivery ₹799+
+                    Inclusive of all taxes · Apply FREESHIP in bag for free shipping
                   </p>
 
                   <p style={{ fontSize: "13px", color: "#543E2E", lineHeight: 1.6, marginBottom: "16px" }}>
@@ -1194,6 +1206,21 @@ export default function ProductsSection({
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {quickViewError && (
+                    <div
+                      role="alert"
+                      style={{
+                        fontSize: "12px",
+                        color: "#8A181A",
+                        backgroundColor: "rgba(138, 24, 26, 0.08)",
+                        border: "1px solid rgba(138, 24, 26, 0.25)",
+                        borderRadius: "8px",
+                        padding: "8px 10px",
+                      }}
+                    >
+                      {quickViewError}
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={handleQuickViewAddToBag}
@@ -1222,6 +1249,43 @@ export default function ProductsSection({
                       </>
                     )}
                   </button>
+
+                  {quickViewAdded && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "8px",
+                        padding: "8px 12px",
+                        borderRadius: "10px",
+                        backgroundColor: "#F4F8F5",
+                        border: "1px solid #C4D9CC",
+                        fontSize: "12px",
+                        color: "#1E5E3A",
+                      }}
+                    >
+                      <span>Added to bag! Continue browsing anytime.</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedProduct(null);
+                          openCart();
+                        }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          color: "#261B13",
+                          fontWeight: 700,
+                          textDecoration: "underline",
+                          cursor: "pointer",
+                        }}
+                      >
+                        View Bag →
+                      </button>
+                    </div>
+                  )}
 
                   <Link
                     href={`/products/${selectedProduct.id}${quickViewColor ? `?color=${encodeURIComponent(quickViewColor)}` : ""}`}

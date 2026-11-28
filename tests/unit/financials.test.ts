@@ -9,7 +9,7 @@ import {
   computeVolumetricWeight,
   computeChargeableWeight,
   calculateOrderTotals,
-  FREE_DELIVERY_THRESHOLD,
+  STANDARD_COURIER_FEE,
   COD_SURCHARGE,
 } from "../../src/lib/financials.ts";
 
@@ -32,17 +32,16 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
     assert.strictEqual(resZero.taxableAmount, 0);
   });
 
-  test("Courier fee enforces ₹799 free delivery threshold", () => {
-    assert.strictEqual(FREE_DELIVERY_THRESHOLD, 799);
-    // Under ₹799 threshold incurs ₹50 courier fee
-    assert.strictEqual(computeCourierFee(798), 50);
-    assert.strictEqual(computeCourierFee(499), 50);
-    assert.strictEqual(computeCourierFee(0), 50);
+  test("Courier fee charges ₹250 unless a free-shipping promo is applied", () => {
+    assert.strictEqual(STANDARD_COURIER_FEE, 250);
+    // Without promo code, shipping never becomes free automatically
+    assert.strictEqual(computeCourierFee(499), 250);
+    assert.strictEqual(computeCourierFee(799), 250);
+    assert.strictEqual(computeCourierFee(2499), 250);
+    assert.strictEqual(computeCourierFee(15000), 250);
 
-    // ₹799 or above qualifies for complimentary delivery (₹0)
-    assert.strictEqual(computeCourierFee(799), 0);
-    assert.strictEqual(computeCourierFee(1299), 0);
-    assert.strictEqual(computeCourierFee(15000), 0);
+    // Only free-shipping promo waives delivery fee to ₹0
+    assert.strictEqual(computeCourierFee(2499, STANDARD_COURIER_FEE, true), 0);
   });
 
   test("Cash on Delivery (COD) surcharge strictly applies ₹20", () => {
@@ -91,34 +90,40 @@ describe("E-Commerce Financials & Calculations Unit Tests", () => {
   });
 
   test("calculateOrderTotals orchestrates subtotal, discounts, shipping, COD, and GST without drift", () => {
-    // Scenario 1: Subtotal ₹400 with COD -> Shipping ₹50, COD ₹20 -> Total ₹470
+    // Scenario 1: Subtotal ₹400 with COD, no promo -> Shipping ₹250, COD ₹20 -> Total ₹670
     const ord1 = calculateOrderTotals({
       subtotal: 400,
       discountAmount: 0,
       paymentMethod: "COD",
     });
-    assert.strictEqual(ord1.shippingFee, 50);
+    assert.strictEqual(ord1.shippingFee, 250);
+    assert.strictEqual(ord1.shippingDiscount, 0);
     assert.strictEqual(ord1.codSurcharge, 20);
-    assert.strictEqual(ord1.totalAmount, 470);
+    assert.strictEqual(ord1.totalAmount, 670);
 
-    // Scenario 2: Subtotal ₹1050 with Online Card -> Free shipping, COD ₹0 -> Total ₹1050
+    // Scenario 2: Subtotal ₹2499 with Online Card, NO promo -> Shipping ₹250 still applies -> Total ₹2749
     const ord2 = calculateOrderTotals({
-      subtotal: 1050,
+      subtotal: 2499,
       discountAmount: 0,
       paymentMethod: "Razorpay",
     });
-    assert.strictEqual(ord2.shippingFee, 0);
+    assert.strictEqual(ord2.baseShippingFee, 250);
+    assert.strictEqual(ord2.shippingFee, 250);
+    assert.strictEqual(ord2.shippingDiscount, 0);
     assert.strictEqual(ord2.codSurcharge, 0);
-    assert.strictEqual(ord2.totalAmount, 1050);
-    // Scenario 3: Subtotal ₹400 with Free Shipping Promo (customShippingFee: 0) and Prepaid -> Shipping ₹0, COD ₹0 -> Total ₹400
+    assert.strictEqual(ord2.totalAmount, 2749);
+
+    // Scenario 3: Subtotal ₹2499 with Free Shipping Promo (customShippingFee: 0) -> Shipping ₹250 - ₹250 discount = ₹0 -> Total ₹2499
     const ord3 = calculateOrderTotals({
-      subtotal: 400,
+      subtotal: 2499,
       discountAmount: 0,
       paymentMethod: "Razorpay",
       customShippingFee: 0,
     });
+    assert.strictEqual(ord3.baseShippingFee, 250);
+    assert.strictEqual(ord3.shippingDiscount, 250);
     assert.strictEqual(ord3.shippingFee, 0);
     assert.strictEqual(ord3.codSurcharge, 0);
-    assert.strictEqual(ord3.totalAmount, 400);
+    assert.strictEqual(ord3.totalAmount, 2499);
   });
 });

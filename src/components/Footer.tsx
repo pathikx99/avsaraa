@@ -339,8 +339,8 @@ export default function Footer() {
                 <DeliveryVanIcon size={20} color="#866951" />
               </div>
             </div>
-            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Free Shipping ₹799+</h4>
-            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Complimentary delivery above ₹799</p>
+            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>Insured Shipping</h4>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Free with promo FREESHIP</p>
           </div>
 
           <div>
@@ -349,8 +349,8 @@ export default function Footer() {
                 <ReturnBoxIcon size={20} color="#866951" />
               </div>
             </div>
-            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>7-Day Exchange Only</h4>
-            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Hassle-free 7-day exchanges (No refunds)</p>
+            <h4 style={{ fontSize: "13.5px", fontWeight: 600, color: "#261B13", marginBottom: "3px" }}>7-Day Easy Exchange</h4>
+            <p style={{ fontSize: "12px", color: "#6E5B4E" }}>Seamless doorstep exchanges</p>
           </div>
 
           <div>

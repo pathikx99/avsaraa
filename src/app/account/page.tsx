@@ -12,6 +12,10 @@ import { Order } from "@/types/order";
 import OrdersAccountTab from "@/components/account/OrdersAccountTab";
 import { normalizePhoneNumber } from "@/lib/phoneUtils";
 import { isSuperAdminUser } from "@/lib/adminConstants";
+import { BodyProfile, BODY_PROFILE_PRESETS, type BodyGender, type FitPreference } from "@/types/bodyProfile";
+import { recommendSizeForProduct } from "@/lib/sizeRecommendation";
+import { isValidIndianPincode } from "@/lib/financials";
+import { lookupPincodeLocally } from "@/lib/pincodeLookup";
 
 const DEFAULT_PRODUCT_FALLBACK = "/images/account_hero.jpg";
 
@@ -68,6 +72,7 @@ export default function AccountPage() {
   // Address Modal State
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [accountPinLookupLoading, setAccountPinLookupLoading] = useState(false);
   const [newAddress, setNewAddress] = useState({
     recipient_name: "",
     phone_number: "",
@@ -78,6 +83,37 @@ export default function AccountPage() {
     state: "Gujarat",
     postal_code: "",
     address_type: "Home",
+    is_default: true,
+  });
+
+  // Body Profiles State (Changes 10 & 11)
+  const [bodyProfiles, setBodyProfiles] = useState<BodyProfile[]>([]);
+  const [activeBodyProfileId, setActiveBodyProfileId] = useState<string>("");
+  const [isAddingNewBodyProfile, setIsAddingNewBodyProfile] = useState(false);
+  const [isSavingBodyProfile, setIsSavingBodyProfile] = useState(false);
+  const [bodyForm, setBodyForm] = useState<{
+    id: string;
+    profile_name: string;
+    gender: BodyGender;
+    height_cm: string;
+    weight_kg: string;
+    bust_chest_in: string;
+    waist_in: string;
+    hip_in: string;
+    fit_preference: FitPreference;
+    preferred_size: string;
+    is_default: boolean;
+  }>({
+    id: "",
+    profile_name: "My Profile",
+    gender: "female",
+    height_cm: "",
+    weight_kg: "",
+    bust_chest_in: "",
+    waist_in: "",
+    hip_in: "",
+    fit_preference: "regular",
+    preferred_size: "M",
     is_default: true,
   });
 
@@ -187,13 +223,39 @@ export default function AccountPage() {
         setProducts([]);
       }
 
-      // 4. Fetch Patron Orders
+      // 4. Fetch Patron Orders & Body Profiles
       try {
         setLoadingOrders(true);
-        const ordRes = await fetch("/api/orders");
+        const [ordRes, profApiRes] = await Promise.all([
+          fetch("/api/orders"),
+          fetch("/api/customer/profile"),
+        ]);
         const ordData = await ordRes.json();
         if (ordData.success && Array.isArray(ordData.orders)) {
           setOrders(ordData.orders);
+        }
+        if (profApiRes.ok) {
+          const profApiData = await profApiRes.json();
+          if (Array.isArray(profApiData.body_profiles)) {
+            setBodyProfiles(profApiData.body_profiles);
+            const first = profApiData.body_profiles.find((p: BodyProfile) => p.is_default) || profApiData.body_profiles[0];
+            if (first) {
+              setActiveBodyProfileId(first.id);
+              setBodyForm({
+                id: first.id,
+                profile_name: first.profile_name || "My Profile",
+                gender: first.gender || "female",
+                height_cm: first.height_cm != null ? String(first.height_cm) : "",
+                weight_kg: first.weight_kg != null ? String(first.weight_kg) : "",
+                bust_chest_in: first.bust_chest_in != null ? String(first.bust_chest_in) : "",
+                waist_in: first.waist_in != null ? String(first.waist_in) : "",
+                hip_in: first.hip_in != null ? String(first.hip_in) : "",
+                fit_preference: first.fit_preference || "regular",
+                preferred_size: first.preferred_size || "M",
+                is_default: Boolean(first.is_default),
+              });
+            }
+          }
         }
       } catch (ordErr) {
         console.warn("Orders fetch warning:", ordErr);
@@ -260,6 +322,168 @@ export default function AccountPage() {
     };
   }, [loadUserData, router]);
 
+  const selectBodyProfileForEdit = (bp: BodyProfile) => {
+    setIsAddingNewBodyProfile(false);
+    setActiveBodyProfileId(bp.id);
+    setBodyForm({
+      id: bp.id,
+      profile_name: bp.profile_name || "My Profile",
+      gender: bp.gender || "female",
+      height_cm: bp.height_cm != null ? String(bp.height_cm) : "",
+      weight_kg: bp.weight_kg != null ? String(bp.weight_kg) : "",
+      bust_chest_in: bp.bust_chest_in != null ? String(bp.bust_chest_in) : "",
+      waist_in: bp.waist_in != null ? String(bp.waist_in) : "",
+      hip_in: bp.hip_in != null ? String(bp.hip_in) : "",
+      fit_preference: bp.fit_preference || "regular",
+      preferred_size: bp.preferred_size || "M",
+      is_default: Boolean(bp.is_default),
+    });
+  };
+
+  const startNewBodyProfile = (presetName = "") => {
+    setIsAddingNewBodyProfile(true);
+    setActiveBodyProfileId("");
+    setBodyForm({
+      id: `bp-${Date.now()}`,
+      profile_name: presetName || (bodyProfiles.length === 0 ? "My Profile" : "Mother"),
+      gender: "female",
+      height_cm: "",
+      weight_kg: "",
+      bust_chest_in: "",
+      waist_in: "",
+      hip_in: "",
+      fit_preference: "regular",
+      preferred_size: "M",
+      is_default: bodyProfiles.length === 0,
+    });
+  };
+
+  const handleSaveBodyProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authUser) return;
+    if (!bodyForm.profile_name.trim()) {
+      showToast("Please enter a profile name (e.g. My Profile, Mother, Sister, Wife)");
+      return;
+    }
+
+    setIsSavingBodyProfile(true);
+    try {
+      const targetId = bodyForm.id || `bp-${Date.now()}`;
+      const newEntry: BodyProfile = {
+        id: targetId,
+        profile_name: bodyForm.profile_name.trim(),
+        gender: bodyForm.gender,
+        height_cm: bodyForm.height_cm ? Number(bodyForm.height_cm) : null,
+        weight_kg: bodyForm.weight_kg ? Number(bodyForm.weight_kg) : null,
+        bust_chest_in: bodyForm.bust_chest_in ? Number(bodyForm.bust_chest_in) : null,
+        waist_in: bodyForm.waist_in ? Number(bodyForm.waist_in) : null,
+        hip_in: bodyForm.hip_in ? Number(bodyForm.hip_in) : null,
+        fit_preference: bodyForm.fit_preference,
+        preferred_size: bodyForm.preferred_size || undefined,
+        is_default: bodyProfiles.length === 0 ? true : bodyForm.is_default,
+      };
+
+      const existsIdx = bodyProfiles.findIndex((p) => p.id === targetId);
+      let nextList =
+        existsIdx >= 0
+          ? bodyProfiles.map((p, idx) => (idx === existsIdx ? newEntry : p))
+          : [...bodyProfiles, newEntry];
+
+      if (newEntry.is_default) {
+        nextList = nextList.map((p) => ({ ...p, is_default: p.id === newEntry.id }));
+      }
+
+      const res = await fetch("/api/customer/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body_profiles: nextList }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || "Failed to save body profile");
+        return;
+      }
+
+      const savedList = Array.isArray(data.body_profiles) ? (data.body_profiles as BodyProfile[]) : nextList;
+      setBodyProfiles(savedList);
+      setIsAddingNewBodyProfile(false);
+      const savedItem = savedList.find((p) => p.id === targetId) || savedList[savedList.length - 1];
+      if (savedItem) selectBodyProfileForEdit(savedItem);
+      showToast(`Saved body profile for "${newEntry.profile_name}"`);
+    } catch {
+      showToast("Network error while saving body profile");
+    } finally {
+      setIsSavingBodyProfile(false);
+    }
+  };
+
+  const handleDeleteBodyProfile = async (idToRemove: string) => {
+    setIsSavingBodyProfile(true);
+    try {
+      const nextList = bodyProfiles.filter((p) => p.id !== idToRemove);
+      const res = await fetch("/api/customer/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body_profiles: nextList }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const savedList = Array.isArray(data.body_profiles) ? (data.body_profiles as BodyProfile[]) : nextList;
+        setBodyProfiles(savedList);
+        if (savedList.length > 0) {
+          selectBodyProfileForEdit(savedList[0]);
+        } else {
+          startNewBodyProfile("My Profile");
+        }
+        showToast("Body profile removed");
+      }
+    } catch {
+      showToast("Failed to remove body profile");
+    } finally {
+      setIsSavingBodyProfile(false);
+    }
+  };
+
+  const handleAccountPinChange = async (rawPin: string) => {
+    const cleanPin = rawPin.replace(/\D/g, "").slice(0, 6);
+    const localHit = isValidIndianPincode(cleanPin) ? lookupPincodeLocally(cleanPin) : null;
+
+    setNewAddress((prev) => ({
+      ...prev,
+      postal_code: cleanPin,
+      ...(localHit
+        ? {
+            city: localHit.city || prev.city,
+            state: localHit.state || prev.state,
+          }
+        : {}),
+    }));
+
+    if (isValidIndianPincode(cleanPin)) {
+      setAccountPinLookupLoading(true);
+      try {
+        const res = await fetch(`/api/pincode?code=${encodeURIComponent(cleanPin)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.valid) {
+            setNewAddress((prev) => {
+              if (prev.postal_code !== cleanPin) return prev;
+              return {
+                ...prev,
+                city: data.city || prev.city,
+                state: data.state || prev.state,
+              };
+            });
+          }
+        }
+      } catch {
+        // Fallback already applied
+      } finally {
+        setAccountPinLookupLoading(false);
+      }
+    }
+  };
+
   // Handle Save Profile to Database
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -305,33 +529,29 @@ export default function AccountPage() {
 
     setIsSavingProfile(true);
     try {
-      const updatedData = {
-        id: authUser.id,
-        full_name: editFullName.trim(),
-        phone_number: trimmedPhone ? normalizePhoneNumber(trimmedPhone).normalized : null,
-        email: profile?.email || authUser.email || "",
-        updated_at: new Date().toISOString(),
-      };
+      const normalizedNextPhone = trimmedPhone ? normalizePhoneNumber(trimmedPhone).normalized : null;
+      const res = await fetch("/api/customer/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: editFullName.trim(),
+          phone_number: normalizedNextPhone,
+        }),
+      });
+      const data = await res.json();
 
-      const { error } = await supabase.from("profiles").upsert(updatedData);
-
-      if (error) {
-        if (error.message.includes("unique") || error.code === "23505") {
-          showToast(
-            "This phone number is already registered to another account. Please enter a different number."
-          );
-          setIsSavingProfile(false);
-          return;
-        }
-        console.warn("Profile update note:", error.message);
+      if (!res.ok || !data.success) {
+        showToast(data.error || "Could not update profile. Please try again.");
+        setIsSavingProfile(false);
+        return;
       }
 
       setProfile((prev) =>
         prev
           ? {
               ...prev,
-              full_name: editFullName.trim(),
-              phone_number: trimmedPhone ? normalizePhoneNumber(trimmedPhone).normalized : null,
+              full_name: data.profile?.full_name ?? editFullName.trim(),
+              phone_number: data.profile?.phone_number ?? normalizedNextPhone,
             }
           : null
       );
@@ -985,7 +1205,7 @@ export default function AccountPage() {
                 MEMBER BENEFITS
               </span>
               <p style={{ fontSize: "13px", color: "#6E5B4E", lineHeight: 1.5, marginTop: "6px" }}>
-                Enjoy complimentary free shipping and delivery on all orders with priority concierge support.
+                Save body measurements for smart size suggestions and apply promo code FREESHIP in your shopping bag for free delivery.
               </p>
             </div>
           </aside>
@@ -1157,6 +1377,311 @@ export default function AccountPage() {
                       Contact Us
                     </Link>
                   </div>
+                </div>
+
+                {/* Changes 10 & 11: Body Details & Multiple Family Profiles */}
+                <div
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    border: "1px solid #E8DED3",
+                    borderRadius: "20px",
+                    padding: "28px",
+                    marginTop: "24px",
+                    boxShadow: "0 8px 30px -8px rgba(38,27,19,0.04)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "18px" }}>
+                    <div>
+                      <span style={{ fontSize: "11px", color: "#866951", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", display: "block" }}>
+                        PERSONAL &amp; FAMILY FIT PROFILES
+                      </span>
+                      <h3 style={{ fontFamily: "var(--font-serif)", fontSize: "22px", color: "#261B13", margin: "2px 0 4px" }}>
+                        Body Details &amp; Size Preferences
+                      </h3>
+                      <p style={{ fontSize: "12.5px", color: "#6E5B4E", margin: 0 }}>
+                        Save multiple body profiles (e.g., My Profile, Mother, Sister, Wife) for automatic &ldquo;Suggest Size for You&rdquo; recommendations on products.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => startNewBodyProfile("")}
+                      className="avsaraa-btn-outline"
+                      style={{ height: "38px", padding: "0 16px", fontSize: "12px", width: "auto", backgroundColor: "#FAF7F2" }}
+                    >
+                      + Add Body Profile
+                    </button>
+                  </div>
+
+                  {/* Existing Saved Profile Pills + Presets */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "18px" }}>
+                    {bodyProfiles.map((bp) => {
+                      const active = !isAddingNewBodyProfile && activeBodyProfileId === bp.id;
+                      return (
+                        <button
+                          key={bp.id}
+                          type="button"
+                          onClick={() => selectBodyProfileForEdit(bp)}
+                          style={{
+                            padding: "7px 14px",
+                            borderRadius: "999px",
+                            border: active ? "1.5px solid #261B13" : "1px solid #DFD2C4",
+                            backgroundColor: active ? "#261B13" : "#FAF7F2",
+                            color: active ? "#FAF7F2" : "#261B13",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {bp.profile_name}{bp.is_default ? " ★" : ""}
+                        </button>
+                      );
+                    })}
+
+                    {BODY_PROFILE_PRESETS.filter(
+                      (preset) => !bodyProfiles.some((bp) => bp.profile_name.toLowerCase() === preset.toLowerCase())
+                    ).map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => startNewBodyProfile(preset)}
+                        style={{
+                          padding: "7px 12px",
+                          borderRadius: "999px",
+                          border: "1px dashed #C5A059",
+                          backgroundColor: "#FFFFFF",
+                          color: "#866951",
+                          fontSize: "11.5px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        + {preset}
+                      </button>
+                    ))}
+                  </div>
+
+                  <form onSubmit={handleSaveBodyProfile} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+                      <div>
+                        <label htmlFor="bp_profile_name" style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                          Profile Name *
+                        </label>
+                        <input
+                          id="bp_profile_name"
+                          type="text"
+                          required
+                          placeholder="My Profile, Mother, Sister, Wife..."
+                          value={bodyForm.profile_name}
+                          onChange={(e) => setBodyForm({ ...bodyForm, profile_name: e.target.value })}
+                          style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FCFAF7" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="bp_gender" style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                          Gender
+                        </label>
+                        <select
+                          id="bp_gender"
+                          value={bodyForm.gender}
+                          onChange={(e) => setBodyForm({ ...bodyForm, gender: e.target.value as BodyGender })}
+                          style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FCFAF7" }}
+                        >
+                          <option value="female">Female</option>
+                          <option value="male">Male</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="bp_fit_preference" style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                          Fit Preference
+                        </label>
+                        <select
+                          id="bp_fit_preference"
+                          value={bodyForm.fit_preference}
+                          onChange={(e) => setBodyForm({ ...bodyForm, fit_preference: e.target.value as FitPreference })}
+                          style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FCFAF7" }}
+                        >
+                          <option value="snug">Tailored / Snug Fit</option>
+                          <option value="regular">Regular / Standard Fit</option>
+                          <option value="relaxed">Relaxed / Comfort Fit</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="bp_preferred_size" style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                          Usual Size
+                        </label>
+                        <select
+                          id="bp_preferred_size"
+                          value={bodyForm.preferred_size}
+                          onChange={(e) => setBodyForm({ ...bodyForm, preferred_size: e.target.value })}
+                          style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FCFAF7" }}
+                        >
+                          {["XS", "S", "M", "L", "XL", "XXL", "XXXL"].map((sz) => (
+                            <option key={sz} value={sz}>{sz}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px" }}>
+                      <div>
+                        <label htmlFor="bp_height" style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                          Height (cm)
+                        </label>
+                        <input
+                          id="bp_height"
+                          type="number"
+                          min={90}
+                          max={240}
+                          step="0.5"
+                          placeholder="e.g. 162"
+                          value={bodyForm.height_cm}
+                          onChange={(e) => setBodyForm({ ...bodyForm, height_cm: e.target.value })}
+                          style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FCFAF7" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="bp_weight" style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                          Weight (kg)
+                        </label>
+                        <input
+                          id="bp_weight"
+                          type="number"
+                          min={25}
+                          max={220}
+                          step="0.5"
+                          placeholder="e.g. 58"
+                          value={bodyForm.weight_kg}
+                          onChange={(e) => setBodyForm({ ...bodyForm, weight_kg: e.target.value })}
+                          style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FCFAF7" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="bp_bust" style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                          Bust / Chest (in)
+                        </label>
+                        <input
+                          id="bp_bust"
+                          type="number"
+                          min={24}
+                          max={65}
+                          step="0.5"
+                          placeholder="e.g. 36"
+                          value={bodyForm.bust_chest_in}
+                          onChange={(e) => setBodyForm({ ...bodyForm, bust_chest_in: e.target.value })}
+                          style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FCFAF7" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="bp_waist" style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                          Waist (in)
+                        </label>
+                        <input
+                          id="bp_waist"
+                          type="number"
+                          min={20}
+                          max={60}
+                          step="0.5"
+                          placeholder="e.g. 30"
+                          value={bodyForm.waist_in}
+                          onChange={(e) => setBodyForm({ ...bodyForm, waist_in: e.target.value })}
+                          style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FCFAF7" }}
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="bp_hip" style={{ display: "block", fontSize: "11.5px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                          Hip (in)
+                        </label>
+                        <input
+                          id="bp_hip"
+                          type="number"
+                          min={24}
+                          max={70}
+                          step="0.5"
+                          placeholder="e.g. 40"
+                          value={bodyForm.hip_in}
+                          onChange={(e) => setBodyForm({ ...bodyForm, hip_in: e.target.value })}
+                          style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "13.5px", backgroundColor: "#FCFAF7" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live Calculated Fit Preview */}
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: "12px",
+                        backgroundColor: "#FAF7F2",
+                        border: "1px solid #E6DACF",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                        fontSize: "12.5px",
+                        color: "#261B13",
+                      }}
+                    >
+                      <span>
+                        ✦{" "}
+                        {
+                          recommendSizeForProduct(
+                            {
+                              profile_name: bodyForm.profile_name,
+                              gender: bodyForm.gender,
+                              height_cm: bodyForm.height_cm ? Number(bodyForm.height_cm) : null,
+                              weight_kg: bodyForm.weight_kg ? Number(bodyForm.weight_kg) : null,
+                              bust_chest_in: bodyForm.bust_chest_in ? Number(bodyForm.bust_chest_in) : null,
+                              waist_in: bodyForm.waist_in ? Number(bodyForm.waist_in) : null,
+                              hip_in: bodyForm.hip_in ? Number(bodyForm.hip_in) : null,
+                              fit_preference: bodyForm.fit_preference,
+                              preferred_size: bodyForm.preferred_size,
+                            },
+                            ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
+                          ).summary
+                        }
+                      </span>
+
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px", color: "#5A4535" }}>
+                        <input
+                          type="checkbox"
+                          checked={bodyForm.is_default}
+                          onChange={(e) => setBodyForm({ ...bodyForm, is_default: e.target.checked })}
+                        />
+                        <span>Default profile</span>
+                      </label>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                      <button
+                        type="submit"
+                        disabled={isSavingBodyProfile}
+                        className="avsaraa-btn-primary"
+                        style={{ height: "44px", padding: "0 24px", fontSize: "13px", width: "auto" }}
+                      >
+                        {isSavingBodyProfile ? "Saving..." : "Save Body Profile"}
+                      </button>
+
+                      {!isAddingNewBodyProfile && bodyProfiles.some((p) => p.id === bodyForm.id) && (
+                        <button
+                          type="button"
+                          disabled={isSavingBodyProfile}
+                          onClick={() => handleDeleteBodyProfile(bodyForm.id)}
+                          className="avsaraa-btn-outline"
+                          style={{ height: "44px", padding: "0 18px", fontSize: "12.5px", width: "auto", color: "#8A181A", borderColor: "#E8C9C9" }}
+                        >
+                          Remove Profile
+                        </button>
+                      )}
+                    </div>
+                  </form>
                 </div>
               </div>
             )}
@@ -1685,12 +2210,28 @@ export default function AccountPage() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                  <label htmlFor="account_postal_code" style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                    PIN Code * {accountPinLookupLoading ? "(Auto-filling...)" : ""}
+                  </label>
+                  <input
+                    id="account_postal_code"
+                    type="text"
+                    value={newAddress.postal_code}
+                    onChange={(e) => handleAccountPinChange(e.target.value)}
+                    required
+                    placeholder="380001"
+                    maxLength={6}
+                    style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="account_city" style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
                     City *
                   </label>
                   <input
+                    id="account_city"
                     type="text"
                     value={newAddress.city}
                     onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
@@ -1700,29 +2241,16 @@ export default function AccountPage() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
+                  <label htmlFor="account_state" style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
                     State *
                   </label>
                   <input
+                    id="account_state"
                     type="text"
                     value={newAddress.state}
                     onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
                     required
                     placeholder="Gujarat"
-                    style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#261B13", marginBottom: "4px" }}>
-                    PIN Code *
-                  </label>
-                  <input
-                    type="text"
-                    value={newAddress.postal_code}
-                    onChange={(e) => setNewAddress({ ...newAddress, postal_code: e.target.value })}
-                    required
-                    placeholder="395001"
-                    maxLength={6}
                     style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #CFBEAD", fontSize: "14px", backgroundColor: "#FCFAF7" }}
                   />
                 </div>

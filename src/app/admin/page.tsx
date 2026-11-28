@@ -116,6 +116,7 @@ export default function AdminDashboardPage() {
 
   // Bulk Product Ingestion & Image Upload States
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [showCatalogFeedsModal, setShowCatalogFeedsModal] = useState(false);
   const [bulkCsvFile, setBulkCsvFile] = useState<File | null>(null);
   const [bulkParsedProducts, setBulkParsedProducts] = useState<Array<Record<string, unknown>>>([]);
   const [bulkImporting, setBulkImporting] = useState(false);
@@ -2482,6 +2483,26 @@ export default function AdminDashboardPage() {
                 >
                   <span>📥 CSV Template</span>
                 </a>
+
+                <button
+                  onClick={() => setShowCatalogFeedsModal(true)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "9px 14px",
+                    backgroundColor: "#FAF7F2",
+                    color: "#261B13",
+                    borderRadius: "10px",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    border: "1px solid #CFBEAD",
+                    cursor: "pointer",
+                  }}
+                  title="Copy Meta / Google Merchant feed URLs and export Amazon, Myntra, Ajio CSV sheets"
+                >
+                  <span>🔗 Catalog Feeds</span>
+                </button>
 
                 <button
                   onClick={() => {
@@ -4904,7 +4925,17 @@ export default function AdminDashboardPage() {
                         type="number"
                         min="0"
                         value={productForm.stock_count}
-                        onChange={(e) => setProductForm({ ...productForm, stock_count: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const numVal = Math.max(0, Number(val) || 0);
+                          setProductForm((prev) => ({
+                            ...prev,
+                            stock_count: val,
+                            ...(prev.available_sizes.length === 1
+                              ? { size_inventory: { [prev.available_sizes[0]]: numVal } }
+                              : {}),
+                          }));
+                        }}
                         placeholder="10"
                         style={{
                           width: "100%",
@@ -6029,6 +6060,246 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: CATALOG FEEDS & MARKETPLACE EXPORTS                            */}
+      {/* ===================================================================== */}
+      {showCatalogFeedsModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 999,
+            backgroundColor: "rgba(38,27,19,0.65)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowCatalogFeedsModal(false);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "660px",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              padding: "28px",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px" }}>
+              <div>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#866951", textTransform: "uppercase" }}>
+                  Multi-Channel Syndication
+                </span>
+                <h3 style={{ fontSize: "20px", fontWeight: 700, color: "#261B13", marginTop: "2px" }}>
+                  Product Catalog Feeds &amp; Marketplace Exports
+                </h3>
+                <p style={{ fontSize: "12.5px", color: "#6E5B4E", marginTop: "4px" }}>
+                  Paste the scheduled feed URLs into Meta Commerce Manager or Google Merchant Center, or download formatted CSV sheets for Indian marketplaces.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCatalogFeedsModal(false)}
+                style={{ padding: "6px", color: "#866951", background: "none", border: "none", cursor: "pointer" }}
+              >
+                <CloseIcon size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div style={{ padding: "14px 16px", backgroundColor: "#FAF7F2", borderRadius: "12px", border: "1px solid #E6DACF" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <strong style={{ fontSize: "13px", color: "#261B13" }}>
+                    Meta (Facebook / Instagram) &amp; Google Merchant Center — XML Feed URL
+                  </strong>
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: "#1E5E3A", backgroundColor: "#E8F5E9", padding: "2px 8px", borderRadius: "999px" }}>
+                    AUTO-SYNC URL
+                  </span>
+                </div>
+                <p style={{ fontSize: "11.5px", color: "#6E5B4E", marginBottom: "8px" }}>
+                  Paste this URL directly in Meta Commerce Manager (Data Feed → Use a URL) or Google Merchant Center (Scheduled Fetch).
+                </p>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${typeof window !== "undefined" ? window.location.origin : "https://avsaraa.in"}/api/catalog/feed?format=xml`}
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      borderRadius: "6px",
+                      border: "1px solid #CFBEAD",
+                      backgroundColor: "#FFFFFF",
+                      fontSize: "12px",
+                      fontFamily: "monospace",
+                      color: "#261B13",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = `${window.location.origin}/api/catalog/feed?format=xml`;
+                      void navigator.clipboard.writeText(url);
+                      showToast("XML Catalog Feed URL copied!");
+                    }}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "6px",
+                      backgroundColor: "#261B13",
+                      color: "#FAF7F2",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      border: "none",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Copy URL
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: "14px 16px", backgroundColor: "#FAF7F2", borderRadius: "12px", border: "1px solid #E6DACF" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <strong style={{ fontSize: "13px", color: "#261B13" }}>
+                    Meta &amp; Google Merchant Center — CSV Feed URL
+                  </strong>
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: "#1E5E3A", backgroundColor: "#E8F5E9", padding: "2px 8px", borderRadius: "999px" }}>
+                    AUTO-SYNC URL
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${typeof window !== "undefined" ? window.location.origin : "https://avsaraa.in"}/api/catalog/feed?format=csv`}
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      borderRadius: "6px",
+                      border: "1px solid #CFBEAD",
+                      backgroundColor: "#FFFFFF",
+                      fontSize: "12px",
+                      fontFamily: "monospace",
+                      color: "#261B13",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = `${window.location.origin}/api/catalog/feed?format=csv`;
+                      void navigator.clipboard.writeText(url);
+                      showToast("CSV Catalog Feed URL copied!");
+                    }}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "6px",
+                      backgroundColor: "#261B13",
+                      color: "#FAF7F2",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      border: "none",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Copy URL
+                  </button>
+                  <a
+                    href="/api/catalog/feed?format=csv&download=1"
+                    download="avsaraa-meta-google-catalog.csv"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      backgroundColor: "#FFFFFF",
+                      color: "#866951",
+                      border: "1px solid #CFBEAD",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+
+              <div style={{ padding: "14px 16px", backgroundColor: "#FFFFFF", borderRadius: "12px", border: "1px solid #E6DACF" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <strong style={{ fontSize: "13px", color: "#261B13" }}>
+                    Amazon, Myntra &amp; Ajio — Bulk Marketplace Sheets
+                  </strong>
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: "#866951", backgroundColor: "#F7F2EE", padding: "2px 8px", borderRadius: "999px" }}>
+                    PORTAL UPLOAD ONLY
+                  </span>
+                </div>
+                <p style={{ fontSize: "11.5px", color: "#6E5B4E", marginBottom: "12px" }}>
+                  Amazon Seller Central, Myntra Partner Portal, and Ajio Seller Portal do not support pasting external catalog URLs; download their formatted CSV sheets below to upload inside each seller portal.
+                </p>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <a
+                    href="/api/catalog/feed?channel=amazon"
+                    download="avsaraa-amazon-catalog.csv"
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      backgroundColor: "#FAF7F2",
+                      border: "1px solid #CFBEAD",
+                      color: "#261B13",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    📥 Amazon CSV
+                  </a>
+                  <a
+                    href="/api/catalog/feed?channel=myntra"
+                    download="avsaraa-myntra-catalog.csv"
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      backgroundColor: "#FAF7F2",
+                      border: "1px solid #CFBEAD",
+                      color: "#261B13",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    📥 Myntra CSV
+                  </a>
+                  <a
+                    href="/api/catalog/feed?channel=ajio"
+                    download="avsaraa-ajio-catalog.csv"
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      backgroundColor: "#FAF7F2",
+                      border: "1px solid #CFBEAD",
+                      color: "#261B13",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    📥 Ajio CSV
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

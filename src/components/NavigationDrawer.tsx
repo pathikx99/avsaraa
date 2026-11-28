@@ -509,7 +509,7 @@ export default function NavigationDrawer({
             <span>→</span>
           </Link>
           <p style={{ marginTop: "2px", textAlign: "center", fontSize: "11px", color: "#6A584B" }}>
-            Avsaraa Handloom Atelier • Pan-India Express Delivery (Free ₹799+)
+            Avsaraa Handloom Atelier • Pan-India Express Delivery (Use FREESHIP in bag)
           </p>
         </div>
       </div>

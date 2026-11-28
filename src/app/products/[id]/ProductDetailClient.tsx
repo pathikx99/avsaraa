@@ -9,6 +9,8 @@ import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { formatINR } from "@/lib/productUtils";
 import { isValidGujaratPincode, isValidIndianPincode } from "@/lib/financials";
+import { BodyProfile } from "@/types/bodyProfile";
+import { recommendSizeForProduct } from "@/lib/sizeRecommendation";
 import BackInStockNotifier from "@/components/BackInStockNotifier";
 import { ProductReview } from "@/types/review";
 import Footer from "@/components/Footer";
@@ -16,7 +18,6 @@ import Header from "@/components/Header";
 import {
   HeartIcon,
   ShoppingBagIcon,
-  ChevronDownIcon,
   CheckIcon,
   StarIcon,
   DeliveryVanIcon,
@@ -41,28 +42,51 @@ interface ProductDetailClientProps {
 
 export default function ProductDetailClient({ initialProduct }: ProductDetailClientProps) {
   const router = useRouter();
-  const { addToCart } = useCart();
+  const { addToCart, openCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
 
   const searchParams = useSearchParams();
   const urlColor = searchParams?.get("color");
+  const colorVariantsList = initialProduct.color_variants || [];
+  const matchedUrlColor =
+    urlColor &&
+    colorVariantsList.find((v) => v.name.toLowerCase() === urlColor.toLowerCase())?.name;
   const initialColor =
-    (urlColor &&
-      initialProduct.color_variants?.find(
-        (v) => v.name.toLowerCase() === urlColor.toLowerCase()
-      )?.name) ||
-    initialProduct.color_variants?.[0]?.name ||
-    "Default";
+    matchedUrlColor ||
+    (colorVariantsList.length === 1
+      ? colorVariantsList[0].name
+      : colorVariantsList.length === 0
+      ? "Default"
+      : "");
+
+  const initialSizesList = initialProduct.available_sizes || [];
+  const initialSize =
+    initialSizesList.length === 1
+      ? initialSizesList[0]
+      : initialSizesList.length === 0
+      ? "Free Size"
+      : "";
 
   const product = initialProduct;
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedColor, setSelectedColor] = useState<string>(initialColor);
-  const [selectedSize, setSelectedSize] = useState<string>(
-    initialProduct.available_sizes?.[0] || "Free Size"
-  );
+  const [selectedSize, setSelectedSize] = useState<string>(initialSize);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [isAddedToCart, setIsAddedToCart] = useState(false);
   const [preOrderMode, setPreOrderMode] = useState(false);
+
+  // Suggest Size for You state (Changes 9-11)
+  const [showSizeSuggester, setShowSizeSuggester] = useState(false);
+  const [savedBodyProfiles, setSavedBodyProfiles] = useState<BodyProfile[]>([]);
+  const [selectedBodyProfileId, setSelectedBodyProfileId] = useState<string>("");
+  const [quickBodyDraft, setQuickBodyDraft] = useState({
+    height_cm: "",
+    weight_kg: "",
+    bust_chest_in: "",
+    waist_in: "",
+    fit_preference: "regular" as "snug" | "regular" | "relaxed",
+  });
 
   // Modals & Overlays
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
@@ -244,6 +268,24 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     };
   }, [product.id, product.category]);
 
+  // Load saved customer body profiles for "Suggest Size for You"
+  useEffect(() => {
+    let isMounted = true;
+    fetch("/api/customer/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!isMounted || !data?.body_profiles) return;
+        const profiles = data.body_profiles as BodyProfile[];
+        setSavedBodyProfiles(profiles);
+        const def = profiles.find((p) => p.is_default) || profiles[0];
+        if (def) setSelectedBodyProfileId(def.id);
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Monitor scroll for mobile sticky bar
   useEffect(() => {
     const handleScroll = () => {
@@ -265,16 +307,32 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   }, [product.color_variants, selectedColor]);
 
   const allAvailableSizes = useMemo(() => {
-    if (activeColorVariant?.sizes && activeColorVariant.sizes.length > 0) {
+    if (selectedColor && activeColorVariant?.sizes && activeColorVariant.sizes.length > 0) {
       return Array.from(new Set(activeColorVariant.sizes.map((s) => s.size)));
     }
-    return Array.isArray(product.available_sizes) && product.available_sizes.length > 0
-      ? Array.from(new Set(product.available_sizes))
-      : ["Free Size"];
-  }, [activeColorVariant, product.available_sizes]);
+    const unionVariantSizes = (product.color_variants || []).flatMap((v) =>
+      Array.isArray(v.sizes) ? v.sizes.map((s) => s.size) : []
+    );
+    const merged = [
+      ...(Array.isArray(product.available_sizes) ? product.available_sizes : []),
+      ...unionVariantSizes,
+    ].filter(Boolean);
+    return merged.length > 0 ? Array.from(new Set(merged)) : ["Free Size"];
+  }, [selectedColor, activeColorVariant, product.color_variants, product.available_sizes]);
 
   const getSizeStock = useCallback(
     (sz: string): number => {
+      // If colour is not selected yet on a multi-colourway item, show max stock available across colourways for that size
+      if (!selectedColor && Array.isArray(product.color_variants) && product.color_variants.length > 1) {
+        const variantStocks = product.color_variants.map((v) => {
+          const match = v.sizes?.find((s) => s.size.toLowerCase().trim() === sz.toLowerCase().trim());
+          if (match && typeof match.stock === "number") return Math.max(0, match.stock);
+          if (typeof v.stock === "number") return Math.max(0, v.stock);
+          return -1;
+        }).filter((n) => n >= 0);
+        if (variantStocks.length > 0) return Math.max(...variantStocks);
+      }
+
       // 1. If active colorway has explicit sizes with stock
       if (activeColorVariant?.sizes && activeColorVariant.sizes.length > 0) {
         const match = activeColorVariant.sizes.find(
@@ -309,12 +367,52 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       // 4. Fallback to product stock_count
       return product.stock_count !== undefined ? Math.max(0, product.stock_count) : 10;
     },
-    [activeColorVariant, product.size_inventory, product.specifications, product.stock_count]
+    [
+      activeColorVariant,
+      product.color_variants,
+      selectedColor,
+      product.size_inventory,
+      product.specifications,
+      product.stock_count,
+    ]
   );
 
   const currentVariantStock = useMemo(() => {
+    if (!selectedSize) {
+      // Check if at least one available size has stock
+      const anyStock = allAvailableSizes.reduce((max, sz) => Math.max(max, getSizeStock(sz)), 0);
+      return anyStock;
+    }
     return getSizeStock(selectedSize);
-  }, [getSizeStock, selectedSize]);
+  }, [getSizeStock, selectedSize, allAvailableSizes]);
+
+  const activeBodyProfileForSuggestion = useMemo(() => {
+    if (savedBodyProfiles.length > 0) {
+      return savedBodyProfiles.find((p) => p.id === selectedBodyProfileId) || savedBodyProfiles[0];
+    }
+    return {
+      profile_name: "You",
+      gender: product.category === "Men's Wear" ? ("male" as const) : ("female" as const),
+      height_cm: quickBodyDraft.height_cm ? Number(quickBodyDraft.height_cm) : null,
+      weight_kg: quickBodyDraft.weight_kg ? Number(quickBodyDraft.weight_kg) : null,
+      bust_chest_in: quickBodyDraft.bust_chest_in ? Number(quickBodyDraft.bust_chest_in) : null,
+      waist_in: quickBodyDraft.waist_in ? Number(quickBodyDraft.waist_in) : null,
+      fit_preference: quickBodyDraft.fit_preference,
+    };
+  }, [savedBodyProfiles, selectedBodyProfileId, quickBodyDraft, product.category]);
+
+  const currentSizeRecommendation = useMemo(() => {
+    const hasData =
+      savedBodyProfiles.length > 0 ||
+      Boolean(
+        quickBodyDraft.bust_chest_in ||
+          quickBodyDraft.waist_in ||
+          quickBodyDraft.weight_kg ||
+          quickBodyDraft.height_cm
+      );
+    if (!hasData) return null;
+    return recommendSizeForProduct(activeBodyProfileForSuggestion, allAvailableSizes, product.category);
+  }, [savedBodyProfiles.length, quickBodyDraft, activeBodyProfileForSuggestion, allAvailableSizes, product.category]);
 
   const isCurrentVariantOutOfStock = currentVariantStock === 0;
   const effectiveQuantity = isCurrentVariantOutOfStock
@@ -364,10 +462,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
   // Update image when color changes and ensure valid size selection
   const handleColorChange = (variantName: string) => {
     setSelectedColor(variantName);
+    setSelectionError(null);
     setSelectedImageIndex(0);
 
     const targetVariant = product.color_variants?.find((v) => v.name === variantName);
-    if (targetVariant?.sizes && targetVariant.sizes.length > 0) {
+    if (targetVariant?.sizes && targetVariant.sizes.length > 0 && selectedSize) {
       const curSizeStillInStock = targetVariant.sizes.some(
         (s) => s.size.toLowerCase().trim() === selectedSize.toLowerCase().trim() && s.stock > 0
       );
@@ -409,9 +508,23 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
     setTouchStartX(null);
   };
 
-  // Add to Cart
+  const selectionRef = useRef<HTMLDivElement>(null);
+
+  const validateVariantSelection = (): boolean => {
+    const needsColor = Boolean(product.color_variants && product.color_variants.length > 0);
+    if ((needsColor && !selectedColor) || !selectedSize) {
+      setSelectionError("Please select both a colour and size before adding this piece to your bag.");
+      selectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
+    setSelectionError(null);
+    return true;
+  };
+
+  // Add to Cart (Change 12: require color & size, allow customer to keep browsing instead of forcing checkout)
   const handleAddToCart = () => {
     if (isCurrentVariantOutOfStock) return;
+    if (!validateVariantSelection()) return;
     const cartProduct: DetailedProduct = {
       ...product,
       price: product.price,
@@ -419,16 +532,17 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       name: `${product.name} · ${selectedSize}${selectedColor && selectedColor !== "Default" && selectedColor !== "Royal Edition" ? ` · ${selectedColor}` : ""}`,
     };
 
-    const success = addToCart(cartProduct, effectiveQuantity);
+    const success = addToCart(cartProduct, effectiveQuantity, { openCartDrawer: false });
     if (success) {
       setIsAddedToCart(true);
-      setTimeout(() => setIsAddedToCart(false), 2400);
+      setTimeout(() => setIsAddedToCart(false), 3200);
     }
   };
 
   // Buy Now
   const handleBuyNow = () => {
     if (isCurrentVariantOutOfStock) return;
+    if (!validateVariantSelection()) return;
     const cartProduct: DetailedProduct = {
       ...product,
       price: product.price,
@@ -436,7 +550,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
       name: `${product.name} · ${selectedSize}${selectedColor && selectedColor !== "Default" && selectedColor !== "Royal Edition" ? ` · ${selectedColor}` : ""}`,
     };
 
-    const success = addToCart(cartProduct, effectiveQuantity);
+    const success = addToCart(cartProduct, effectiveQuantity, { openCartDrawer: false });
     if (success) {
       router.push("/checkout");
     }
@@ -444,28 +558,30 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
 
   // Pre-order handlers
   const handlePreOrderAddToCart = () => {
+    if (!validateVariantSelection()) return;
     const cartProduct: DetailedProduct = {
       ...product,
       price: product.price,
       image_url: currentGalleryImg,
       name: `${product.name} · Pre-Order · ${selectedSize}${selectedColor && selectedColor !== "Default" ? ` · ${selectedColor}` : ""}`,
     };
-    const success = addToCart(cartProduct, quantity);
+    const success = addToCart(cartProduct, quantity, { openCartDrawer: false });
     if (success) {
       setIsAddedToCart(true);
       setPreOrderMode(false);
-      setTimeout(() => setIsAddedToCart(false), 2400);
+      setTimeout(() => setIsAddedToCart(false), 3200);
     }
   };
 
   const handlePreOrderBuyNow = () => {
+    if (!validateVariantSelection()) return;
     const cartProduct: DetailedProduct = {
       ...product,
       price: product.price,
       image_url: currentGalleryImg,
       name: `${product.name} · Pre-Order · ${selectedSize}${selectedColor && selectedColor !== "Default" ? ` · ${selectedColor}` : ""}`,
     };
-    const success = addToCart(cartProduct, quantity);
+    const success = addToCart(cartProduct, quantity, { openCartDrawer: false });
     if (success) {
       router.push("/checkout");
     }
@@ -938,6 +1054,28 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     SKU: {product.sku}
                   </span>
                 )}
+                {(product.occasion_tags || [])
+                  .filter((tag) =>
+                    ["Special Promo", "Festive Offer", "Sale", "Under ₹1,299", "Flash Deal", "Limited Deal"].includes(tag)
+                  )
+                  .map((tag) => (
+                    <span
+                      key={tag}
+                      style={{
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        color: "#8A181A",
+                        backgroundColor: "rgba(138, 24, 26, 0.08)",
+                        border: "1px solid rgba(138, 24, 26, 0.25)",
+                        padding: "3px 9px",
+                        borderRadius: "999px",
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
               </div>
 
               <button
@@ -1028,7 +1166,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             </div>
 
             <p style={{ fontSize: "12px", color: "#6E5B4E", marginBottom: "14px" }}>
-              Inclusive of all taxes · Fall &amp; Pico Included · Free Pan-India Delivery ₹799+
+              Inclusive of all taxes · Fall &amp; Pico Included · Insured Pan-India Delivery
             </p>
 
             {/* Short Product Description (2-3 lines) */}
@@ -1111,13 +1249,14 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             {/* =========================================================================
                 5. COLOUR SELECTION
                ========================================================================= */}
+            <div ref={selectionRef} />
             {product.color_variants && product.color_variants.length > 0 && (
               <div style={{ marginBottom: "24px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                   <span style={{ fontSize: "13px", fontWeight: 600, color: "#261B13" }}>
                     Colour:{" "}
-                    <span style={{ fontWeight: 400, color: "#6E5B4E" }}>
-                      {selectedColor}
+                    <span style={{ fontWeight: selectedColor ? 500 : 600, color: selectedColor ? "#6E5B4E" : "#8A181A" }}>
+                      {selectedColor || "Select a colour"}
                     </span>
                   </span>
                 </div>
@@ -1165,7 +1304,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             )}
 
             {/* =========================================================================
-                6. SIZE SELECTION & MEASUREMENT GUIDE
+                6. SIZE SELECTION, SUGGEST SIZE FOR YOU & MEASUREMENT GUIDE
                ========================================================================= */}
             <div style={{ marginBottom: "24px" }}>
               <div
@@ -1173,37 +1312,218 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "8px",
                   marginBottom: "10px",
                 }}
               >
                 <span style={{ fontSize: "13px", fontWeight: 600, color: "#261B13" }}>
                   Select Size:{" "}
-                  <span style={{ fontWeight: 400, color: "#6E5B4E" }}>{selectedSize}</span>
+                  <span style={{ fontWeight: selectedSize ? 500 : 600, color: selectedSize ? "#6E5B4E" : "#8A181A" }}>
+                    {selectedSize || "Select a size"}
+                  </span>
                 </span>
 
-                {/* Size Guide Link (Requirement 6) */}
-                <button
-                  type="button"
-                  onClick={() => setIsSizeGuideOpen(true)}
-                  aria-label="Open Size Measurement Guide"
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowSizeSuggester((prev) => !prev)}
+                    aria-expanded={showSizeSuggester}
+                    style={{
+                      background: showSizeSuggester ? "#261B13" : "#F5EFE6",
+                      border: "1px solid #C5A059",
+                      color: showSizeSuggester ? "#FAF7F2" : "#261B13",
+                      fontSize: "11.5px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      padding: "4px 10px",
+                      borderRadius: "999px",
+                    }}
+                  >
+                    <span>✦ Suggest Size for You</span>
+                  </button>
+
+                  {/* Size Guide Link */}
+                  <button
+                    type="button"
+                    onClick={() => setIsSizeGuideOpen(true)}
+                    aria-label="Open Size Measurement Guide"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#8A181A",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    <RulerIcon size={14} color="#8A181A" />
+                    <span>Size Guide</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Change 9: Interactive Suggest Size for You Panel */}
+              {showSizeSuggester && (
+                <div
+                  className="product-info-tab-panel"
                   style={{
-                    background: "none",
-                    border: "none",
-                    color: "#8A181A",
-                    fontSize: "12.5px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "5px",
-                    textDecoration: "underline",
-                    padding: 0,
+                    marginBottom: "12px",
+                    padding: "14px",
+                    borderRadius: "14px",
+                    backgroundColor: "#FAF7F2",
+                    border: "1px solid #DFD2C4",
                   }}
                 >
-                  <RulerIcon size={14} color="#8A181A" />
-                  <span>Size Guide</span>
-                </button>
-              </div>
+                  {savedBodyProfiles.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: "#261B13" }}>
+                          Select Body Profile
+                        </span>
+                        <Link href="/account" style={{ fontSize: "11px", color: "#866951", textDecoration: "underline" }}>
+                          Manage Family Profiles →
+                        </Link>
+                      </div>
+
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {savedBodyProfiles.map((bp) => {
+                          const active = (selectedBodyProfileId || savedBodyProfiles[0]?.id) === bp.id;
+                          return (
+                            <button
+                              key={bp.id}
+                              type="button"
+                              onClick={() => setSelectedBodyProfileId(bp.id)}
+                              style={{
+                                padding: "5px 12px",
+                                borderRadius: "999px",
+                                border: active ? "1.5px solid #261B13" : "1px solid #DFD2C4",
+                                backgroundColor: active ? "#261B13" : "#FFFFFF",
+                                color: active ? "#FAF7F2" : "#261B13",
+                                fontSize: "11.5px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {bp.profile_name}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {currentSizeRecommendation && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px", padding: "10px 12px", borderRadius: "10px", backgroundColor: "#FFFFFF", border: "1px solid #E6DACF" }}>
+                          <div style={{ fontSize: "12.5px", color: "#261B13", flex: 1 }}>
+                            <strong>Suggested Size: {currentSizeRecommendation.matchedAvailableSize}</strong>
+                            <div style={{ fontSize: "11.5px", color: "#6E5B4E", marginTop: "2px" }}>
+                              {currentSizeRecommendation.summary}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedSize(currentSizeRecommendation.matchedAvailableSize);
+                              setSelectionError(null);
+                            }}
+                            style={{
+                              padding: "7px 14px",
+                              borderRadius: "8px",
+                              backgroundColor: "#56351E",
+                              color: "#FAF7F2",
+                              border: "none",
+                              fontSize: "11.5px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Apply Size {currentSizeRecommendation.matchedAvailableSize}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: "#261B13" }}>
+                          Quick Size Finder
+                        </span>
+                        <Link href="/account" style={{ fontSize: "11px", color: "#866951", textDecoration: "underline" }}>
+                          Sign in to save profiles →
+                        </Link>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "8px" }}>
+                        <input
+                          type="number"
+                          placeholder="Height (cm)"
+                          aria-label="Height in cm"
+                          value={quickBodyDraft.height_cm}
+                          onChange={(e) => setQuickBodyDraft({ ...quickBodyDraft, height_cm: e.target.value })}
+                          style={{ padding: "7px 9px", borderRadius: "8px", border: "1px solid #D8CABE", fontSize: "12px", backgroundColor: "#FFFFFF" }}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Weight (kg)"
+                          aria-label="Weight in kg"
+                          value={quickBodyDraft.weight_kg}
+                          onChange={(e) => setQuickBodyDraft({ ...quickBodyDraft, weight_kg: e.target.value })}
+                          style={{ padding: "7px 9px", borderRadius: "8px", border: "1px solid #D8CABE", fontSize: "12px", backgroundColor: "#FFFFFF" }}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Bust / Chest (in)"
+                          aria-label="Bust or chest in inches"
+                          value={quickBodyDraft.bust_chest_in}
+                          onChange={(e) => setQuickBodyDraft({ ...quickBodyDraft, bust_chest_in: e.target.value })}
+                          style={{ padding: "7px 9px", borderRadius: "8px", border: "1px solid #D8CABE", fontSize: "12px", backgroundColor: "#FFFFFF" }}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Waist (in)"
+                          aria-label="Waist in inches"
+                          value={quickBodyDraft.waist_in}
+                          onChange={(e) => setQuickBodyDraft({ ...quickBodyDraft, waist_in: e.target.value })}
+                          style={{ padding: "7px 9px", borderRadius: "8px", border: "1px solid #D8CABE", fontSize: "12px", backgroundColor: "#FFFFFF" }}
+                        />
+                      </div>
+
+                      {currentSizeRecommendation && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px", padding: "10px 12px", borderRadius: "10px", backgroundColor: "#FFFFFF", border: "1px solid #E6DACF" }}>
+                          <span style={{ fontSize: "12px", color: "#261B13" }}>
+                            ✦ {currentSizeRecommendation.summary}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedSize(currentSizeRecommendation.matchedAvailableSize);
+                              setSelectionError(null);
+                            }}
+                            style={{
+                              padding: "6px 12px",
+                              borderRadius: "8px",
+                              backgroundColor: "#56351E",
+                              color: "#FAF7F2",
+                              border: "none",
+                              fontSize: "11.5px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Select {currentSizeRecommendation.matchedAvailableSize}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Size Buttons */}
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -1215,7 +1535,10 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                     <button
                       key={`${sz}-${idx}`}
                       type="button"
-                      onClick={() => setSelectedSize(sz)}
+                      onClick={() => {
+                        setSelectedSize(sz);
+                        setSelectionError(null);
+                      }}
                       aria-label={`Select size ${sz}${isOutOfStock ? " - Out of stock" : ""}`}
                       style={{
                         minWidth: sz.length > 5 ? "auto" : "44px",
@@ -1476,6 +1799,61 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               </div>
             )}
 
+            {selectionError && (
+              <div
+                role="alert"
+                style={{
+                  marginBottom: "12px",
+                  padding: "10px 14px",
+                  borderRadius: "10px",
+                  backgroundColor: "rgba(138, 24, 26, 0.08)",
+                  border: "1px solid rgba(138, 24, 26, 0.3)",
+                  color: "#8A181A",
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                }}
+              >
+                {selectionError}
+              </div>
+            )}
+
+            {isAddedToCart && (
+              <div
+                style={{
+                  marginBottom: "12px",
+                  padding: "10px 14px",
+                  borderRadius: "10px",
+                  backgroundColor: "#F4F8F5",
+                  border: "1px solid #C4D9CC",
+                  color: "#1E5E3A",
+                  fontSize: "12.5px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                }}
+              >
+                <span>✓ Added to your shopping bag! Continue browsing or view bag anytime.</span>
+                <button
+                  type="button"
+                  onClick={openCart}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    color: "#261B13",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                  }}
+                >
+                  Open Shopping Bag →
+                </button>
+              </div>
+            )}
+
             {/* =========================================================================
                 9. ADD TO CART & BUY NOW (Primary Chocolate-Brown Styling)
                ========================================================================= */}
@@ -1671,9 +2049,9 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               >
                 <DeliveryVanIcon size={20} color="#866951" />
                 <div>
-                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#261B13", letterSpacing: "0.04em" }}>FREE SHIPPING</div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#261B13", letterSpacing: "0.04em" }}>EXPRESS DELIVERY</div>
                   <div style={{ fontSize: "10.5px", color: "#6A584B", marginTop: "2px", lineHeight: 1.3 }}>
-                    Orders ₹799+
+                    Code FREESHIP in bag
                   </div>
                 </div>
               </div>
@@ -1693,9 +2071,9 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
               >
                 <ReturnBoxIcon size={20} color="#866951" />
                 <div>
-                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#261B13", letterSpacing: "0.04em" }}>7-DAY EXCHANGE ONLY</div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#261B13", letterSpacing: "0.04em" }}>7-DAY EASY EXCHANGE</div>
                   <div style={{ fontSize: "10.5px", color: "#6A584B", marginTop: "2px", lineHeight: 1.3 }}>
-                    Easy doorstep pickup · No refunds
+                    Doorstep pickup guarantee
                   </div>
                 </div>
               </div>
@@ -1926,7 +2304,7 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   </div>
                   <div style={{ fontSize: "11.5px", color: "#3B5244", marginTop: "4px", lineHeight: 1.4 }}>
                     ✦ Cash on Delivery (COD) available<br />
-                    ✦ Free Express Pan-India Delivery directly from our Atelier (Orders ₹799+)
+                    ✦ Insured Pan-India Delivery · Use promo code FREESHIP in bag for free shipping
                   </div>
                 </div>
               )}
@@ -1957,229 +2335,197 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
             </div>
 
             {/* =========================================================================
-                12, 13, 14. EXPANDABLE SECTIONS (Product Details, Fabric & Care, Exchange)
+                12, 13, 14. HORIZONTAL SIDE-BY-SIDE TABS (Product Details, Fabric & Care, Shipping & Exchange)
                ========================================================================= */}
             <div className="product-accordions-group" style={{ marginBottom: "32px" }}>
+              {/* Horizontal 3-button row — stays strictly side-by-side even on mobile */}
+              <div className="product-info-tabs-row" role="tablist" aria-label="Product Information Tabs">
+                {[
+                  {
+                    id: "specifications",
+                    label: "Product Details",
+                    icon: (active: boolean) => (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? "#FAF7F2" : "#261B13"} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                        <path d="M12 6a2 2 0 1 0-2-2" />
+                        <path d="M12 6v2l8 5.5a1.5 1.5 0 0 1-.85 2.75H4.85A1.5 1.5 0 0 1 4 13.5L12 8z" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    id: "care",
+                    label: "Fabric & Care",
+                    icon: (active: boolean) => (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? "#FAF7F2" : "#261B13"} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                        <polygon points="12 3 21 8 12 13 3 8 12 3" />
+                        <polyline points="3 12 12 17 21 12" />
+                        <polyline points="3 16 12 21 21 16" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    id: "exchange",
+                    label: "Shipping & Exchange",
+                    icon: (active: boolean) => (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? "#FAF7F2" : "#261B13"} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                        <line x1="12" y1="22.08" x2="12" y2="12" />
+                      </svg>
+                    ),
+                  },
+                ].map((tab) => {
+                  const isActive = openAccordion === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => setOpenAccordion(isActive ? null : tab.id)}
+                      className="product-info-tab-btn"
+                      style={{
+                        backgroundColor: isActive ? "#56351E" : "#FAF5EE",
+                        color: isActive ? "#FAF7F2" : "#261B13",
+                        border: isActive ? "1.5px solid #56351E" : "1px solid #DFD2C4",
+                        boxShadow: isActive ? "0 6px 16px rgba(86, 53, 30, 0.22)" : "none",
+                      }}
+                    >
+                      {tab.icon(isActive)}
+                      <span
+                        style={{
+                          fontSize: "clamp(10.5px, 2.7vw, 13px)",
+                          fontWeight: isActive ? 600 : 500,
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {tab.label}
+                      </span>
+                      {isActive && (
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            position: "absolute",
+                            bottom: "-7px",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            width: 0,
+                            height: 0,
+                            borderLeft: "7px solid transparent",
+                            borderRight: "7px solid transparent",
+                            borderTop: "7px solid #56351E",
+                          }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
 
-              {/* SECTION 12: Product Details */}
-              <div
-                style={{
-                  borderBottom: "1px solid #E6DACF",
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "12px",
-                  marginBottom: "10px",
-                  overflow: "hidden",
-                  border: "1px solid #E6DACF",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenAccordion(openAccordion === "specifications" ? null : "specifications")}
-                  aria-expanded={openAccordion === "specifications"}
+              {/* Active Tab Panel below the full horizontal button row with fall-down animation */}
+              {openAccordion && (
+                <div
+                  key={openAccordion}
+                  role="tabpanel"
+                  className="product-info-tab-panel"
                   style={{
-                    width: "100%",
-                    padding: "16px 18px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "none",
-                    border: "none",
-                    textAlign: "left",
-                    cursor: "pointer",
+                    marginTop: "14px",
+                    backgroundColor: "#FAF7F2",
+                    border: "1px solid #E2D5C7",
+                    borderRadius: "16px",
+                    padding: "18px 18px",
+                    boxShadow: "0 4px 18px rgba(38, 27, 19, 0.04)",
                   }}
                 >
-                  <span style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
-                    Product Details &amp; Specifications
-                  </span>
-                  <span
-                    style={{
-                      transform: openAccordion === "specifications" ? "rotate(180deg)" : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                      color: "#6E5B4E",
-                    }}
-                  >
-                    <ChevronDownIcon size={16} />
-                  </span>
-                </button>
-
-                {openAccordion === "specifications" && (
-                  <div style={{ padding: "0 18px 18px 18px" }}>
+                  {openAccordion === "specifications" && (
                     <div
                       style={{
                         display: "grid",
                         gridTemplateColumns: "1fr",
-                        gap: "10px",
+                        gap: "12px",
                         fontSize: "13px",
                       }}
                     >
-                      <div style={{ display: "flex", borderBottom: "1px solid #F0E8DF", paddingBottom: "6px" }}>
-                        <span style={{ width: "120px", color: "#8E7D70", flexShrink: 0 }}>Fabric</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(96px, 34%) 1fr", gap: "10px", borderBottom: "1px solid #EAE0D5", paddingBottom: "8px" }}>
+                        <span style={{ color: "#866951", fontWeight: 500 }}>Fabric</span>
                         <span style={{ color: "#261B13", fontWeight: 500 }}>{product.specifications.fabric}</span>
                       </div>
-                      <div style={{ display: "flex", borderBottom: "1px solid #F0E8DF", paddingBottom: "6px" }}>
-                        <span style={{ width: "120px", color: "#8E7D70", flexShrink: 0 }}>Work / Embroidery</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(96px, 34%) 1fr", gap: "10px", borderBottom: "1px solid #EAE0D5", paddingBottom: "8px" }}>
+                        <span style={{ color: "#866951", fontWeight: 500 }}>Work / Embroidery</span>
                         <span style={{ color: "#261B13", fontWeight: 500 }}>{product.specifications.work}</span>
                       </div>
-                      <div style={{ display: "flex", borderBottom: "1px solid #F0E8DF", paddingBottom: "6px" }}>
-                        <span style={{ width: "120px", color: "#8E7D70", flexShrink: 0 }}>Pattern</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(96px, 34%) 1fr", gap: "10px", borderBottom: "1px solid #EAE0D5", paddingBottom: "8px" }}>
+                        <span style={{ color: "#866951", fontWeight: 500 }}>Pattern</span>
                         <span style={{ color: "#261B13", fontWeight: 500 }}>{product.specifications.pattern}</span>
                       </div>
-                      <div style={{ display: "flex", borderBottom: "1px solid #F0E8DF", paddingBottom: "6px" }}>
-                        <span style={{ width: "120px", color: "#8E7D70", flexShrink: 0 }}>Fit</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(96px, 34%) 1fr", gap: "10px", borderBottom: "1px solid #EAE0D5", paddingBottom: "8px" }}>
+                        <span style={{ color: "#866951", fontWeight: 500 }}>Fit</span>
                         <span style={{ color: "#261B13", fontWeight: 500 }}>{product.specifications.fit}</span>
                       </div>
-                      <div style={{ display: "flex", borderBottom: "1px solid #F0E8DF", paddingBottom: "6px" }}>
-                        <span style={{ width: "120px", color: "#8E7D70", flexShrink: 0 }}>Occasion</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(96px, 34%) 1fr", gap: "10px", borderBottom: "1px solid #EAE0D5", paddingBottom: "8px" }}>
+                        <span style={{ color: "#866951", fontWeight: 500 }}>Occasion</span>
                         <span style={{ color: "#261B13", fontWeight: 500 }}>{product.specifications.occasion}</span>
                       </div>
-                      <div style={{ display: "flex", borderBottom: "1px solid #F0E8DF", paddingBottom: "6px" }}>
-                        <span style={{ width: "120px", color: "#8E7D70", flexShrink: 0 }}>Set Includes</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(96px, 34%) 1fr", gap: "10px", borderBottom: "1px solid #EAE0D5", paddingBottom: "8px" }}>
+                        <span style={{ color: "#866951", fontWeight: 500 }}>Set Includes</span>
                         <span style={{ color: "#261B13", fontWeight: 500 }}>{product.specifications.set_includes}</span>
                       </div>
-                      <div style={{ display: "flex", borderBottom: "1px solid #F0E8DF", paddingBottom: "6px" }}>
-                        <span style={{ width: "120px", color: "#8E7D70", flexShrink: 0 }}>Product Length</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(96px, 34%) 1fr", gap: "10px", borderBottom: "1px solid #EAE0D5", paddingBottom: "8px" }}>
+                        <span style={{ color: "#866951", fontWeight: 500 }}>Product Length</span>
                         <span style={{ color: "#261B13", fontWeight: 500 }}>{product.specifications.product_length}</span>
                       </div>
-                      <div style={{ display: "flex" }}>
-                        <span style={{ width: "120px", color: "#8E7D70", flexShrink: 0 }}>Care Instructions</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(96px, 34%) 1fr", gap: "10px" }}>
+                        <span style={{ color: "#866951", fontWeight: 500 }}>Care Instructions</span>
                         <span style={{ color: "#261B13", fontWeight: 500 }}>{product.specifications.care_instructions}</span>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
 
-              {/* SECTION 13: Fabric & Care */}
-              <div
-                style={{
-                  borderBottom: "1px solid #E6DACF",
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "12px",
-                  marginBottom: "10px",
-                  overflow: "hidden",
-                  border: "1px solid #E6DACF",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenAccordion(openAccordion === "care" ? null : "care")}
-                  aria-expanded={openAccordion === "care"}
-                  style={{
-                    width: "100%",
-                    padding: "16px 18px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "none",
-                    border: "none",
-                    textAlign: "left",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
-                    Fabric &amp; Maintenance Care
-                  </span>
-                  <span
-                    style={{
-                      transform: openAccordion === "care" ? "rotate(180deg)" : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                      color: "#6E5B4E",
-                    }}
-                  >
-                    <ChevronDownIcon size={16} />
-                  </span>
-                </button>
-
-                {openAccordion === "care" && (
-                  <div style={{ padding: "0 18px 18px 18px" }}>
-                    <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "13px", color: "#4A3B30", lineHeight: 1.7 }}>
-                      {product.wash_care_bullets.map((bullet, i) => (
-                        <li key={i} style={{ marginBottom: "6px" }}>
-                          {bullet}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* SECTION 14: 7-Day Easy Exchange Policy */}
-              <div
-                style={{
-                  borderBottom: "1px solid #E6DACF",
-                  backgroundColor: "#FFFFFF",
-                  borderRadius: "12px",
-                  marginBottom: "10px",
-                  overflow: "hidden",
-                  border: "1px solid #E6DACF",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenAccordion(openAccordion === "exchange" ? null : "exchange")}
-                  aria-expanded={openAccordion === "exchange"}
-                  style={{
-                    width: "100%",
-                    padding: "16px 18px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "none",
-                    border: "none",
-                    textAlign: "left",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span style={{ fontSize: "14px", fontWeight: 600, color: "#261B13" }}>
-                    Shipping &amp; 7-Day Exchange Policy
-                  </span>
-                  <span
-                    style={{
-                      transform: openAccordion === "exchange" ? "rotate(180deg)" : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                      color: "#6E5B4E",
-                    }}
-                  >
-                    <ChevronDownIcon size={16} />
-                  </span>
-                </button>
-
-                {openAccordion === "exchange" && (
-                  <div style={{ padding: "0 18px 18px 18px", fontSize: "13px", color: "#4A3B30", lineHeight: 1.65 }}>
-                    <p style={{ fontWeight: 600, color: "#8A181A", marginBottom: "8px" }}>
-                      At AVSARAA, we want you to love what you wear!
-                    </p>
-                    <ul style={{ margin: 0, paddingLeft: "18px", marginBottom: "14px" }}>
-                      <li>Exchange your purchase for a different size or design within 7 days of delivery (No refunds).</li>
-                      <li>Exchange for any available size or choose another dress.</li>
-                      <li>
-                        If the replacement product has a lower price, the difference will be credited as store credit to your AVSARAA account for future orders.
-                      </li>
-                      <li>
-                        If the replacement product has a higher price, you only pay the difference.
-                      </li>
-                    </ul>
-
-                    <p style={{ fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>Exchange Conditions:</p>
-                    <ul style={{ margin: 0, paddingLeft: "18px", color: "#6E5B4E" }}>
-                      <li>Product must be unused and unwashed.</li>
-                      <li>Original tags must be attached.</li>
-                      <li>Product must be sent back for exchange in its original condition.</li>
-                      <li>Exchange request must be raised within 7 days of delivery.</li>
-                      <li>Exchange is subject to product availability (exchanges only, no refunds).</li>
-                    </ul>
-
-                    <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px dashed #E6DACF", display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "12px" }}>
-                      <Link href="/returns" target="_blank" rel="noopener noreferrer" style={{ color: "#866951", fontWeight: 600, textDecoration: "underline" }}>
-                        View Exchange Policy →
-                      </Link>
-                      <Link href="/shipping" target="_blank" rel="noopener noreferrer" style={{ color: "#866951", fontWeight: 600, textDecoration: "underline" }}>
-                        View Shipping Policy →
-                      </Link>
+                  {openAccordion === "care" && (
+                    <div>
+                      <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "13px", color: "#4A3B30", lineHeight: 1.75 }}>
+                        {product.wash_care_bullets.map((bullet, i) => (
+                          <li key={i} style={{ marginBottom: "6px" }}>
+                            {bullet}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+
+                  {openAccordion === "exchange" && (
+                    <div style={{ fontSize: "13px", color: "#4A3B30", lineHeight: 1.65 }}>
+                      <p style={{ fontWeight: 600, color: "#56351E", marginBottom: "8px" }}>
+                        At AVSARAA, we want you to love every drape you wear!
+                      </p>
+                      <ul style={{ margin: 0, paddingLeft: "18px", marginBottom: "14px" }}>
+                        <li>Insured Pan-India Express Shipping via Shiprocket (apply code <strong>FREESHIP</strong> in your bag for free shipping).</li>
+                        <li>Easy 7-day doorstep exchange for another size or ensemble.</li>
+                        <li>
+                          If the replacement product has a lower price, the difference is credited as store credit to your AVSARAA account.
+                        </li>
+                        <li>
+                          If the replacement product has a higher price, you simply pay the difference.
+                        </li>
+                      </ul>
+
+                      <p style={{ fontWeight: 600, color: "#261B13", marginBottom: "6px" }}>Exchange Eligibility:</p>
+                      <ul style={{ margin: 0, paddingLeft: "18px", color: "#6E5B4E" }}>
+                        <li>Product must be unused, unwashed, and in original condition with tags intact.</li>
+                        <li>Exchange request must be raised within 7 days of delivery via My Orders.</li>
+                      </ul>
+
+                      <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px dashed #E6DACF", display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "12px" }}>
+                        <Link href="/returns" target="_blank" rel="noopener noreferrer" style={{ color: "#866951", fontWeight: 600, textDecoration: "underline" }}>
+                          View Exchange Policy →
+                        </Link>
+                        <Link href="/shipping" target="_blank" rel="noopener noreferrer" style={{ color: "#866951", fontWeight: 600, textDecoration: "underline" }}>
+                          View Shipping Policy →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* =========================================================================
@@ -2627,7 +2973,11 @@ export default function ProductDetailClient({ initialProduct }: ProductDetailCli
                   textOverflow: "ellipsis",
                 }}
               >
-                {selectedSize.startsWith("Free Size") ? "Free Size" : selectedSize}
+                {selectedSize
+                  ? selectedSize.startsWith("Free Size")
+                    ? "Free Size"
+                    : selectedSize
+                  : "Select Size"}
               </span>
             </div>
           </div>

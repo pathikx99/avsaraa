@@ -222,6 +222,7 @@ export default function RegisterForm({
       }
 
       // Auto-authenticated session
+      window.dispatchEvent(new Event("avsaraa-auth-changed"));
       showToast(`Welcome to Avsaraa, ${cleanName.split(" ")[0]}!`);
       setTimeout(() => {
         router.push("/account");

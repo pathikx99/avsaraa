@@ -1,1 +1,6 @@
-{}
+{
+  "FREESHIP": {
+    "per_user_limit": 99,
+    "is_free_shipping": true
+  }
+}
